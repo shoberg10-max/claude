@@ -446,12 +446,383 @@ window.DocAssist = window.DocAssist || {};
     },
   };
 
+  // ---------- サイクル図（循環プロセス） ----------
+  function circlePositions(n, radiusPct) {
+    const pos = [];
+    for (let i = 0; i < n; i++) {
+      const angle = ((-90 + (360 / n) * i) * Math.PI) / 180;
+      pos.push({ x: 50 + radiusPct * Math.cos(angle), y: 50 + radiusPct * Math.sin(angle) });
+    }
+    return pos;
+  }
+
+  const cycle = {
+    id: 'cycle',
+    name: 'サイクル図（循環プロセス）',
+    description: 'PDCAなど繰り返すプロセスを円環で示す（3〜6項目）。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['サイクル', 'PDCA', '循環', '繰り返し']);
+      const n = bullets.length;
+      if (kw && n >= 3 && n <= 6) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (items.length < 2) return emptyBody();
+      const pos = circlePositions(items.length, 36);
+      const nodes = items
+        .map(
+          (it, i) => `
+        <div class="pv-cycle-node" style="left:${pos[i].x}%;top:${pos[i].y}%;">
+          <div class="pv-cycle-num">${i + 1}</div>
+          <div class="pv-cycle-label">${esc(it.key)}</div>
+        </div>`
+        )
+        .join('');
+      return `<div class="pv-cycle"><div class="pv-cycle-ring"></div>${nodes}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (items.length < 2) return;
+      const n = items.length;
+      const cx = box.x + box.w / 2;
+      const cy = box.y + box.h / 2;
+      const R = (Math.min(box.w, box.h) / 2) * 0.66;
+      slide.addShape('oval', { x: cx - R, y: cy - R, w: R * 2, h: R * 2, fill: { type: 'none' }, line: { color: theme.accent, width: 1.5, dashType: 'dash' } });
+      const nodeW = Math.min(2.4, (box.w / n) * 1.3);
+      const nodeH = 0.9;
+      items.forEach((it, i) => {
+        const angle = ((-90 + (360 / n) * i) * Math.PI) / 180;
+        const x = cx + R * Math.cos(angle) - nodeW / 2;
+        const y = cy + R * Math.sin(angle) - nodeH / 2;
+        slide.addShape('roundRect', { x, y, w: nodeW, h: nodeH, fill: { color: theme.primary }, rectRadius: 0.5 });
+        slide.addText(`${i + 1}. ${it.key}`, { x, y, w: nodeW, h: nodeH, fontSize: 11, bold: true, color: theme.white, align: 'center', valign: 'middle' });
+      });
+    },
+  };
+
+  // ---------- ロジックツリー ----------
+  const logicTree = {
+    id: 'logic-tree',
+    name: 'ロジックツリー',
+    description: 'テーマを複数の要素に分解して示す（MECE整理）。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ロジックツリー', '要素分解', 'MECE', '内訳', '分解']);
+      if (kw && bullets.length >= 2) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 5);
+      if (!items.length) return emptyBody();
+      return `<div class="pv-tree">
+        <div class="pv-tree-trunk"></div>
+        <div class="pv-tree-branches">${items
+          .map(
+            (it) => `
+          <div class="pv-tree-branch">
+            <div class="pv-tree-connector"></div>
+            <div class="pv-tree-node">${esc(it.key)}</div>
+            ${it.value !== it.key ? `<div class="pv-tree-leaf">${esc(it.value)}</div>` : ''}
+          </div>`
+          )
+          .join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 5);
+      if (!items.length) return;
+      const n = items.length;
+      const trunkY = box.y + 0.3;
+      slide.addShape('line', { x: box.x + box.w / 2, y: box.y, w: 0, h: 0.3, line: { color: theme.accent, width: 2 } });
+      slide.addShape('line', { x: box.x, y: trunkY, w: box.w, h: 0, line: { color: theme.accent, width: 2 } });
+      const gap = 0.2;
+      const colW = (box.w - gap * (n - 1)) / n;
+      items.forEach((it, i) => {
+        const x = box.x + i * (colW + gap);
+        const cx = x + colW / 2;
+        slide.addShape('line', { x: cx, y: trunkY, w: 0, h: 0.25, line: { color: theme.accent, width: 2 } });
+        const nodeY = trunkY + 0.25;
+        slide.addShape('rect', { x, y: nodeY, w: colW, h: 0.6, fill: { color: theme.primary } });
+        slide.addText(it.key, { x, y: nodeY, w: colW, h: 0.6, fontSize: 11, bold: true, color: theme.white, align: 'center', valign: 'middle' });
+        if (it.value !== it.key) {
+          const leafY = nodeY + 0.75;
+          slide.addShape('rect', { x, y: leafY, w: colW, h: box.y + box.h - leafY, fill: { color: theme.light }, line: { color: theme.accent, width: 1 } });
+          slide.addText(it.value, { x: x + 0.05, y: leafY + 0.1, w: colW - 0.1, h: box.y + box.h - leafY - 0.1, fontSize: 10, color: theme.text, align: 'center', valign: 'top' });
+        }
+      });
+    },
+  };
+
+  // ---------- ファネル図 ----------
+  function firstNumber(str) {
+    const m = String(str).match(/[\d,]+(?:\.\d+)?/);
+    return m ? parseFloat(m[0].replace(/,/g, '')) : null;
+  }
+  function isDecreasingSeq(items) {
+    const nums = items.map((it) => firstNumber(it.value));
+    if (nums.some((n) => n === null) || nums.length < 3) return false;
+    for (let i = 1; i < nums.length; i++) {
+      if (nums[i] > nums[i - 1]) return false;
+    }
+    return true;
+  }
+
+  const funnel = {
+    id: 'funnel',
+    name: 'ファネル図',
+    description: '歩留まり・コンバージョンなど段階的に絞り込まれるデータを示す。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ファネル', '歩留まり', 'コンバージョン']);
+      const items = A.extractItems(bullets);
+      const n = bullets.length;
+      const dec = n >= 3 && isDecreasingSeq(items);
+      if (n >= 3 && n <= 6 && kw && dec) return 10;
+      if (n >= 3 && n <= 6 && dec) return 8;
+      if (kw && n >= 3) return 6;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (items.length < 2) return emptyBody();
+      const n = items.length;
+      return `<div class="pv-funnel">${items
+        .map((it, i) => {
+          const widthPct = 100 - i * (60 / (n - 1 || 1));
+          return `<div class="pv-funnel-row" style="width:${widthPct}%;"><span>${esc(it.key)}</span><span>${esc(it.value)}</span></div>`;
+        })
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (items.length < 2) return;
+      const n = items.length;
+      const gap = 0.12;
+      const rowH = (box.h - gap * (n - 1)) / n;
+      const maxW = box.w * 0.92;
+      items.forEach((it, i) => {
+        const w = maxW * (1 - i * (0.6 / (n - 1 || 1)));
+        const x = box.x + (box.w - w) / 2;
+        const y = box.y + i * (rowH + gap);
+        slide.addShape('trapezoid', { x, y, w, h: rowH, fill: { color: theme.accent }, line: { type: 'none' } });
+        slide.addText(`${it.key}：${it.value}`, { x, y, w, h: rowH, fontSize: 11, color: theme.white, align: 'center', valign: 'middle' });
+      });
+    },
+  };
+
+  // ---------- ウォーターフォール（増減内訳） ----------
+  function parseSignedNumber(str) {
+    const s = String(str);
+    const m = s.match(/([+\-−▲△])?\s*([\d,]+(?:\.\d+)?)/);
+    if (!m) return null;
+    const val = parseFloat(m[2].replace(/,/g, ''));
+    const negMark = m[1] === '-' || m[1] === '−' || m[1] === '▲' || m[1] === '△';
+    const neg = negMark || /減/.test(s);
+    const pos = m[1] === '+' || /増/.test(s);
+    if (neg && !pos) return -Math.abs(val);
+    return Math.abs(val);
+  }
+  function isTotalLabel(key) {
+    return /(開始|期首|期末|終了|合計|総計|計)/.test(key);
+  }
+  function computeWaterfallBars(items) {
+    let cumulative = 0;
+    return items.map((it, i) => {
+      const isTotal = isTotalLabel(it.key) || i === 0 || i === items.length - 1;
+      const parsed = parseSignedNumber(it.value);
+      let from;
+      let to;
+      if (isTotal) {
+        const val = parsed != null ? Math.abs(parsed) : cumulative;
+        from = 0;
+        to = val;
+        cumulative = val;
+      } else {
+        const delta = parsed || 0;
+        from = cumulative;
+        to = cumulative + delta;
+        cumulative = to;
+      }
+      return { key: it.key, value: it.value, from: Math.min(from, to), to: Math.max(from, to), isTotal, isIncrease: isTotal ? true : to >= from };
+    });
+  }
+  function hasSignedNumber(str) {
+    return /[+\-−▲△]\s*\d|\d\s*(増|減)/.test(String(str));
+  }
+
+  const waterfall = {
+    id: 'waterfall',
+    name: 'ウォーターフォール（増減内訳）',
+    description: '数値の増減要因を積み上げ棒で示す（開始値→各要因→終了値）。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ウォーターフォール', '増減', 'ブリッジ']);
+      const items = A.extractItems(bullets);
+      const signedCount = items.filter((it) => hasSignedNumber(it.value)).length;
+      const n = bullets.length;
+      if (n >= 3 && n <= 7 && kw && signedCount >= 2) return 10;
+      if (n >= 3 && n <= 7 && signedCount >= Math.ceil(n * 0.5)) return 8;
+      if (kw && n >= 3) return 6;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 7);
+      if (items.length < 2) return emptyBody();
+      const bars = computeWaterfallBars(items);
+      const maxVal = Math.max(...bars.map((b) => b.to), 1);
+      return `<div class="pv-waterfall">${bars
+        .map((b) => {
+          const heightPct = Math.max(4, ((b.to - b.from) / maxVal) * 100);
+          const bottomPct = (b.from / maxVal) * 100;
+          const cls = b.isTotal ? 'total' : b.isIncrease ? 'up' : 'down';
+          return `<div class="pv-wf-col">
+            <div class="pv-wf-bar-track"><div class="pv-wf-bar ${cls}" style="height:${heightPct}%;bottom:${bottomPct}%;"></div></div>
+            <div class="pv-wf-label">${esc(b.key)}<br>${esc(b.value)}</div>
+          </div>`;
+        })
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 7);
+      if (items.length < 2) return;
+      const bars = computeWaterfallBars(items);
+      const maxVal = Math.max(...bars.map((b) => b.to), 1);
+      const n = bars.length;
+      const gap = 0.15;
+      const colW = (box.w - gap * (n - 1)) / n;
+      const chartH = box.h - 0.9;
+      const chartBottom = box.y + chartH;
+      bars.forEach((b, i) => {
+        const x = box.x + i * (colW + gap);
+        const h = Math.max(0.15, ((b.to - b.from) / maxVal) * chartH);
+        const y = chartBottom - (b.to / maxVal) * chartH;
+        const color = b.isTotal ? theme.primary : b.isIncrease ? '2E8B57' : 'C0392B';
+        slide.addShape('rect', { x, y, w: colW, h, fill: { color } });
+        slide.addText(`${b.key}\n${b.value}`, { x, y: chartBottom + 0.05, w: colW, h: 0.8, fontSize: 8, color: theme.text, align: 'center', valign: 'top' });
+      });
+    },
+  };
+
+  // ---------- SWOT分析 ----------
+  const SWOT_LABELS = ['強み', '弱み', '機会', '脅威'];
+  const SWOT_COLORS = ['2E8B57', 'C0392B', '2E75B6', 'C55A11'];
+  function mapToSwot(items) {
+    const slots = [null, null, null, null];
+    const rest = [];
+    items.forEach((it) => {
+      const idx = SWOT_LABELS.findIndex((l) => it.key.includes(l));
+      if (idx !== -1 && !slots[idx]) slots[idx] = it;
+      else rest.push(it);
+    });
+    let ri = 0;
+    for (let i = 0; i < 4; i++) {
+      if (!slots[i] && ri < rest.length) slots[i] = rest[ri++];
+    }
+    return slots;
+  }
+
+  const swot = {
+    id: 'swot',
+    name: 'SWOT分析',
+    description: '強み・弱み・機会・脅威の4象限で整理する。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.countAny(text, ['SWOT', '強み', '弱み', '機会', '脅威']);
+      if (kw >= 2 && bullets.length >= 2) return 10;
+      if (kw >= 1 && bullets.length >= 2) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets);
+      const slots = mapToSwot(items);
+      if (slots.every((s) => !s)) return emptyBody();
+      return `<div class="pv-matrix">${slots
+        .map(
+          (s, i) => `
+        <div class="pv-matrix-cell pv-swot-${i}">
+          <div class="pv-matrix-key">${esc(SWOT_LABELS[i])}</div>
+          <div class="pv-matrix-value">${s ? esc(s.value) : ''}</div>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets);
+      const slots = mapToSwot(items);
+      if (slots.every((s) => !s)) return;
+      const gap = 0.2;
+      const cw = (box.w - gap) / 2;
+      const ch = (box.h - gap) / 2;
+      const positions = [
+        [box.x, box.y],
+        [box.x + cw + gap, box.y],
+        [box.x, box.y + ch + gap],
+        [box.x + cw + gap, box.y + ch + gap],
+      ];
+      slots.forEach((s, i) => {
+        const [x, y] = positions[i];
+        slide.addShape('rect', { x, y, w: cw, h: ch, fill: { color: SWOT_COLORS[i] }, line: { color: theme.white, width: 2 } });
+        slide.addText(
+          [
+            { text: SWOT_LABELS[i] + '\n', options: { bold: true, fontSize: 13 } },
+            { text: s ? s.value : '', options: { fontSize: 11 } },
+          ],
+          { x: x + 0.15, y: y + 0.15, w: cw - 0.3, h: ch - 0.3, color: theme.white, valign: 'top' }
+        );
+      });
+    },
+  };
+
+  // ---------- アジェンダ／目次 ----------
+  const agenda = {
+    id: 'agenda',
+    name: 'アジェンダ／目次',
+    description: '本日お伝えする項目を番号付きリストで示す（表紙・目次スライド向け）。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['アジェンダ', '目次', 'もくじ', '本日お伝えすること', 'Agenda']);
+      return kw ? 10 : 0;
+    },
+    renderBody(bullets) {
+      const list = (bullets || []).slice(0, 8);
+      if (!list.length) return emptyBody();
+      return `<ol class="pv-agenda">${list.map((b) => `<li>${esc(b)}</li>`).join('')}</ol>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const list = (bullets || []).slice(0, 8);
+      if (!list.length) return;
+      const rowH = box.h / list.length;
+      list.forEach((b, i) => {
+        const y = box.y + i * rowH;
+        slide.addShape('oval', { x: box.x, y: y + rowH / 2 - 0.2, w: 0.4, h: 0.4, fill: { color: theme.primary } });
+        slide.addText(String(i + 1), { x: box.x, y: y + rowH / 2 - 0.2, w: 0.4, h: 0.4, fontSize: 12, bold: true, color: theme.white, align: 'center', valign: 'middle' });
+        slide.addText(b, { x: box.x + 0.6, y, w: box.w - 0.6, h: rowH, fontSize: 14, color: theme.text, valign: 'middle' });
+        if (i < list.length - 1) {
+          slide.addShape('line', { x: box.x, y: y + rowH, w: box.w, h: 0, line: { color: theme.border, width: 0.75 } });
+        }
+      });
+    },
+  };
+
   DocAssist.patterns = [
     titleMessage,
+    agenda,
     boxCompare,
+    swot,
     matrix2x2,
     processFlow,
+    cycle,
+    funnel,
+    waterfall,
     pyramid,
+    logicTree,
     beforeAfter,
     timeline,
     comparisonTable,

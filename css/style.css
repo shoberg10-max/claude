@@ -271,6 +271,87 @@ textarea.bullets {
 }
 
 /* ---------- ステップ3: プレビュー & 書き出し ---------- */
+.step3-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.step3-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-btn {
+  font-size: 12px;
+}
+
+.card-error {
+  background: #fdecec;
+  color: #c0392b;
+  border: 1px solid #f2b8b5;
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 11.5px;
+  margin-bottom: 6px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 24, 33, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: 10px;
+  padding: 22px;
+  width: 460px;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-box h3 {
+  margin: 0 0 8px;
+  color: var(--primary);
+  font-size: 16px;
+}
+
+.modal-box label {
+  display: block;
+  font-size: 12.5px;
+  color: var(--subtext);
+  margin-top: 12px;
+}
+
+.modal-box input,
+.modal-box select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+
 .pattern-legend {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -646,6 +727,224 @@ table.pv-table tr:nth-child(even) td {
   color: var(--text);
   margin-top: 2px;
   text-align: center;
+}
+
+.pv-cycle {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.pv-cycle-ring {
+  position: absolute;
+  inset: 16%;
+  border: 2px dashed var(--accent);
+  border-radius: 50%;
+}
+
+.pv-cycle-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 32%;
+  text-align: center;
+  font-size: 9.5px;
+}
+
+.pv-cycle-num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 2px;
+  font-size: 10px;
+}
+
+.pv-cycle-label {
+  background: #fff;
+  border-radius: 3px;
+  padding: 1px 2px;
+}
+
+.pv-tree {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.pv-tree-trunk {
+  width: 2px;
+  height: 14px;
+  background: var(--accent);
+  margin: 0 auto;
+}
+
+.pv-tree-branches {
+  display: flex;
+  flex: 1;
+  border-top: 2px solid var(--accent);
+  padding-top: 10px;
+  gap: 6px;
+}
+
+.pv-tree-branch {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pv-tree-connector {
+  width: 2px;
+  height: 8px;
+  background: var(--accent);
+  margin-bottom: 4px;
+}
+
+.pv-tree-node {
+  background: var(--primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 5px 6px;
+  border-radius: 4px;
+  text-align: center;
+  width: 100%;
+}
+
+.pv-tree-leaf {
+  margin-top: 6px;
+  background: #eef2f8;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 5px 6px;
+  font-size: 9.5px;
+  text-align: center;
+  width: 100%;
+}
+
+.pv-funnel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  justify-content: center;
+}
+
+.pv-funnel-row {
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  padding: 6px 10px;
+  border-radius: 2px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pv-waterfall {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  gap: 6px;
+}
+
+.pv-wf-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.pv-wf-bar-track {
+  position: relative;
+  flex: 1;
+  width: 70%;
+}
+
+.pv-wf-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 2px;
+}
+
+.pv-wf-bar.total {
+  background: var(--primary);
+}
+
+.pv-wf-bar.up {
+  background: #2e8b57;
+}
+
+.pv-wf-bar.down {
+  background: #c0392b;
+}
+
+.pv-wf-label {
+  font-size: 8.5px;
+  text-align: center;
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+.pv-swot-0 {
+  background: #2e8b57;
+}
+
+.pv-swot-1 {
+  background: #c0392b;
+}
+
+.pv-swot-2 {
+  background: var(--accent);
+}
+
+.pv-swot-3 {
+  background: var(--accent2);
+}
+
+.pv-agenda {
+  list-style: none;
+  counter-reset: agenda;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pv-agenda li {
+  counter-increment: agenda;
+  font-size: 12px;
+  padding: 6px 10px 6px 38px;
+  position: relative;
+  border-bottom: 1px solid var(--border);
+}
+
+.pv-agenda li::before {
+  content: counter(agenda);
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ---------- フッター操作 ---------- */
