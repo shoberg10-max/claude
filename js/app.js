@@ -52,7 +52,20 @@ C社CRM：高コストだが分析機能が充実
     });
   }
 
-  // patternSource: 'rule'（自動選択） / 'ai'（AI判定） / 'manual'（手動選択）
+  // 構成案の見出しに "[pattern: xxx]" タグが付いていれば（js/promptBuilder.js が
+  // 生成するプロンプトの出力フォーマット）、それを社内LLMによるパターン提案として採用する。
+  function applyTaggedPatterns(outline) {
+    outline.slides.forEach((s) => {
+      if (s.taggedPatternId && DocAssist.patternById[s.taggedPatternId]) {
+        s.patternId = s.taggedPatternId;
+        s.patternSource = 'ai';
+        s.patternReason = '社内LLMが構成案の中で提案したパターンです。';
+      }
+      delete s.taggedPatternId;
+    });
+  }
+
+  // patternSource: 'rule'（自動選択） / 'ai'（社内LLM提案） / 'manual'（手動選択）
   // 'ai' と 'manual' はユーザーが確定させた選択なので、構成案編集画面に戻って
   // 内容を直しても上書きしない。
   function ensurePatterns() {
@@ -83,6 +96,7 @@ C社CRM：高コストだが分析機能が充実
     }
     const outline = DocAssist.outlineProvider(state.notesText);
     ensureIds(outline.slides);
+    applyTaggedPatterns(outline);
     state.outline = outline;
     if (!state.outline.slides.length) {
       renderStep1('構成案を読み取れませんでした。見出しや箇条書きを増やして再度お試しください。');
@@ -121,12 +135,16 @@ C社CRM：高コストだが分析機能が充実
     screen.innerHTML = `
       <div class="panel">
         <h2>Step 1. 会議メモ・議事録を入力</h2>
-        <p class="hint">次回会議に向けた資料の元になるメモや議事録を貼り付けてください。見出し（# や ##）や箇条書き（- ・）があると構成案の精度が上がりますが、フリーテキストでも解析します。他のLLMで先に作成した構成案テキストをそのまま貼り付けても構いません。</p>
+        <p class="hint">次回会議に向けた資料の元になるメモや議事録を貼り付けてください。見出し（# や ##）や箇条書き（- ・）があると構成案の精度が上がりますが、フリーテキストでも解析します。</p>
+        <p class="hint">構成案がうまく組み立てられない場合は、「🪄 社内LLM用プロンプトを作成」でこのアプリの形式に合わせて整形するためのプロンプトを作成できます。社内LLMに貼り付けて実行し、出力結果をこの下の欄に貼り付け直してから「次へ」を押してください。</p>
         <textarea class="notes-input" id="notesInput" placeholder="例：\n# 会議タイトル\n## 現状の課題\n- 課題A\n- 課題B\n## 比較：A案 vs B案\nA案：...\nB案：...">${escapeHtml(state.notesText)}</textarea>
         ${errorMsg ? `<p class="status-msg error">${escapeHtml(errorMsg)}</p>` : ''}
         <div class="btn-row">
           <button class="btn ghost" id="sampleBtn">サンプルを試す</button>
-          <button class="btn" id="nextBtn">次へ：構成案を生成</button>
+          <div style="display:flex;gap:10px;">
+            <button class="btn secondary" id="promptBtn">🪄 社内LLM用プロンプトを作成</button>
+            <button class="btn" id="nextBtn">次へ：構成案を生成</button>
+          </div>
         </div>
       </div>
     `;
@@ -138,7 +156,47 @@ C社CRM：高コストだが分析機能が充実
       state.notesText = SAMPLE_NOTES;
       input.value = SAMPLE_NOTES;
     });
+    document.getElementById('promptBtn').addEventListener('click', () => openPromptModal(input.value));
     document.getElementById('nextBtn').addEventListener('click', generateOutlineAndProceed);
+  }
+
+  function openPromptModal(rawNotes) {
+    const prompt = DocAssist.buildOutlineFormatPrompt(rawNotes);
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-box modal-box-wide">
+        <h3>🪄 社内LLM用 構成案整形プロンプト</h3>
+        <p class="hint">下のテキストをコピーして社内LLMのチャットに貼り付けて実行してください。出力された構成案をコピーし、Step 1の入力欄に貼り付け直してから「次へ」を押すと、このアプリの形式にきれいに読み込まれます（見出しに含まれる [pattern: ...] タグはデザインパターンの提案として自動的に反映されます）。</p>
+        <textarea class="prompt-output" id="promptOutput" readonly>${escapeHtml(prompt)}</textarea>
+        <div class="btn-row">
+          <span class="status-msg" id="copyStatus"></span>
+          <div style="display:flex;gap:10px;">
+            <button class="btn ghost" id="promptClose">閉じる</button>
+            <button class="btn" id="promptCopy">コピーする</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => document.body.removeChild(overlay);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector('#promptClose').addEventListener('click', close);
+    const textarea = overlay.querySelector('#promptOutput');
+    overlay.querySelector('#promptCopy').addEventListener('click', async () => {
+      const statusEl = overlay.querySelector('#copyStatus');
+      try {
+        await navigator.clipboard.writeText(prompt);
+        statusEl.textContent = 'コピーしました。';
+        statusEl.classList.remove('error');
+      } catch (e) {
+        textarea.select();
+        statusEl.textContent = '自動コピーに失敗しました。テキストを選択したので Ctrl+C（Mac は Cmd+C）でコピーしてください。';
+        statusEl.classList.add('error');
+      }
+    });
   }
 
   // ---------------- Step 2 ----------------
@@ -224,20 +282,10 @@ C社CRM：高コストだが分析機能が充実
   // ---------------- Step 3 ----------------
   function renderStep3() {
     const o = state.outline;
-    const cfg = DocAssist.loadLlmConfig();
-    const aiReady = !!cfg.endpoint;
     screen.innerHTML = `
       <div class="panel">
-        <div class="step3-head">
-          <div>
-            <h2>Step 3. デザインパターンを自動選択 → PowerPoint書き出し</h2>
-            <p class="hint">各スライドの内容から、あらかじめ用意したコンサルスライドのデザインパターンを自動選択しました（ルールベース）。プレビュー右上のプルダウンで手動変更するか、社内LLM等に接続してAIに判定させることもできます。</p>
-          </div>
-          <div class="step3-actions">
-            <button class="btn ghost" id="settingsBtn">⚙ AI設定</button>
-            <button class="btn secondary" id="aiAllBtn" ${aiReady ? '' : 'disabled'} title="${aiReady ? 'すべてのスライドをAIで再判定します' : '先に「⚙ AI設定」でエンドポイントを設定してください'}">🤖 AIで一括判定</button>
-          </div>
-        </div>
+        <h2>Step 3. デザインパターンを自動選択 → PowerPoint書き出し</h2>
+        <p class="hint">各スライドの内容から、あらかじめ用意したコンサルスライドのデザインパターンを自動選択しました。「🤖 AI選択」は社内LLMがStep 1のプロンプトで提案したパターンです。プレビュー右上のプルダウンから手動で変更することもできます。</p>
         <details>
           <summary style="cursor:pointer;color:var(--accent);font-size:13px;">利用可能なデザインパターン一覧（${DocAssist.patterns.length}種類）</summary>
           <div class="pattern-legend">
@@ -262,8 +310,6 @@ C社CRM：高コストだが分析機能が充実
     });
 
     document.getElementById('backBtn').addEventListener('click', () => goToStep(2));
-    document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
-    document.getElementById('aiAllBtn').addEventListener('click', runAiSelectionForAll);
     document.getElementById('exportBtn').addEventListener('click', async () => {
       const statusEl = document.getElementById('exportStatus');
       const fileNameInput = document.getElementById('fileName');
@@ -294,90 +340,6 @@ C社CRM：高コストだが分析機能が充実
     }
   }
 
-  async function runAiSelectionForAll() {
-    const btn = document.getElementById('aiAllBtn');
-    const o = state.outline;
-    const total = o.slides.length;
-    const originalLabel = btn.textContent;
-    btn.disabled = true;
-    let errors = 0;
-    for (let i = 0; i < total; i++) {
-      btn.textContent = `判定中…(${i + 1}/${total})`;
-      const slide = o.slides[i];
-      try {
-        const result = await DocAssist.selectPatternWithLLM(slide, DocAssist.patterns);
-        slide.patternId = result.pattern.id;
-        slide.patternSource = 'ai';
-        slide.patternReason = result.reason;
-        slide.lastAiError = '';
-      } catch (e) {
-        console.error('AIパターン判定エラー:', slide.heading, e);
-        slide.lastAiError = e.message;
-        errors++;
-      }
-      replaceCard(slide);
-    }
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-    const statusEl = document.getElementById('exportStatus');
-    if (statusEl) {
-      if (errors) {
-        statusEl.textContent = `AI判定: ${total - errors}/${total}件成功（${errors}件は失敗のため既存の選択のままです。詳細は各カードを確認してください）`;
-        statusEl.classList.add('error');
-      } else {
-        statusEl.textContent = `AI判定が完了しました（${total}件）`;
-        statusEl.classList.remove('error');
-      }
-    }
-  }
-
-  function openSettingsModal() {
-    const cfg = DocAssist.loadLlmConfig();
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `
-      <div class="modal-box">
-        <h3>⚙ AI設定（パターン自動判定用のLLM接続先）</h3>
-        <p class="hint">社内の隔離LLM環境など、OpenAI互換またはAnthropic互換のAPIエンドポイントを設定すると、Step 3で「AIによるパターン判定」が使えるようになります。入力内容はこのブラウザのlocalStorageにのみ保存され、外部には送信されません。</p>
-        <label>リクエスト形式
-          <select id="cfgFormat">
-            <option value="openai" ${cfg.format === 'openai' ? 'selected' : ''}>OpenAI互換（Chat Completions）</option>
-            <option value="anthropic" ${cfg.format === 'anthropic' ? 'selected' : ''}>Anthropic互換（Messages API）</option>
-          </select>
-        </label>
-        <label>エンドポイントURL
-          <input type="text" id="cfgEndpoint" value="${escapeAttr(cfg.endpoint)}" placeholder="https://internal-llm.example.com/v1/chat/completions">
-        </label>
-        <label>モデル名
-          <input type="text" id="cfgModel" value="${escapeAttr(cfg.model)}" placeholder="例：internal-gpt-4o">
-        </label>
-        <label>APIキー（任意・リクエストヘッダーに設定されます）
-          <input type="password" id="cfgApiKey" value="${escapeAttr(cfg.apiKey)}">
-        </label>
-        <div class="btn-row">
-          <button class="btn ghost" id="cfgCancel">キャンセル</button>
-          <button class="btn" id="cfgSave">保存</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-    const close = () => document.body.removeChild(overlay);
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) close();
-    });
-    overlay.querySelector('#cfgCancel').addEventListener('click', close);
-    overlay.querySelector('#cfgSave').addEventListener('click', () => {
-      DocAssist.saveLlmConfig({
-        format: overlay.querySelector('#cfgFormat').value,
-        endpoint: overlay.querySelector('#cfgEndpoint').value.trim(),
-        model: overlay.querySelector('#cfgModel').value.trim(),
-        apiKey: overlay.querySelector('#cfgApiKey').value,
-      });
-      close();
-      renderStep3();
-    });
-  }
-
   function renderSlidePreviewCard(slide) {
     const wrap = document.createElement('div');
     wrap.className = 'slide-preview-card';
@@ -390,12 +352,8 @@ C社CRM：高コストだが分析機能が充実
     wrap.innerHTML = `
       <div class="slide-preview-toolbar">
         <span class="label"${reasonAttr}>${sourceLabel(slide.patternSource)}</span>
-        <div class="toolbar-actions">
-          <button class="icon-btn ai-btn" title="この1枚をAIで判定">🤖</button>
-          <select class="pattern-select">${options}</select>
-        </div>
+        <select class="pattern-select">${options}</select>
       </div>
-      ${slide.lastAiError ? `<div class="card-error">${escapeHtml(slide.lastAiError)}</div>` : ''}
       <div class="slide-canvas">
         <div class="slide-title-bar">${escapeHtml(slide.heading || '(見出し未設定)')}</div>
         <div class="slide-body"></div>
@@ -410,24 +368,6 @@ C社CRM：高コストだが分析機能が充実
       slide.patternId = e.target.value;
       slide.patternSource = 'manual';
       slide.patternReason = '';
-      slide.lastAiError = '';
-      replaceCard(slide);
-    });
-
-    wrap.querySelector('.ai-btn').addEventListener('click', async (e) => {
-      const btn = e.currentTarget;
-      btn.disabled = true;
-      btn.textContent = '…';
-      try {
-        const result = await DocAssist.selectPatternWithLLM(slide, DocAssist.patterns);
-        slide.patternId = result.pattern.id;
-        slide.patternSource = 'ai';
-        slide.patternReason = result.reason;
-        slide.lastAiError = '';
-      } catch (err) {
-        console.error('AIパターン判定エラー:', slide.heading, err);
-        slide.lastAiError = err.message;
-      }
       replaceCard(slide);
     });
 

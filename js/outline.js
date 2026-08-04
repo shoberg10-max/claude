@@ -5,6 +5,12 @@
 // { title, slides: [{ heading, bullets }] } の形で返すようにすればよい。
 // UI側 (app.js) は DocAssist.outlineProvider(text) を呼ぶだけなので、
 // ルールベース版とLLM版を差し替え可能にしてある。
+//
+// 見出し行に "## [pattern: パターンID] 見出し文" の形式でタグが付いている場合、
+// タグ部分を取り除いた見出し文と一緒に slide.taggedPatternId としてIDを返す。
+// これは js/promptBuilder.js が生成するプロンプトの出力フォーマットで、
+// 社内LLMにこの形式で構成案を作らせることで、パターン自動選択のヒントを
+// APIを使わずに（コピペで）渡せるようにするためのもの。
 window.DocAssist = window.DocAssist || {};
 
 (function () {
@@ -22,6 +28,12 @@ window.DocAssist = window.DocAssist || {};
 
   function stripHeading(line) {
     return line.replace(/^\s*#{1,3}\s+/, '').trim();
+  }
+
+  function extractPatternTag(headingText) {
+    const m = headingText.match(/^\[pattern:\s*([a-z0-9-]+)\]\s*(.*)$/i);
+    if (!m) return { patternId: null, heading: headingText };
+    return { patternId: m[1].toLowerCase(), heading: m[2].trim() || headingText };
   }
 
   function parseNotes(rawText) {
@@ -55,23 +67,26 @@ window.DocAssist = window.DocAssist || {};
         continue;
       }
 
-      let heading;
+      let rawHeading;
       let bodyLines;
       if (isHeadingLine(lines[0])) {
-        heading = stripHeading(lines[0]);
+        rawHeading = stripHeading(lines[0]);
         bodyLines = lines.slice(1);
       } else if (lines.length > 1) {
-        heading = lines[0];
+        rawHeading = lines[0];
         bodyLines = lines.slice(1);
       } else {
-        heading = lines[0];
+        rawHeading = lines[0];
         bodyLines = [];
       }
 
-      slides.push({
+      const { patternId, heading } = extractPatternTag(rawHeading);
+      const slide = {
         heading: heading || '(見出し未設定)',
         bullets: bodyLines.map(stripBullet).filter(Boolean),
-      });
+      };
+      if (patternId) slide.taggedPatternId = patternId;
+      slides.push(slide);
     }
 
     slides.forEach((s, idx) => {
