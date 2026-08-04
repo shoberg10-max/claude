@@ -2,27 +2,31 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>3年生 さんすう・かんじ ドリル</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>資料作成支援アプリ</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div id="app">
 
   <header class="topbar">
-    <button id="homeBtn" class="iconBtn" title="ホームへ" aria-label="ホームへ">🏠</button>
-    <h1 id="pageTitle">３年生 さんすう・かんじ ドリル</h1>
-    <div class="starCount">⭐ <span id="starTotal">0</span></div>
+    <h1>資料作成支援アプリ</h1>
+    <p>会議メモから構成案を作成し、コンサルスライドのデザインパターンを自動選択してPowerPointに書き出します。</p>
   </header>
+
+  <div class="steps" id="stepPills"></div>
 
   <main id="screen"></main>
 
 </div>
 
-<script src="js/data/kanji3.js"></script>
-<script src="js/storage.js"></script>
-<script src="js/math.js"></script>
-<script src="js/kanji.js"></script>
+<script src="js/vendor/pptxgen.bundle.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/analyze.js"></script>
+<script src="js/outline.js"></script>
+<script src="js/patterns.js"></script>
+<script src="js/patternSelector.js"></script>
+<script src="js/pptxExport.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
