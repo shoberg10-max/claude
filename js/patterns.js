@@ -291,7 +291,7 @@ window.DocAssist = window.DocAssist || {};
       items.forEach((it, i) => {
         const x = box.x + i * (boxW + arrowW);
         const label = it.key !== `項目${i + 1}` ? it.key : labels[i];
-        slide.addShape('rect', { x, y: box.y, w: boxW, h: 0.6, fill: { color: i === 0 ? theme.subtext : theme.accent2 } });
+        slide.addShape('rect', { x, y: box.y, w: boxW, h: 0.6, fill: { color: i === 0 ? theme.subtext : theme.primaryLight } });
         slide.addText(label, { x, y: box.y, w: boxW, h: 0.6, fontSize: 14, bold: true, color: theme.white, align: 'center', valign: 'middle' });
         slide.addShape('rect', { x, y: box.y + 0.6, w: boxW, h: box.h - 0.6, fill: { color: theme.light }, line: { color: theme.border, width: 1 } });
         slide.addText(it.value, { x: x + 0.15, y: box.y + 0.75, w: boxW - 0.3, h: box.h - 0.9, fontSize: 13, color: theme.text, valign: 'top' });
@@ -440,7 +440,7 @@ window.DocAssist = window.DocAssist || {};
         const numMatch = it.value.match(/[\d.,]+\s*(?:%|％|億|万|千|件|人|円|pt)?/);
         const big = numMatch ? numMatch[0] : it.value;
         slide.addShape('roundRect', { x, y, w: cw, h: ch, fill: { color: theme.light }, line: { color: theme.accent, width: 1 }, rectRadius: 0.06 });
-        slide.addText(big, { x: x + 0.1, y: y + 0.1, w: cw - 0.2, h: ch * 0.6, fontSize: 22, bold: true, color: theme.accent2, align: 'center', valign: 'bottom' });
+        slide.addText(big, { x: x + 0.1, y: y + 0.1, w: cw - 0.2, h: ch * 0.6, fontSize: 22, bold: true, color: theme.primary, align: 'center', valign: 'bottom' });
         slide.addText(it.key, { x: x + 0.1, y: y + ch * 0.65, w: cw - 0.2, h: ch * 0.3, fontSize: 11, color: theme.text, align: 'center', valign: 'top' });
       });
     },
@@ -702,7 +702,7 @@ window.DocAssist = window.DocAssist || {};
         const x = box.x + i * (colW + gap);
         const h = Math.max(0.15, ((b.to - b.from) / maxVal) * chartH);
         const y = chartBottom - (b.to / maxVal) * chartH;
-        const color = b.isTotal ? theme.primary : b.isIncrease ? '2E8B57' : 'C0392B';
+        const color = b.isTotal ? theme.primary : b.isIncrease ? theme.accent : theme.negative;
         slide.addShape('rect', { x, y, w: colW, h, fill: { color } });
         slide.addText(`${b.key}\n${b.value}`, { x, y: chartBottom + 0.05, w: colW, h: 0.8, fontSize: 8, color: theme.text, align: 'center', valign: 'top' });
       });
@@ -711,7 +711,9 @@ window.DocAssist = window.DocAssist || {};
 
   // ---------- SWOT分析 ----------
   const SWOT_LABELS = ['強み', '弱み', '機会', '脅威'];
-  const SWOT_COLORS = ['2E8B57', 'C0392B', '2E75B6', 'C55A11'];
+  // 強み=青（濃）／弱み=スレートグレー／機会=青（中）／脅威=スレートグレー（濃）
+  // theme.js の primaryLight / negative / accent と揃えている（青基調・モノトーン）。
+  const SWOT_COLORS = ['1F4E8C', '6B7787', '2E6DA4', '48505C'];
   function mapToSwot(items) {
     const slots = [null, null, null, null];
     const rest = [];

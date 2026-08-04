@@ -61,6 +61,15 @@ window.DocAssist = window.DocAssist || {};
     return (bullets || []).filter((b) => NUMBERED_BULLET_RE.test(b)).length;
   }
 
+  // スライドに明示的なリード文（message）が無い場合のフォールバック。
+  // 官公庁向け報告書の「タイトル→メッセージ→ボディ」の型を崩さないよう、
+  // 未入力でも空欄のまま出力しないためのもの（先頭の箇条書き、それも無ければ見出しを流用）。
+  function effectiveMessage(slide) {
+    if (slide.message && slide.message.trim()) return slide.message.trim();
+    if (slide.bullets && slide.bullets.length) return slide.bullets[0];
+    return slide.heading || '';
+  }
+
   DocAssist.analyze = {
     fullText,
     hasAny,
@@ -72,5 +81,6 @@ window.DocAssist = window.DocAssist || {};
     dateTokenCount,
     sequenceWordCount,
     numberedBulletCount,
+    effectiveMessage,
   };
 })();

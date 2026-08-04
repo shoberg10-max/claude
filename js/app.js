@@ -1,36 +1,37 @@
 // 画面遷移とUI制御（3ステップのウィザード）
 (function () {
-  const SAMPLE_NOTES = `# 新規顧客管理システム導入 次回会議資料
+  const SAMPLE_NOTES = `# 新規顧客管理システム導入に関する検討報告
 
-## 現状の課題
-- 顧客情報がExcelで属人的に管理されている
-- 対応履歴の共有が遅く、二重対応が発生している
-- 解約予兆の把握が遅れ、解約率が上昇している
+## [pattern: pyramid] 現状の課題と対応方針
+> 顧客情報の分散管理が対応品質の低下と解約率上昇を招いており、クラウド型CRMによる一元化が急務である
+>> 現行体制のまま推移した場合、来期の解約率はさらに悪化する見込みである
+- 課題：顧客対応の質と速度が低下し、顧客満足度調査のスコアが前年比8ポイント低下している
+- 原因：顧客情報が担当者個人のPC・Excelに分散し、組織的な検索・共有ができていない
+- 対策：クラウド型CRMを導入し、顧客情報と対応履歴を全社で一元管理する体制を構築する
 
-## 課題の原因と対策
-課題：顧客対応の質と速度が低下している
-原因：情報が個人PCに分散し検索性が低い
-対策：クラウド型CRMを導入し情報を一元化する
+## [pattern: box-compare] 導入候補ツールの比較検討
+> 3社を比較した結果、機能とコストのバランスからB社CRMが最も現実的な選択肢である
+- A社CRM：低コストだが分析機能が限定的で、将来的な拡張性に課題がある
+- B社CRM：コストは中程度で、必要な機能を標準搭載しており拡張性も高い
+- C社CRM：高コストだが分析機能が充実しており、大規模組織向けの構成である
 
-## 導入候補ツールの比較
-A社CRM：低コストだが機能が限定的
-B社CRM：コストは中程度で機能も標準的
-C社CRM：高コストだが分析機能が充実
+## [pattern: timeline] 導入スケジュール
+> 4フェーズ・約4ヶ月の計画とし、全社展開前に試験運用で定着度を確認する
+- フェーズ1（2026年9月）：要件定義・ベンダー選定・契約締結
+- フェーズ2（2026年10月）：既存データ移行・初期設定・管理者研修
+- フェーズ3（2026年11月）：一部部署での試験運用と課題の洗い出し
+- フェーズ4（2026年12月）：全社展開および利用ルールの周知徹底
 
-## 導入スケジュール
-- フェーズ1（2026年9月）：要件定義・ベンダー選定
-- フェーズ2（2026年10月）：データ移行・設定
-- フェーズ3（2026年11月）：試験運用
-- フェーズ4（2026年12月）：全社展開
+## [pattern: kpi-summary] 導入後に見込まれる効果
+> 対応品質と業務効率の両面で定量的な改善効果が見込まれる
+- 顧客対応リードタイム：50%短縮（平均対応時間 30分→15分）
+- 解約率：20%改善（対応履歴の一元化により解約予兆を早期検知）
+- 営業一人あたり商談数：15%増加（情報検索時間の削減により商談準備時間を確保）
 
-## 導入後の主要KPI
-- 顧客対応リードタイム：50%短縮
-- 解約率：20%改善
-- 営業一人あたり商談数：15%増加
-
-## 現状と導入後の比較
-現状：情報検索に平均15分かかっている
-導入後：情報検索が平均2分に短縮される
+## [pattern: before-after] 情報検索にかかる時間の変化
+> 情報検索の一元化により、担当者1人あたり年間換算で約50時間の業務時間削減が見込まれる
+現状：情報を探すために複数の担当者に確認する必要があり、平均15分を要している
+導入後：CRM上で即座に検索でき、平均2分に短縮される見込みである
 `;
 
   const state = {
@@ -231,7 +232,7 @@ C社CRM：高コストだが分析機能が充実
     });
 
     document.getElementById('addSlideBtn').addEventListener('click', () => {
-      o.slides.push({ id: uid(), heading: '新しいスライド', bullets: [] });
+      o.slides.push({ id: uid(), heading: '新しいスライド', message: '', subMessage: '', bullets: [] });
       renderStep2();
     });
     document.getElementById('backBtn').addEventListener('click', () => goToStep(1));
@@ -244,15 +245,23 @@ C社CRM：高コストだが分析機能が充実
     card.innerHTML = `
       <div class="outline-card-head">
         <span class="idx">${idx + 1}</span>
-        <input type="text" class="heading" value="${escapeAttr(slide.heading)}">
+        <input type="text" class="heading" placeholder="見出し（トピックラベル）" value="${escapeAttr(slide.heading)}">
         <button class="icon-btn" data-act="up" title="上へ" ${idx === 0 ? 'disabled' : ''}>↑</button>
         <button class="icon-btn" data-act="down" title="下へ" ${idx === total - 1 ? 'disabled' : ''}>↓</button>
         <button class="icon-btn danger" data-act="del" title="削除">✕</button>
       </div>
-      <textarea class="bullets" placeholder="箇条書きを1行ずつ入力">${escapeHtml((slide.bullets || []).join('\n'))}</textarea>
+      <input type="text" class="message" placeholder="リード文（このスライドの結論を一文で。未入力の場合は先頭の箇条書きを使用）" value="${escapeAttr(slide.message || '')}">
+      <input type="text" class="sub-message" placeholder="サブメッセージ（リード文の補足。任意）" value="${escapeAttr(slide.subMessage || '')}">
+      <textarea class="bullets" placeholder="箇条書きを1行ずつ入力（メッセージの根拠となる情報）">${escapeHtml((slide.bullets || []).join('\n'))}</textarea>
     `;
     card.querySelector('.heading').addEventListener('input', (e) => {
       slide.heading = e.target.value;
+    });
+    card.querySelector('.message').addEventListener('input', (e) => {
+      slide.message = e.target.value;
+    });
+    card.querySelector('.sub-message').addEventListener('input', (e) => {
+      slide.subMessage = e.target.value;
     });
     card.querySelector('.bullets').addEventListener('input', (e) => {
       slide.bullets = e.target.value.split('\n').map((s) => s.trim()).filter(Boolean);
@@ -305,8 +314,8 @@ C社CRM：高コストだが分析機能が充実
     `;
 
     const grid = document.getElementById('slideGrid');
-    o.slides.forEach((slide) => {
-      grid.appendChild(renderSlidePreviewCard(slide));
+    o.slides.forEach((slide, idx) => {
+      grid.appendChild(renderSlidePreviewCard(slide, idx));
     });
 
     document.getElementById('backBtn').addEventListener('click', () => goToStep(2));
@@ -336,11 +345,11 @@ C社CRM：高コストだが分析機能が充実
     const idx = state.outline.slides.indexOf(slide);
     const grid = document.getElementById('slideGrid');
     if (grid && grid.children[idx]) {
-      grid.replaceChild(renderSlidePreviewCard(slide), grid.children[idx]);
+      grid.replaceChild(renderSlidePreviewCard(slide, idx), grid.children[idx]);
     }
   }
 
-  function renderSlidePreviewCard(slide) {
+  function renderSlidePreviewCard(slide, idx) {
     const wrap = document.createElement('div');
     wrap.className = 'slide-preview-card';
 
@@ -348,6 +357,8 @@ C社CRM：高コストだが分析機能が充実
       .map((p) => `<option value="${p.id}" ${p.id === slide.patternId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`)
       .join('');
     const reasonAttr = slide.patternReason ? ` title="${escapeAttr(slide.patternReason)}"` : '';
+    const message = DocAssist.analyze.effectiveMessage(slide);
+    const subMessage = (slide.subMessage || '').trim();
 
     wrap.innerHTML = `
       <div class="slide-preview-toolbar">
@@ -355,7 +366,15 @@ C社CRM：高コストだが分析機能が充実
         <select class="pattern-select">${options}</select>
       </div>
       <div class="slide-canvas">
-        <div class="slide-title-bar">${escapeHtml(slide.heading || '(見出し未設定)')}</div>
+        <div class="slide-title-bar">
+          <span class="chip"></span>
+          <span class="heading-text">${escapeHtml(slide.heading || '(見出し未設定)')}</span>
+          <span class="page-num">${idx + 1}</span>
+        </div>
+        <div class="slide-message-block">
+          <div class="slide-message-lead">${escapeHtml(message)}</div>
+          ${subMessage ? `<div class="slide-message-sub">${escapeHtml(subMessage)}</div>` : ''}
+        </div>
         <div class="slide-body"></div>
       </div>
     `;

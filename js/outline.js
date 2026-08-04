@@ -11,6 +11,12 @@
 // これは js/promptBuilder.js が生成するプロンプトの出力フォーマットで、
 // 社内LLMにこの形式で構成案を作らせることで、パターン自動選択のヒントを
 // APIを使わずに（コピペで）渡せるようにするためのもの。
+//
+// 見出しの直後に "> リード文（メッセージ）" と ">> サブメッセージ" の行があれば、
+// それぞれ slide.message / slide.subMessage として取り出す。官公庁向け報告書に
+// 典型的な「タイトル→メッセージ→ボディ」の3層構成をこのアプリ全体で共通化するための
+// 入力形式で、js/app.js と js/pptxExport.js の両方がこの2項目を使って
+// スライド上部のメッセージ帯を描画する。
 window.DocAssist = window.DocAssist || {};
 
 (function () {
@@ -34,6 +40,39 @@ window.DocAssist = window.DocAssist || {};
     const m = headingText.match(/^\[pattern:\s*([a-z0-9-]+)\]\s*(.*)$/i);
     if (!m) return { patternId: null, heading: headingText };
     return { patternId: m[1].toLowerCase(), heading: m[2].trim() || headingText };
+  }
+
+  function isSubMessageLine(line) {
+    return /^>>/.test(line);
+  }
+  function isMessageLine(line) {
+    return /^>/.test(line) && !isSubMessageLine(line);
+  }
+  function stripMessage(line) {
+    return line.replace(/^>\s*/, '').trim();
+  }
+  function stripSubMessage(line) {
+    return line.replace(/^>>\s*/, '').trim();
+  }
+
+  // 見出しの直後に並ぶ ">" / ">>" 行をリード文・サブメッセージとして取り出し、
+  // 残りを本文（箇条書き候補の行）として返す。
+  function extractMessage(bodyLines) {
+    let i = 0;
+    let message = '';
+    let subMessage = '';
+    if (bodyLines[i] && isSubMessageLine(bodyLines[i])) {
+      subMessage = stripSubMessage(bodyLines[i]);
+      i++;
+    } else if (bodyLines[i] && isMessageLine(bodyLines[i])) {
+      message = stripMessage(bodyLines[i]);
+      i++;
+      if (bodyLines[i] && isSubMessageLine(bodyLines[i])) {
+        subMessage = stripSubMessage(bodyLines[i]);
+        i++;
+      }
+    }
+    return { message, subMessage, rest: bodyLines.slice(i) };
   }
 
   function parseNotes(rawText) {
@@ -81,9 +120,12 @@ window.DocAssist = window.DocAssist || {};
       }
 
       const { patternId, heading } = extractPatternTag(rawHeading);
+      const { message, subMessage, rest } = extractMessage(bodyLines);
       const slide = {
         heading: heading || '(見出し未設定)',
-        bullets: bodyLines.map(stripBullet).filter(Boolean),
+        message,
+        subMessage,
+        bullets: rest.map(stripBullet).filter(Boolean),
       };
       if (patternId) slide.taggedPatternId = patternId;
       slides.push(slide);
