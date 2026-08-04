@@ -366,11 +366,24 @@ textarea.bullets {
 }
 
 
+.pattern-legend-group {
+  margin-top: 12px;
+}
+
+.pattern-legend-cat {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--primary);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 3px;
+  margin-bottom: 6px;
+}
+
 .pattern-legend {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 8px;
-  margin: 10px 0 22px;
+  margin: 0 0 6px;
   font-size: 12px;
 }
 
@@ -1006,6 +1019,333 @@ table.pv-table tr:nth-child(even) td {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.pv-flow-v {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  padding-left: 30px;
+}
+
+.pv-flow-v-line {
+  position: absolute;
+  left: 12px;
+  top: 4%;
+  bottom: 4%;
+  width: 2px;
+  background: var(--accent);
+}
+
+.pv-flow-v-row {
+  position: relative;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.pv-flow-v-num {
+  position: absolute;
+  left: -30px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.pv-compare-v {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  height: 100%;
+}
+
+.pv-compare-v-row {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.pv-compare-v-label {
+  flex: 0 0 26%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+}
+
+.pv-compare-v-desc {
+  flex: 1;
+  background: #f7f8fb;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+}
+
+.pv-tl-v {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  padding-left: 24px;
+}
+
+.pv-tl-v-line {
+  position: absolute;
+  left: 9px;
+  top: 2%;
+  bottom: 2%;
+  width: 2px;
+  background: var(--accent);
+}
+
+.pv-tl-v-row {
+  position: relative;
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.pv-tl-v-dot {
+  position: absolute;
+  left: -24px;
+  top: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.pv-posmap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.pv-posmap-axis-x {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 50%;
+  height: 1px;
+  background: var(--border);
+}
+
+.pv-posmap-axis-y {
+  position: absolute;
+  top: 4%;
+  bottom: 4%;
+  left: 50%;
+  width: 1px;
+  background: var(--border);
+}
+
+.pv-posmap-label {
+  position: absolute;
+  font-size: 8px;
+  color: var(--subtext);
+}
+
+.pv-posmap-label.top {
+  top: 2%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.pv-posmap-label.bottom {
+  bottom: 2%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.pv-posmap-label.left {
+  left: 2%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.pv-posmap-label.right {
+  right: 2%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.pv-posmap-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font-size: 8.5px;
+  color: var(--text);
+}
+
+.pv-posmap-dot .dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin: 0 auto 2px;
+}
+
+.pv-pyr-t {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.pv-pyr-t-row {
+  border-radius: 2px;
+  padding: 6px 10px;
+  text-align: center;
+  color: #fff;
+}
+
+.pv-pyr-t-row:nth-child(1) {
+  background: var(--primary);
+}
+
+.pv-pyr-t-row:nth-child(2) {
+  background: var(--primary-light);
+}
+
+.pv-pyr-t-row:nth-child(3) {
+  background: var(--accent);
+}
+
+.pv-pyr-t-key {
+  font-weight: bold;
+  font-size: 11px;
+}
+
+.pv-pyr-t-val {
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+.pv-barchart {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  gap: 8px;
+}
+
+.pv-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.pv-bar-val {
+  font-size: 9px;
+  color: var(--primary);
+  font-weight: bold;
+}
+
+.pv-bar-track {
+  flex: 1;
+  width: 60%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.pv-bar {
+  width: 100%;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+}
+
+.pv-bar-label {
+  font-size: 8.5px;
+  color: var(--text);
+  margin-top: 4px;
+  text-align: center;
+}
+
+.pv-linechart {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.pv-line-svg {
+  flex: 1;
+  width: 100%;
+}
+
+.pv-line-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8.5px;
+  color: var(--subtext);
+  margin-top: 4px;
+}
+
+.pv-piechart {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 100%;
+}
+
+.pv-pie-donut {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.pv-pie-donut::after {
+  content: '';
+  position: absolute;
+  top: 28%;
+  left: 28%;
+  width: 44%;
+  height: 44%;
+  background: #fff;
+  border-radius: 50%;
+}
+
+.pv-pie-legend {
+  font-size: 9.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pv-pie-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pv-pie-legend .sw {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
 }
 
 /* ---------- フッター操作 ---------- */

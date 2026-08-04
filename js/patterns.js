@@ -8,11 +8,17 @@
 //   {
 //     id: 'kebab-case-id',           // 一意なID
 //     name: '表示名',
+//     category: '比較',              // 手動切り替えプルダウンのグループ名（同カテゴリ＝デザインの兄弟候補）
 //     description: '説明文（プレビュー画面に表示）',
 //     score(section) -> number,      // {heading, bullets} を見て 0〜10 程度で採点
 //     renderBody(bullets) -> HTML文字列,   // プレビュー用（本文のみ。見出しは共通枠が描く）
 //     buildBody(pptxSlide, bullets, theme, box) -> void,  // PPTX書き出し用
 //   }
+//
+// 既存カテゴリ: 汎用／比較／マトリクス／ポジショニング／フロー・プロセス／
+//              構造・ロジック／変化・対比／時系列／数値・グラフ
+// 同じカテゴリに複数のパターンを登録しておくと、手動切り替えプルダウンで
+// 「同じ用途の別デザイン」としてまとめて選べるようになる。
 window.DocAssist = window.DocAssist || {};
 
 (function () {
@@ -32,6 +38,7 @@ window.DocAssist = window.DocAssist || {};
   const titleMessage = {
     id: 'title-message',
     name: 'タイトル＋メッセージ',
+    category: '汎用',
     description: 'キーメッセージ1行と補足の箇条書き。どんな内容にも使える汎用パターン。',
     score(section) {
       const n = (section.bullets || []).length;
@@ -63,6 +70,7 @@ window.DocAssist = window.DocAssist || {};
   const boxCompare = {
     id: 'box-compare',
     name: 'ボックス比較',
+    category: '比較',
     description: '2〜4個の項目を横並びのボックスで比較する。',
     score(section) {
       const bullets = section.bullets || [];
@@ -105,6 +113,7 @@ window.DocAssist = window.DocAssist || {};
   const matrix2x2 = {
     id: 'matrix-2x2',
     name: '2軸マトリクス',
+    category: 'マトリクス／ポジショニング',
     description: '4象限のマトリクスで整理する（4項目向け）。',
     score(section) {
       const bullets = section.bullets || [];
@@ -158,6 +167,7 @@ window.DocAssist = window.DocAssist || {};
   const processFlow = {
     id: 'process-flow',
     name: 'プロセス／フロー',
+    category: 'フロー・プロセス',
     description: '手順やステップを左から右へ順番に示す。',
     score(section) {
       const bullets = section.bullets || [];
@@ -208,6 +218,7 @@ window.DocAssist = window.DocAssist || {};
   const pyramid = {
     id: 'pyramid',
     name: 'ピラミッド構造',
+    category: '構造・ロジック',
     description: '結論（メッセージ）を頂点に、根拠・要点を土台として示す。',
     score(section) {
       const text = A.fullText(section);
@@ -255,6 +266,7 @@ window.DocAssist = window.DocAssist || {};
   const beforeAfter = {
     id: 'before-after',
     name: 'Before／After',
+    category: '変化・対比',
     description: '現状（Before）と施策後（After）を対比させる。',
     score(section) {
       const bullets = section.bullets || [];
@@ -304,6 +316,7 @@ window.DocAssist = window.DocAssist || {};
   const timeline = {
     id: 'timeline',
     name: 'タイムライン／ロードマップ',
+    category: '時系列',
     description: '日付・フェーズを時系列に並べて示す。',
     score(section) {
       const bullets = section.bullets || [];
@@ -351,6 +364,7 @@ window.DocAssist = window.DocAssist || {};
   const comparisonTable = {
     id: 'comparison-table',
     name: '比較表',
+    category: '比較',
     description: '5項目以上を一覧で比較する表形式。',
     score(section) {
       const bullets = section.bullets || [];
@@ -399,6 +413,7 @@ window.DocAssist = window.DocAssist || {};
   const kpiSummary = {
     id: 'kpi-summary',
     name: 'KPIサマリー',
+    category: '数値・グラフ',
     description: '数値・指標をカード形式で並べて見せる。',
     score(section) {
       const bullets = section.bullets || [];
@@ -459,6 +474,7 @@ window.DocAssist = window.DocAssist || {};
   const cycle = {
     id: 'cycle',
     name: 'サイクル図（循環プロセス）',
+    category: 'フロー・プロセス',
     description: 'PDCAなど繰り返すプロセスを円環で示す（3〜6項目）。',
     score(section) {
       const bullets = section.bullets || [];
@@ -507,6 +523,7 @@ window.DocAssist = window.DocAssist || {};
   const logicTree = {
     id: 'logic-tree',
     name: 'ロジックツリー',
+    category: '構造・ロジック',
     description: 'テーマを複数の要素に分解して示す（MECE整理）。',
     score(section) {
       const bullets = section.bullets || [];
@@ -574,6 +591,7 @@ window.DocAssist = window.DocAssist || {};
   const funnel = {
     id: 'funnel',
     name: 'ファネル図',
+    category: '変化・対比',
     description: '歩留まり・コンバージョンなど段階的に絞り込まれるデータを示す。',
     score(section) {
       const bullets = section.bullets || [];
@@ -658,6 +676,7 @@ window.DocAssist = window.DocAssist || {};
   const waterfall = {
     id: 'waterfall',
     name: 'ウォーターフォール（増減内訳）',
+    category: '変化・対比',
     description: '数値の増減要因を積み上げ棒で示す（開始値→各要因→終了値）。',
     score(section) {
       const bullets = section.bullets || [];
@@ -732,6 +751,7 @@ window.DocAssist = window.DocAssist || {};
   const swot = {
     id: 'swot',
     name: 'SWOT分析',
+    category: 'マトリクス／ポジショニング',
     description: '強み・弱み・機会・脅威の4象限で整理する。',
     score(section) {
       const bullets = section.bullets || [];
@@ -786,6 +806,7 @@ window.DocAssist = window.DocAssist || {};
   const agenda = {
     id: 'agenda',
     name: 'アジェンダ／目次',
+    category: '汎用',
     description: '本日お伝えする項目を番号付きリストで示す（表紙・目次スライド向け）。',
     score(section) {
       const text = A.fullText(section);
@@ -813,22 +834,459 @@ window.DocAssist = window.DocAssist || {};
     },
   };
 
+  // ---------- 縦型プロセスフロー（ステップ数が多い場合向け） ----------
+  const flowVertical = {
+    id: 'flow-vertical',
+    name: '縦型プロセスフロー',
+    category: 'フロー・プロセス',
+    description: '手順・ステップを縦に並べて示す。ステップ数が多い・説明が長い場合に横型より読みやすい。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ステップ', 'フロー', '手順', 'プロセス', 'フェーズ']);
+      const seq = A.sequenceWordCount(text) + A.numberedBulletCount(bullets);
+      const n = bullets.length;
+      if (n >= 5 && n <= 8 && kw && seq > 0) return 9;
+      if (n >= 5 && n <= 8 && (kw || seq > 0)) return 7;
+      if (n >= 3 && n <= 4 && kw && seq > 0) return 5;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (!items.length) return emptyBody();
+      return `<div class="pv-flow-v">
+        <div class="pv-flow-v-line"></div>
+        ${items
+          .map((it, i) => {
+            const label = it.value !== it.key ? `${it.key}：${it.value}` : it.key;
+            return `<div class="pv-flow-v-row"><div class="pv-flow-v-num">${i + 1}</div><div class="pv-flow-v-text">${esc(label)}</div></div>`;
+          })
+          .join('')}
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (!items.length) return;
+      const n = items.length;
+      const rowH = box.h / n;
+      const lineX = box.x + 0.22;
+      slide.addShape('line', { x: lineX, y: box.y + 0.1, w: 0, h: box.h - 0.2, line: { color: theme.accent, width: 2 } });
+      items.forEach((it, i) => {
+        const y = box.y + i * rowH;
+        const cy = y + rowH / 2;
+        slide.addShape('oval', { x: lineX - 0.18, y: cy - 0.18, w: 0.36, h: 0.36, fill: { color: theme.primary } });
+        slide.addText(String(i + 1), { x: lineX - 0.18, y: cy - 0.18, w: 0.36, h: 0.36, fontSize: 11, bold: true, color: theme.white, align: 'center', valign: 'middle' });
+        const label = it.value !== it.key ? `${it.key}：${it.value}` : it.key;
+        slide.addText(label, { x: lineX + 0.35, y: y + 0.03, w: box.x + box.w - (lineX + 0.35), h: rowH - 0.06, fontSize: 11, color: theme.text, valign: 'middle' });
+      });
+    },
+  };
+
+  // ---------- 縦型比較（項目数が多い・説明が長い場合向け） ----------
+  const compareVertical = {
+    id: 'compare-vertical',
+    name: '縦型比較',
+    category: '比較',
+    description: '複数の項目を縦に並べて比較する。項目数が多い・説明が長い場合にボックス比較より読みやすい。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const ratio = A.kvRatio(bullets);
+      const n = bullets.length;
+      const avgLen = bullets.length ? bullets.join('').length / bullets.length : 0;
+      if (n >= 5 && n <= 6 && ratio >= 0.5) return 8;
+      if (n >= 2 && n <= 6 && ratio >= 0.5 && avgLen > 28) return 7;
+      if (n >= 5 && n <= 6) return 4;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (!items.length) return emptyBody();
+      return `<div class="pv-compare-v">${items
+        .map(
+          (it) => `
+        <div class="pv-compare-v-row">
+          <div class="pv-compare-v-label">${esc(it.key)}</div>
+          <div class="pv-compare-v-desc">${esc(it.value)}</div>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (!items.length) return;
+      const n = items.length;
+      const gap = 0.12;
+      const rowH = (box.h - gap * (n - 1)) / n;
+      const labelW = box.w * 0.26;
+      items.forEach((it, i) => {
+        const y = box.y + i * (rowH + gap);
+        slide.addShape('rect', { x: box.x, y, w: labelW, h: rowH, fill: { color: theme.primary } });
+        slide.addText(it.key, { x: box.x + 0.08, y, w: labelW - 0.16, h: rowH, fontSize: 11, bold: true, color: theme.white, valign: 'middle' });
+        slide.addShape('rect', { x: box.x + labelW, y, w: box.w - labelW, h: rowH, fill: { color: theme.light }, line: { color: theme.border, width: 1 } });
+        slide.addText(it.value, { x: box.x + labelW + 0.1, y, w: box.w - labelW - 0.2, h: rowH, fontSize: 10.5, color: theme.text, valign: 'middle' });
+      });
+    },
+  };
+
+  // ---------- 縦型タイムライン（マイルストーンが多い場合向け） ----------
+  const timelineVertical = {
+    id: 'timeline-vertical',
+    name: '縦型タイムライン',
+    category: '時系列',
+    description: 'マイルストーンが多い・説明が詳しい場合向けの縦型タイムライン。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['スケジュール', 'ロードマップ', 'タイムライン']);
+      const dates = A.dateTokenCount(text);
+      const n = bullets.length;
+      if (n >= 5 && n <= 8 && kw && dates > 0) return 9;
+      if (n >= 5 && n <= 8 && dates >= n * 0.5) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (!items.length) return emptyBody();
+      return `<div class="pv-tl-v">
+        <div class="pv-tl-v-line"></div>
+        ${items
+          .map(
+            (it) => `
+          <div class="pv-tl-v-row">
+            <div class="pv-tl-v-dot"></div>
+            <div class="pv-tl-v-text"><b>${esc(it.key)}</b>${it.value !== it.key ? '<br>' + esc(it.value) : ''}</div>
+          </div>`
+          )
+          .join('')}
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (!items.length) return;
+      const n = items.length;
+      const rowH = box.h / n;
+      const lineX = box.x + 0.16;
+      slide.addShape('line', { x: lineX, y: box.y + 0.1, w: 0, h: box.h - 0.2, line: { color: theme.accent, width: 2 } });
+      items.forEach((it, i) => {
+        const y = box.y + i * rowH;
+        const cy = y + Math.min(0.3, rowH / 2);
+        slide.addShape('oval', { x: lineX - 0.09, y: cy - 0.09, w: 0.18, h: 0.18, fill: { color: theme.primary } });
+        const label = it.value !== it.key ? `${it.key}\n${it.value}` : it.key;
+        slide.addText(label, { x: lineX + 0.25, y: y + 0.03, w: box.x + box.w - (lineX + 0.25), h: rowH - 0.06, fontSize: 10.5, color: theme.text, valign: 'top' });
+      });
+    },
+  };
+
+  // ---------- ポジショニングマップ ----------
+  const SCATTER_POS = [
+    [0.22, 0.24],
+    [0.72, 0.2],
+    [0.3, 0.7],
+    [0.78, 0.68],
+    [0.5, 0.15],
+    [0.15, 0.5],
+    [0.85, 0.5],
+    [0.5, 0.85],
+  ];
+
+  const positioningMap = {
+    id: 'positioning-map',
+    name: 'ポジショニングマップ',
+    category: 'マトリクス／ポジショニング',
+    description: '2軸の座標平面上に複数項目をプロットし、位置づけを示す。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      // 「マップ」は「ロードマップ」等と誤マッチしやすいため、より具体的な語のみ使う
+      const kw = A.hasAny(text, ['ポジショニングマップ', 'ポジショニング', '位置づけ', '位置付け']);
+      const n = bullets.length;
+      if (kw && n >= 3 && n <= 8) return 10;
+      if (A.hasAny(text, ['軸', 'マトリクス']) && n >= 5 && n <= 8) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (items.length < 2) return emptyBody();
+      return `<div class="pv-posmap">
+        <div class="pv-posmap-axis-x"></div>
+        <div class="pv-posmap-axis-y"></div>
+        <div class="pv-posmap-label top">軸2（高）</div>
+        <div class="pv-posmap-label bottom">軸2（低）</div>
+        <div class="pv-posmap-label left">軸1（低）</div>
+        <div class="pv-posmap-label right">軸1（高）</div>
+        ${items
+          .map((it, i) => {
+            const [x, y] = SCATTER_POS[i % SCATTER_POS.length];
+            return `<div class="pv-posmap-dot" style="left:${x * 100}%;top:${y * 100}%;"><span class="dot"></span><span class="lbl">${esc(it.key)}</span></div>`;
+          })
+          .join('')}
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (items.length < 2) return;
+      const cx = box.x + box.w / 2;
+      const cy = box.y + box.h / 2;
+      slide.addShape('line', { x: box.x + box.w * 0.04, y: cy, w: box.w * 0.92, h: 0, line: { color: theme.border, width: 1 } });
+      slide.addShape('line', { x: cx, y: box.y + box.h * 0.04, w: 0, h: box.h * 0.92, line: { color: theme.border, width: 1 } });
+      slide.addText('軸2（高）', { x: box.x, y: box.y, w: box.w, h: 0.22, fontSize: 9, color: theme.subtext, align: 'center' });
+      slide.addText('軸2（低）', { x: box.x, y: box.y + box.h - 0.22, w: box.w, h: 0.22, fontSize: 9, color: theme.subtext, align: 'center' });
+      slide.addText('軸1（低）', { x: box.x, y: cy - 0.15, w: 1.0, h: 0.3, fontSize: 9, color: theme.subtext, valign: 'middle' });
+      slide.addText('軸1（高）', { x: box.x + box.w - 1.0, y: cy - 0.15, w: 1.0, h: 0.3, fontSize: 9, color: theme.subtext, align: 'right', valign: 'middle' });
+      items.forEach((it, i) => {
+        const [px, py] = SCATTER_POS[i % SCATTER_POS.length];
+        const x = box.x + box.w * px;
+        const y = box.y + box.h * py;
+        slide.addShape('oval', { x: x - 0.07, y: y - 0.07, w: 0.14, h: 0.14, fill: { color: theme.accent } });
+        slide.addText(it.key, { x: x - 0.7, y: y + 0.09, w: 1.4, h: 0.28, fontSize: 9, color: theme.text, align: 'center' });
+      });
+    },
+  };
+
+  // ---------- 階層ピラミッド（ビジョン→戦略→施策など） ----------
+  const pyramidTiered = {
+    id: 'pyramid-tiered',
+    name: '階層ピラミッド',
+    category: '構造・ロジック',
+    description: 'ビジョン→戦略→施策など、2〜3段階の階層を三角形の積み上げで示す。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ビジョン', '戦略', '階層', 'ピラミッド', '重点', '基本方針']);
+      const n = (section.bullets || []).length;
+      if (kw && n >= 2 && n <= 3) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 3);
+      if (!items.length) return emptyBody();
+      const n = items.length;
+      return `<div class="pv-pyr-t">${items
+        .map((it, i) => {
+          const widthPct = n > 1 ? 35 + i * (65 / (n - 1)) : 70;
+          return `<div class="pv-pyr-t-row" style="width:${widthPct}%;"><div class="pv-pyr-t-key">${esc(it.key)}</div><div class="pv-pyr-t-val">${esc(it.value)}</div></div>`;
+        })
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 3);
+      if (!items.length) return;
+      const n = items.length;
+      const gap = 0.15;
+      const rowH = (box.h - gap * (n - 1)) / n;
+      const colors = [theme.primary, theme.primaryLight, theme.accent];
+      items.forEach((it, i) => {
+        const widthFrac = n > 1 ? 0.35 + i * (0.65 / (n - 1)) : 0.7;
+        const w = box.w * widthFrac;
+        const x = box.x + (box.w - w) / 2;
+        const y = box.y + i * (rowH + gap);
+        slide.addShape('rect', { x, y, w, h: rowH, fill: { color: colors[i % colors.length] } });
+        slide.addText(
+          [
+            { text: it.key + '\n', options: { bold: true, fontSize: 12 } },
+            { text: it.value, options: { fontSize: 10 } },
+          ],
+          { x: x + 0.1, y, w: w - 0.2, h: rowH, color: theme.white, align: 'center', valign: 'middle' }
+        );
+      });
+    },
+  };
+
+  // ---------- 棒グラフ（ネイティブグラフ） ----------
+  const barChart = {
+    id: 'bar-chart',
+    name: '棒グラフ',
+    category: '数値・グラフ',
+    description: '複数項目の数値を棒グラフで比較する（PowerPointのネイティブグラフとして生成）。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const items = A.extractItems(bullets);
+      const validNums = items.filter((it) => firstNumber(it.value) !== null).length;
+      const kw = A.hasAny(A.fullText(section), ['グラフ', '棒グラフ']);
+      const n = bullets.length;
+      if (n >= 3 && n <= 8 && validNums === n && kw) return 10;
+      if (n >= 3 && n <= 8 && validNums === n) return 6;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (items.length < 2) return emptyBody();
+      const values = items.map((it) => firstNumber(it.value) || 0);
+      const maxV = Math.max(...values, 1);
+      return `<div class="pv-barchart">${items
+        .map((it, i) => {
+          const h = Math.max(4, (values[i] / maxV) * 100);
+          return `<div class="pv-bar-col">
+            <div class="pv-bar-val">${esc(String(values[i]))}</div>
+            <div class="pv-bar-track"><div class="pv-bar" style="height:${h}%;"></div></div>
+            <div class="pv-bar-label">${esc(it.key)}</div>
+          </div>`;
+        })
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (items.length < 2) return;
+      const labels = items.map((it) => it.key);
+      const values = items.map((it) => firstNumber(it.value) || 0);
+      slide.addChart('bar', [{ name: '値', labels, values }], {
+        x: box.x, y: box.y, w: box.w, h: box.h,
+        barDir: 'col',
+        showLegend: false,
+        showValue: true,
+        dataLabelColor: theme.text,
+        dataLabelFontSize: 10,
+        catAxisLabelColor: theme.text,
+        catAxisLabelFontSize: 9,
+        valAxisLabelColor: theme.subtext,
+        valAxisLabelFontSize: 8,
+        chartColors: [theme.accent],
+      });
+    },
+  };
+
+  // ---------- 折れ線グラフ（ネイティブグラフ） ----------
+  const lineChart = {
+    id: 'line-chart',
+    name: '折れ線グラフ',
+    category: '数値・グラフ',
+    description: '数値の時系列推移を折れ線グラフで示す（PowerPointのネイティブグラフとして生成）。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const items = A.extractItems(bullets);
+      const dateNum = items.filter((it) => A.dateTokenCount(it.key + it.value) > 0 && firstNumber(it.value) !== null).length;
+      const kw = A.hasAny(text, ['推移', 'トレンド', '折れ線']);
+      const n = bullets.length;
+      if (n >= 3 && n <= 8 && dateNum >= Math.ceil(n * 0.6) && kw) return 10;
+      if (n >= 3 && n <= 8 && dateNum >= Math.ceil(n * 0.6)) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (items.length < 2) return emptyBody();
+      const values = items.map((it) => firstNumber(it.value) || 0);
+      const maxV = Math.max(...values, 1);
+      const minV = Math.min(...values, 0);
+      const range = maxV - minV || 1;
+      const w = 100;
+      const h = 60;
+      const stepX = w / (items.length - 1 || 1);
+      const points = values.map((v, i) => `${(i * stepX).toFixed(1)},${(h - ((v - minV) / range) * h).toFixed(1)}`).join(' ');
+      return `<div class="pv-linechart">
+        <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" class="pv-line-svg">
+          <polyline points="${points}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" />
+          ${values
+            .map((v, i) => `<circle cx="${(i * stepX).toFixed(1)}" cy="${(h - ((v - minV) / range) * h).toFixed(1)}" r="1.6" fill="var(--primary)" />`)
+            .join('')}
+        </svg>
+        <div class="pv-line-labels">${items.map((it) => `<span>${esc(it.key)}</span>`).join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (items.length < 2) return;
+      const labels = items.map((it) => it.key);
+      const values = items.map((it) => firstNumber(it.value) || 0);
+      slide.addChart('line', [{ name: '値', labels, values }], {
+        x: box.x, y: box.y, w: box.w, h: box.h,
+        showLegend: false,
+        showValue: true,
+        lineDataSymbol: 'circle',
+        lineSize: 2,
+        chartColors: [theme.accent],
+        dataLabelColor: theme.text,
+        dataLabelFontSize: 9,
+        catAxisLabelColor: theme.text,
+        catAxisLabelFontSize: 9,
+        valAxisLabelColor: theme.subtext,
+        valAxisLabelFontSize: 8,
+      });
+    },
+  };
+
+  // ---------- 円グラフ／構成比（ネイティブグラフ） ----------
+  const pieChart = {
+    id: 'pie-chart',
+    name: '円グラフ／構成比',
+    category: '数値・グラフ',
+    description: '構成比・内訳をドーナツ／円グラフで示す（PowerPointのネイティブグラフとして生成）。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['内訳', '構成比', 'シェア', '割合', '円グラフ']);
+      const items = A.extractItems(bullets);
+      const pctCount = items.filter((it) => /%|％/.test(it.value)).length;
+      const n = bullets.length;
+      if (n >= 2 && n <= 6 && kw && pctCount >= Math.ceil(n * 0.5)) return 10;
+      if (n >= 2 && n <= 6 && pctCount === n) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (items.length < 2) return emptyBody();
+      const values = items.map((it) => firstNumber(it.value) || 0);
+      const total = values.reduce((a, b) => a + b, 0) || 1;
+      const colors = ['var(--primary)', 'var(--accent)', 'var(--primary-light)', '#8fb2d8', 'var(--negative)', '#a9b3c1'];
+      let acc = 0;
+      const stops = values
+        .map((v, i) => {
+          const start = (acc / total) * 360;
+          acc += v;
+          const end = (acc / total) * 360;
+          return `${colors[i % colors.length]} ${start}deg ${end}deg`;
+        })
+        .join(', ');
+      return `<div class="pv-piechart">
+        <div class="pv-pie-donut" style="background: conic-gradient(${stops});"></div>
+        <div class="pv-pie-legend">${items
+          .map((it, i) => `<div class="pv-pie-legend-item"><span class="sw" style="background:${colors[i % colors.length]};"></span>${esc(it.key)}：${esc(it.value)}</div>`)
+          .join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (items.length < 2) return;
+      const labels = items.map((it) => it.key);
+      const values = items.map((it) => firstNumber(it.value) || 0);
+      const colors = [theme.primary, theme.accent, theme.primaryLight, '8FB2D8', theme.negative, 'A9B3C1'];
+      slide.addChart('doughnut', [{ name: '構成比', labels, values }], {
+        x: box.x, y: box.y, w: box.w, h: box.h,
+        showLegend: true,
+        legendPos: 'r',
+        legendColor: theme.text,
+        legendFontSize: 10,
+        showPercent: true,
+        dataLabelColor: theme.white,
+        dataLabelFontSize: 9,
+        chartColors: colors,
+      });
+    },
+  };
+
   DocAssist.patterns = [
     titleMessage,
     agenda,
     boxCompare,
+    compareVertical,
     swot,
     matrix2x2,
+    positioningMap,
     processFlow,
+    flowVertical,
     cycle,
     funnel,
     waterfall,
     pyramid,
+    pyramidTiered,
     logicTree,
     beforeAfter,
     timeline,
+    timelineVertical,
     comparisonTable,
     kpiSummary,
+    barChart,
+    lineChart,
+    pieChart,
   ];
   DocAssist.patternById = {};
   DocAssist.patterns.forEach((p) => {

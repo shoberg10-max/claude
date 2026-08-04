@@ -297,9 +297,7 @@
         <p class="hint">各スライドの内容から、あらかじめ用意したコンサルスライドのデザインパターンを自動選択しました。「🤖 AI選択」は社内LLMがStep 1のプロンプトで提案したパターンです。プレビュー右上のプルダウンから手動で変更することもできます。</p>
         <details>
           <summary style="cursor:pointer;color:var(--accent);font-size:13px;">利用可能なデザインパターン一覧（${DocAssist.patterns.length}種類）</summary>
-          <div class="pattern-legend">
-            ${DocAssist.patterns.map((p) => `<div class="item"><b>${escapeHtml(p.name)}</b>${escapeHtml(p.description)}</div>`).join('')}
-          </div>
+          ${renderPatternLegend()}
         </details>
         <div class="slide-grid" id="slideGrid"></div>
         <div class="export-row">
@@ -349,13 +347,58 @@
     }
   }
 
+  function renderPatternLegend() {
+    const groups = [];
+    const byCategory = {};
+    DocAssist.patterns.forEach((p) => {
+      const cat = p.category || 'その他';
+      if (!byCategory[cat]) {
+        byCategory[cat] = [];
+        groups.push(cat);
+      }
+      byCategory[cat].push(p);
+    });
+    return groups
+      .map(
+        (cat) => `
+        <div class="pattern-legend-group">
+          <div class="pattern-legend-cat">${escapeHtml(cat)}</div>
+          <div class="pattern-legend">
+            ${byCategory[cat].map((p) => `<div class="item"><b>${escapeHtml(p.name)}</b>${escapeHtml(p.description)}</div>`).join('')}
+          </div>
+        </div>`
+      )
+      .join('');
+  }
+
+  // 同じカテゴリ（用途）のパターンを <optgroup> でまとめ、兄弟デザインを
+  // 見つけやすくする。同一カテゴリが複数登録されているほど選択肢が増える。
+  function groupedPatternOptions(selectedId) {
+    const groups = [];
+    const byCategory = {};
+    DocAssist.patterns.forEach((p) => {
+      const cat = p.category || 'その他';
+      if (!byCategory[cat]) {
+        byCategory[cat] = [];
+        groups.push(cat);
+      }
+      byCategory[cat].push(p);
+    });
+    return groups
+      .map((cat) => {
+        const opts = byCategory[cat]
+          .map((p) => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`)
+          .join('');
+        return `<optgroup label="${escapeAttr(cat)}">${opts}</optgroup>`;
+      })
+      .join('');
+  }
+
   function renderSlidePreviewCard(slide, idx) {
     const wrap = document.createElement('div');
     wrap.className = 'slide-preview-card';
 
-    const options = DocAssist.patterns
-      .map((p) => `<option value="${p.id}" ${p.id === slide.patternId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`)
-      .join('');
+    const options = groupedPatternOptions(slide.patternId);
     const reasonAttr = slide.patternReason ? ` title="${escapeAttr(slide.patternReason)}"` : '';
     const message = DocAssist.analyze.effectiveMessage(slide);
     const subMessage = (slide.subMessage || '').trim();
