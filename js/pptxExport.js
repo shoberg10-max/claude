@@ -13,6 +13,21 @@ window.DocAssist = window.DocAssist || {};
 (function () {
   const SLIDE_W = 13.33;
   const SLIDE_H = 7.5;
+  const FONT_FACE = 'Yu Gothic UI';
+
+  // slide.addText / addTable に渡す options に既定の fontFace を差し込む。
+  // 個々のパターン実装（40箇所以上）に手を入れず、フォントを一箇所で統一するための薄いラッパー。
+  // 呼び出し側が明示的に fontFace を指定した場合はそちらを優先する。
+  function withDefaultFont(slide) {
+    const origAddText = slide.addText.bind(slide);
+    const origAddTable = slide.addTable.bind(slide);
+    function withFont(opts) {
+      return opts && opts.fontFace ? opts : Object.assign({ fontFace: FONT_FACE }, opts || {});
+    }
+    slide.addText = (text, options) => origAddText(text, withFont(options));
+    slide.addTable = (rows, options) => origAddTable(rows, withFont(options));
+    return slide;
+  }
 
   const MARGIN_X = 0.55;
   const BODY_X = MARGIN_X;
@@ -39,7 +54,7 @@ window.DocAssist = window.DocAssist || {};
     slide.addShape('rect', { x: BODY_X, y: HEADER_Y + 0.02, w: BAR_W, h: CRUMB_H - 0.04, fill: { color: theme.primary }, line: { type: 'none' } });
     slide.addText(crumbText, {
       x: BODY_X + BAR_W + 0.1, y: HEADER_Y, w: BODY_W - BAR_W - 0.1, h: CRUMB_H,
-      fontSize: 11, bold: true, color: theme.text, valign: 'middle', fontFace: 'Meiryo UI',
+      fontSize: 11, bold: true, color: theme.text, valign: 'middle',
     });
 
     const msg = message || '';
@@ -48,7 +63,7 @@ window.DocAssist = window.DocAssist || {};
     slide.addText(A.emphasisRuns(msg, theme.primary, { bold: true }), {
       x: BODY_X, y: HEADLINE_Y, w: BODY_W, h: headlineH,
       fontSize: 20, color: theme.primary, valign: 'top',
-      fontFace: 'Meiryo UI', lineSpacingMultiple: 1.15,
+      lineSpacingMultiple: 1.15,
     });
 
     let y = HEADLINE_Y + headlineH;
@@ -93,12 +108,12 @@ window.DocAssist = window.DocAssist || {};
   }
 
   function addCoverSlide(pptx, title, theme) {
-    const slide = pptx.addSlide();
+    const slide = withDefaultFont(pptx.addSlide());
     slide.addShape('rect', { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, fill: { color: theme.primary }, line: { type: 'none' } });
-    slide.addShape('rect', { x: MARGIN_X, y: SLIDE_H / 2 + 0.62, w: 1.1, h: 0.045, fill: { color: theme.accent }, line: { type: 'none' } });
+    slide.addShape('rect', { x: MARGIN_X, y: SLIDE_H / 2 + 0.62, w: 1.1, h: 0.045, fill: { color: theme.highlight }, line: { type: 'none' } });
     slide.addText(title || '資料構成案', {
       x: MARGIN_X, y: SLIDE_H / 2 - 1.0, w: SLIDE_W - MARGIN_X * 2, h: 1.6,
-      fontSize: 30, bold: true, color: theme.white, fontFace: 'Meiryo UI',
+      fontSize: 30, bold: true, color: theme.white,
     });
   }
 
@@ -120,7 +135,7 @@ window.DocAssist = window.DocAssist || {};
 
     (outline.slides || []).forEach((s, idx) => {
       const pattern = DocAssist.patternById[s.patternId] || DocAssist.patternById['title-message'];
-      const slide = pptx.addSlide();
+      const slide = withDefaultFont(pptx.addSlide());
       const ruleY = addHeader(slide, s.heading, A.effectiveMessage(s), s.subMessage, theme);
       const outerBox = bodyBoxAfterHeader(ruleY);
       const innerBox = {

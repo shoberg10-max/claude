@@ -1,10 +1,14 @@
 :root {
   --primary: #000f78;
   --primary-light: #3c64aa;
-  --accent: #f59637;
+  --accent: #7b9bc7;
   --accent2: #5a63a7;
+  --gray: #8c97a6;
+  --gray-dark: #6b7480;
+  --highlight: #f59637;
+  --critical: #c0392b;
   --positive: #000f78;
-  --negative: #f59637;
+  --negative: #8c97a6;
   --bg: #f4f6fa;
   --card: #ffffff;
   --border: #bfbfbf;
@@ -611,6 +615,19 @@ b.em {
   color: var(--primary);
 }
 
+.pv-box-highlight .pv-box-head {
+  background: var(--highlight);
+}
+
+.pv-box-highlight .pv-box-body {
+  outline: 1.5px solid var(--highlight);
+  outline-offset: -1.5px;
+}
+
+.pv-box-highlight .pv-box-body::before {
+  color: var(--highlight);
+}
+
 .pv-matrix {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -819,6 +836,18 @@ table.pv-table tr:nth-child(even) td {
   background: var(--light);
 }
 
+.pv-table tr.pv-table-highlight td {
+  background: var(--light);
+  font-weight: bold;
+  color: var(--highlight);
+  border-top: 1.5px solid var(--highlight);
+  border-bottom: 1.5px solid var(--highlight);
+}
+
+.pv-table tr.pv-table-highlight td:last-child {
+  color: var(--text);
+}
+
 .pv-kpi-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1004,7 +1033,7 @@ table.pv-table tr:nth-child(even) td {
 }
 
 .pv-wf-bar.down {
-  background: var(--accent);
+  background: var(--gray);
 }
 
 .pv-wf-label {
@@ -1019,15 +1048,15 @@ table.pv-table tr:nth-child(even) td {
 }
 
 .pv-swot-1 {
-  background: var(--primary-light);
+  background: var(--gray);
 }
 
 .pv-swot-2 {
-  background: var(--accent2);
+  background: var(--primary-light);
 }
 
 .pv-swot-3 {
-  background: var(--accent);
+  background: var(--gray-dark);
 }
 
 .pv-agenda {
@@ -1142,6 +1171,15 @@ table.pv-table tr:nth-child(even) td {
   display: flex;
   align-items: center;
   padding: 4px 8px;
+}
+
+.pv-compare-v-highlight {
+  border-color: var(--highlight);
+  border-width: 1.5px;
+}
+
+.pv-compare-v-highlight .pv-compare-v-label {
+  background: var(--highlight);
 }
 
 .pv-tl-v {

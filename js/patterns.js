@@ -16,7 +16,7 @@
 //   }
 //
 // 既存カテゴリ: 汎用／比較／マトリクス／ポジショニング／フロー・プロセス／
-//              構造・ロジック／変化・対比／時系列／数値・グラフ
+//              構造・ロジック／変化・対比／時系列／数値・グラフ／アクションプラン
 // 同じカテゴリに複数のパターンを登録しておくと、手動切り替えプルダウンで
 // 「同じ用途の別デザイン」としてまとめて選べるようになる。
 window.DocAssist = window.DocAssist || {};
@@ -94,42 +94,48 @@ window.DocAssist = window.DocAssist || {};
     id: 'box-compare',
     name: 'ボックス比較',
     category: '比較',
-    description: '2〜4個の項目を横並びのボックスで比較する。',
+    description: '2〜5個の項目を横並びのボックスで比較する。',
     score(section) {
       const bullets = section.bullets || [];
       const ratio = A.kvRatio(bullets);
       const n = bullets.length;
-      if (n >= 2 && n <= 4 && ratio >= 0.5) return 8;
-      if (n >= 2 && n <= 4) return 4;
+      if (n >= 2 && n <= 5 && ratio >= 0.5) return 8;
+      if (n >= 2 && n <= 5) return 4;
       return 0;
     },
     renderBody(bullets) {
-      const items = A.extractItems(bullets).slice(0, 4);
+      const items = A.extractItems(bullets).slice(0, 5);
       if (!items.length) return emptyBody();
       return `<div class="pv-box-row">${items
         .map(
           (it) => `
-        <div class="pv-box">
-          <div class="pv-box-head">${esc(it.key)}</div>
+        <div class="pv-box${it.highlight ? ' pv-box-highlight' : ''}">
+          <div class="pv-box-head">${it.highlight ? '★ ' : ''}${esc(it.key)}</div>
           <div class="pv-box-body">${esc(it.value)}</div>
         </div>`
         )
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const items = A.extractItems(bullets).slice(0, 4);
+      const items = A.extractItems(bullets).slice(0, 5);
       if (!items.length) return;
       const n = items.length;
-      const gap = 0.25;
+      const gap = n >= 5 ? 0.16 : 0.25;
       const boxW = (box.w - gap * (n - 1)) / n;
+      const headFontSize = n >= 5 ? 12 : 13;
+      const bodyFontSize = n >= 5 ? 10.5 : 11.5;
       items.forEach((it, i) => {
         const x = box.x + i * (boxW + gap);
-        slide.addShape('rect', { x, y: box.y, w: boxW, h: 0.5, fill: { color: theme.primary } });
-        slide.addText(it.key, { x, y: box.y, w: boxW, h: 0.5, fontSize: 13, bold: true, color: theme.white, align: 'center', valign: 'middle' });
-        slide.addShape('rect', { x, y: box.y + 0.5, w: boxW, h: box.h - 0.5, fill: { color: theme.light }, line: { type: 'none' } });
+        const headColor = it.highlight ? theme.highlight : theme.primary;
+        slide.addShape('rect', { x, y: box.y, w: boxW, h: 0.5, fill: { color: headColor } });
+        slide.addText(`${it.highlight ? '★ ' : ''}${it.key}`, { x, y: box.y, w: boxW, h: 0.5, fontSize: headFontSize, bold: true, color: theme.white, align: 'center', valign: 'middle' });
+        slide.addShape('rect', {
+          x, y: box.y + 0.5, w: boxW, h: box.h - 0.5, fill: { color: theme.light },
+          line: it.highlight ? { color: theme.highlight, width: 1.5 } : { type: 'none' },
+        });
         slide.addText(
           [{ text: it.value, options: { bullet: SQUARE_BULLET } }],
-          { x: x + 0.15, y: box.y + 0.62, w: boxW - 0.28, h: box.h - 0.74, fontSize: 11.5, color: theme.text, valign: 'top' }
+          { x: x + 0.15, y: box.y + 0.62, w: boxW - 0.28, h: box.h - 0.74, fontSize: bodyFontSize, color: theme.text, valign: 'top' }
         );
       });
     },
@@ -201,12 +207,12 @@ window.DocAssist = window.DocAssist || {};
       const kw = A.hasAny(text, ['ステップ', 'フロー', '手順', 'プロセス', 'フェーズ']);
       const seq = A.sequenceWordCount(text) + A.numberedBulletCount(bullets);
       const n = bullets.length;
-      if (n >= 3 && n <= 6 && kw && seq > 0) return 9;
-      if (n >= 3 && n <= 6 && (kw || seq > 0)) return 7;
+      if (n >= 3 && n <= 7 && kw && seq > 0) return 9;
+      if (n >= 3 && n <= 7 && (kw || seq > 0)) return 7;
       return 0;
     },
     renderBody(bullets) {
-      const items = A.extractItems(bullets).slice(0, 6);
+      const items = A.extractItems(bullets).slice(0, 7);
       if (!items.length) return emptyBody();
       return `<div class="pv-flow">${items
         .map((it, i) => {
@@ -221,20 +227,21 @@ window.DocAssist = window.DocAssist || {};
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const items = A.extractItems(bullets).slice(0, 6);
+      const items = A.extractItems(bullets).slice(0, 7);
       if (!items.length) return;
       const n = items.length;
-      const arrowW = 0.35;
+      const arrowW = 0.3;
       const stepW = (box.w - arrowW * (n - 1)) / n;
+      const labelFontSize = n >= 6 ? 10 : 11;
       items.forEach((it, i) => {
         const x = box.x + i * (stepW + arrowW);
         const label = it.value === it.key ? it.key : `${it.key}\n${it.value}`;
         slide.addShape('rect', { x, y: box.y + 0.6, w: stepW, h: box.h - 0.6, fill: { color: theme.accent }, line: { type: 'none' } });
         slide.addShape('oval', { x: x + stepW / 2 - 0.25, y: box.y, w: 0.5, h: 0.5, fill: { color: theme.primary } });
         slide.addText(String(i + 1), { x: x + stepW / 2 - 0.25, y: box.y, w: 0.5, h: 0.5, fontSize: 14, bold: true, color: theme.white, align: 'center', valign: 'middle' });
-        slide.addText(label, { x: x + 0.1, y: box.y + 0.7, w: stepW - 0.2, h: box.h - 0.8, fontSize: 11, color: theme.white, align: 'center', valign: 'top' });
+        slide.addText(label, { x: x + 0.1, y: box.y + 0.7, w: stepW - 0.2, h: box.h - 0.8, fontSize: labelFontSize, color: theme.white, align: 'center', valign: 'top' });
         if (i < n - 1) {
-          slide.addText('→', { x: x + stepW, y: box.y + 0.6, w: arrowW, h: box.h - 0.6, fontSize: 18, bold: true, color: theme.primary, align: 'center', valign: 'middle' });
+          slide.addText('→', { x: x + stepW, y: box.y + 0.6, w: arrowW, h: box.h - 0.6, fontSize: 16, bold: true, color: theme.primary, align: 'center', valign: 'middle' });
         }
       });
     },
@@ -263,7 +270,7 @@ window.DocAssist = window.DocAssist || {};
         <div class="pv-pyramid">
           <div class="pv-pyramid-apex">${emphasisHtml(apexText)}</div>
           <div class="pv-pyramid-base">${baseItems
-            .slice(0, 4)
+            .slice(0, 5)
             .map((b) => `<div class="pv-pyramid-cell">${emphasisHtml(b)}</div>`)
             .join('')}</div>
         </div>`;
@@ -271,7 +278,7 @@ window.DocAssist = window.DocAssist || {};
     buildBody(slide, bullets, theme, box) {
       if (!bullets.length) return;
       const [apex, ...base] = bullets;
-      const baseItems = (base.length ? base : [apex]).slice(0, 4);
+      const baseItems = (base.length ? base : [apex]).slice(0, 5);
       const apexText = base.length ? apex : '結論';
       const apexW = box.w * 0.55;
       slide.addShape('rect', { x: box.x + (box.w - apexW) / 2, y: box.y, w: apexW, h: 0.9, fill: { color: theme.primary } });
@@ -405,7 +412,11 @@ window.DocAssist = window.DocAssist || {};
       const items = A.extractItems(bullets);
       if (!items.length) return emptyBody();
       return `<table class="pv-table"><thead><tr><th>項目</th><th>内容</th></tr></thead><tbody>
-        ${items.map((it) => `<tr><td>${esc(it.key)}</td><td>${esc(it.value)}</td></tr>`).join('')}
+        ${items
+          .map(
+            (it) => `<tr${it.highlight ? ' class="pv-table-highlight"' : ''}><td>${it.highlight ? '★ ' : ''}${esc(it.key)}</td><td>${esc(it.value)}</td></tr>`
+          )
+          .join('')}
       </tbody></table>`;
     },
     buildBody(slide, bullets, theme, box) {
@@ -416,10 +427,20 @@ window.DocAssist = window.DocAssist || {};
           { text: '項目', options: { bold: true, color: theme.white, fill: { color: theme.primary } } },
           { text: '内容', options: { bold: true, color: theme.white, fill: { color: theme.primary } } },
         ],
-        ...items.map((it, i) => [
-          { text: it.key, options: { fill: { color: i % 2 ? theme.light : theme.white } } },
-          { text: it.value, options: { fill: { color: i % 2 ? theme.light : theme.white } } },
-        ]),
+        ...items.map((it, i) => {
+          const fillColor = it.highlight ? theme.light : i % 2 ? theme.light : theme.white;
+          return [
+            {
+              text: `${it.highlight ? '★ ' : ''}${it.key}`,
+              options: {
+                fill: { color: fillColor },
+                bold: !!it.highlight,
+                color: it.highlight ? theme.highlight : theme.text,
+              },
+            },
+            { text: it.value, options: { fill: { color: fillColor }, bold: !!it.highlight } },
+          ];
+        }),
       ];
       slide.addTable(rows, {
         x: box.x,
@@ -427,6 +448,85 @@ window.DocAssist = window.DocAssist || {};
         w: box.w,
         colW: [box.w * 0.3, box.w * 0.7],
         fontSize: 12,
+        color: theme.text,
+        border: { type: 'solid', color: theme.white, pt: 1.5 },
+        valign: 'middle',
+        autoPage: false,
+      });
+    },
+  };
+
+  // ---------- アクションプラン（タスク・担当・期限） ----------
+  // 論点への意思決定が済んだあと、「誰が・何を・いつまでに」やるかを一覧化するための表。
+  // 各箇条書きは「タスク｜担当｜期限」の形式（全角パイプ区切り）を想定し、
+  // 区切りが無い行は担当・期限を空欄のままタスク名だけ表示する（壊れないための保険）。
+  function parseActionItems(bullets) {
+    return (bullets || []).map((b) => {
+      const stripped = A.stripEmphasis(b);
+      const parts = stripped.split('｜').map((s) => s.trim()).filter((s) => s.length);
+      if (parts.length >= 3) return { task: parts[0], owner: parts[1], due: parts[2] };
+      if (parts.length === 2) return { task: parts[0], owner: '', due: parts[1] };
+      const kv = A.splitKV(stripped);
+      if (kv) return { task: kv.key, owner: '', due: kv.value };
+      return { task: stripped, owner: '', due: '' };
+    });
+  }
+
+  const actionPlanTable = {
+    id: 'action-plan-table',
+    name: 'アクションプラン（タスク・担当・期限）',
+    category: 'アクションプラン',
+    description: '意思決定後の実行計画を「タスク／担当／期限」の一覧表で示す。各行は「タスク｜担当｜期限」形式。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['アクションプラン', 'ネクストアクション', 'Next Action', '実行計画', 'ToDo', 'To Do', 'todo', '今後の進め方']);
+      const items = parseActionItems(bullets);
+      const structured = items.filter((it) => it.owner && it.due).length;
+      const n = bullets.length;
+      if (n >= 2 && n <= 8 && structured >= Math.ceil(n * 0.6) && kw) return 10;
+      if (n >= 2 && n <= 8 && structured >= Math.ceil(n * 0.6)) return 8;
+      if (kw && n >= 2) return 6;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = parseActionItems(bullets).slice(0, 8);
+      if (!items.length) return emptyBody();
+      return `<table class="pv-table"><thead><tr><th style="width:8%;">No</th><th>タスク</th><th style="width:20%;">担当</th><th style="width:22%;">期限</th></tr></thead><tbody>
+        ${items
+          .map(
+            (it, i) => `<tr><td>${i + 1}</td><td>${esc(it.task)}</td><td>${esc(it.owner)}</td><td>${esc(it.due)}</td></tr>`
+          )
+          .join('')}
+      </tbody></table>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = parseActionItems(bullets).slice(0, 8);
+      if (!items.length) return;
+      const headOpts = { bold: true, color: theme.white, fill: { color: theme.primary } };
+      const rows = [
+        [
+          { text: 'No', options: headOpts },
+          { text: 'タスク', options: headOpts },
+          { text: '担当', options: headOpts },
+          { text: '期限', options: headOpts },
+        ],
+        ...items.map((it, i) => {
+          const fill = { color: i % 2 ? theme.light : theme.white };
+          return [
+            { text: String(i + 1), options: { fill, align: 'center' } },
+            { text: it.task, options: { fill } },
+            { text: it.owner, options: { fill, align: 'center' } },
+            { text: it.due, options: { fill, align: 'center' } },
+          ];
+        }),
+      ];
+      slide.addTable(rows, {
+        x: box.x,
+        y: box.y,
+        w: box.w,
+        colW: [box.w * 0.08, box.w * 0.5, box.w * 0.2, box.w * 0.22],
+        fontSize: 11.5,
         color: theme.text,
         border: { type: 'solid', color: theme.white, pt: 1.5 },
         valign: 'middle',
@@ -451,7 +551,7 @@ window.DocAssist = window.DocAssist || {};
       return 0;
     },
     renderBody(bullets) {
-      const items = A.extractItems(bullets).slice(0, 6);
+      const items = A.extractItems(bullets).slice(0, 9);
       if (!items.length) return emptyBody();
       return `<div class="pv-kpi-grid">${items
         .map((it) => {
@@ -465,7 +565,7 @@ window.DocAssist = window.DocAssist || {};
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const items = A.extractItems(bullets).slice(0, 6);
+      const items = A.extractItems(bullets).slice(0, 9);
       if (!items.length) return;
       const n = items.length;
       const cols = n <= 3 ? n : Math.ceil(n / 2);
@@ -560,7 +660,7 @@ window.DocAssist = window.DocAssist || {};
       return 0;
     },
     renderBody(bullets) {
-      const items = A.extractItems(bullets).slice(0, 5);
+      const items = A.extractItems(bullets).slice(0, 6);
       if (!items.length) return emptyBody();
       return `<div class="pv-tree">
         <div class="pv-tree-trunk"></div>
@@ -577,7 +677,7 @@ window.DocAssist = window.DocAssist || {};
       </div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const items = A.extractItems(bullets).slice(0, 5);
+      const items = A.extractItems(bullets).slice(0, 6);
       if (!items.length) return;
       const n = items.length;
       const trunkY = box.y + 0.3;
@@ -748,7 +848,7 @@ window.DocAssist = window.DocAssist || {};
         const x = box.x + i * (colW + gap);
         const h = Math.max(0.15, ((b.to - b.from) / maxVal) * chartH);
         const y = chartBottom - (b.to / maxVal) * chartH;
-        const color = b.isTotal ? theme.primary : b.isIncrease ? theme.primaryLight : theme.accent;
+        const color = b.isTotal ? theme.primary : b.isIncrease ? theme.primaryLight : theme.gray;
         slide.addShape('rect', { x, y, w: colW, h, fill: { color } });
         slide.addText(`${b.key}\n${b.value}`, { x, y: chartBottom + 0.05, w: colW, h: 0.8, fontSize: 8, color: theme.text, align: 'center', valign: 'top' });
       });
@@ -757,8 +857,6 @@ window.DocAssist = window.DocAssist || {};
 
   // ---------- SWOT分析 ----------
   const SWOT_LABELS = ['強み', '弱み', '機会', '脅威'];
-  // 強み=ネイビー／弱み=ミディアムブルー／機会=青紫／脅威=オレンジ（NRIパレットの強調色）
-  const SWOT_COLORS = ['000F78', '3C64AA', '5A63A7', 'F59637'];
   function mapToSwot(items) {
     const slots = [null, null, null, null];
     const rest = [];
@@ -805,6 +903,9 @@ window.DocAssist = window.DocAssist || {};
       const items = A.extractItems(bullets);
       const slots = mapToSwot(items);
       if (slots.every((s) => !s)) return;
+      // SWOT_LABELSの並び順（強み・弱み・機会・脅威）に対応。
+      // ポジティブ（強み・機会）=青の濃淡、要注意（弱み・脅威）=グレーの濃淡で、色相を変えずに区別する。
+      const swotColors = [theme.primary, theme.gray, theme.primaryLight, '6B7480'];
       const gap = 0.2;
       const cw = (box.w - gap) / 2;
       const ch = (box.h - gap) / 2;
@@ -816,7 +917,7 @@ window.DocAssist = window.DocAssist || {};
       ];
       slots.forEach((s, i) => {
         const [x, y] = positions[i];
-        slide.addShape('rect', { x, y, w: cw, h: ch, fill: { color: SWOT_COLORS[i] }, line: { color: theme.white, width: 2 } });
+        slide.addShape('rect', { x, y, w: cw, h: ch, fill: { color: swotColors[i] }, line: { color: theme.white, width: 2 } });
         slide.addText(
           [
             { text: SWOT_LABELS[i] + '\n', options: { bold: true, fontSize: 13 } },
@@ -919,37 +1020,42 @@ window.DocAssist = window.DocAssist || {};
       const ratio = A.kvRatio(bullets);
       const n = bullets.length;
       const avgLen = bullets.length ? bullets.join('').length / bullets.length : 0;
-      if (n >= 5 && n <= 6 && ratio >= 0.5) return 8;
-      if (n >= 2 && n <= 6 && ratio >= 0.5 && avgLen > 28) return 7;
-      if (n >= 5 && n <= 6) return 4;
+      if (n >= 5 && n <= 8 && ratio >= 0.5) return 8;
+      if (n >= 2 && n <= 8 && ratio >= 0.5 && avgLen > 28) return 7;
+      if (n >= 5 && n <= 8) return 4;
       return 0;
     },
     renderBody(bullets) {
-      const items = A.extractItems(bullets).slice(0, 6);
+      const items = A.extractItems(bullets).slice(0, 8);
       if (!items.length) return emptyBody();
       return `<div class="pv-compare-v">${items
         .map(
           (it) => `
-        <div class="pv-compare-v-row">
-          <div class="pv-compare-v-label">${esc(it.key)}</div>
+        <div class="pv-compare-v-row${it.highlight ? ' pv-compare-v-highlight' : ''}">
+          <div class="pv-compare-v-label">${it.highlight ? '★ ' : ''}${esc(it.key)}</div>
           <div class="pv-compare-v-desc">${esc(it.value)}</div>
         </div>`
         )
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const items = A.extractItems(bullets).slice(0, 6);
+      const items = A.extractItems(bullets).slice(0, 8);
       if (!items.length) return;
       const n = items.length;
-      const gap = 0.12;
+      const gap = n >= 7 ? 0.08 : 0.12;
       const rowH = (box.h - gap * (n - 1)) / n;
       const labelW = box.w * 0.26;
+      const fontSize = n >= 7 ? 10 : 10.5;
       items.forEach((it, i) => {
         const y = box.y + i * (rowH + gap);
-        slide.addShape('rect', { x: box.x, y, w: labelW, h: rowH, fill: { color: theme.primary } });
-        slide.addText(it.key, { x: box.x + 0.08, y, w: labelW - 0.16, h: rowH, fontSize: 11, bold: true, color: theme.white, valign: 'middle' });
-        slide.addShape('rect', { x: box.x + labelW, y, w: box.w - labelW, h: rowH, fill: { color: theme.light }, line: { color: theme.border, width: 1 } });
-        slide.addText(it.value, { x: box.x + labelW + 0.1, y, w: box.w - labelW - 0.2, h: rowH, fontSize: 10.5, color: theme.text, valign: 'middle' });
+        const labelColor = it.highlight ? theme.highlight : theme.primary;
+        slide.addShape('rect', { x: box.x, y, w: labelW, h: rowH, fill: { color: labelColor } });
+        slide.addText(`${it.highlight ? '★ ' : ''}${it.key}`, { x: box.x + 0.08, y, w: labelW - 0.16, h: rowH, fontSize, bold: true, color: theme.white, valign: 'middle' });
+        slide.addShape('rect', {
+          x: box.x + labelW, y, w: box.w - labelW, h: rowH, fill: { color: theme.light },
+          line: it.highlight ? { color: theme.highlight, width: 1.5 } : { color: theme.border, width: 1 },
+        });
+        slide.addText(it.value, { x: box.x + labelW + 0.1, y, w: box.w - labelW - 0.2, h: rowH, fontSize, color: theme.text, valign: 'middle' });
       });
     },
   };
@@ -1013,6 +1119,8 @@ window.DocAssist = window.DocAssist || {};
     [0.15, 0.5],
     [0.85, 0.5],
     [0.5, 0.85],
+    [0.35, 0.4],
+    [0.65, 0.4],
   ];
 
   const positioningMap = {
@@ -1026,12 +1134,12 @@ window.DocAssist = window.DocAssist || {};
       // 「マップ」は「ロードマップ」等と誤マッチしやすいため、より具体的な語のみ使う
       const kw = A.hasAny(text, ['ポジショニングマップ', 'ポジショニング', '位置づけ', '位置付け']);
       const n = bullets.length;
-      if (kw && n >= 3 && n <= 8) return 10;
-      if (A.hasAny(text, ['軸', 'マトリクス']) && n >= 5 && n <= 8) return 7;
+      if (kw && n >= 3 && n <= 10) return 10;
+      if (A.hasAny(text, ['軸', 'マトリクス']) && n >= 5 && n <= 10) return 7;
       return 0;
     },
     renderBody(bullets) {
-      const items = A.extractItems(bullets).slice(0, 8);
+      const items = A.extractItems(bullets).slice(0, 10);
       if (items.length < 2) return emptyBody();
       return `<div class="pv-posmap">
         <div class="pv-posmap-axis-x"></div>
@@ -1129,12 +1237,12 @@ window.DocAssist = window.DocAssist || {};
       const validNums = items.filter((it) => firstNumber(it.value) !== null).length;
       const kw = A.hasAny(A.fullText(section), ['グラフ', '棒グラフ']);
       const n = bullets.length;
-      if (n >= 3 && n <= 8 && validNums === n && kw) return 10;
-      if (n >= 3 && n <= 8 && validNums === n) return 6;
+      if (n >= 3 && n <= 10 && validNums === n && kw) return 10;
+      if (n >= 3 && n <= 10 && validNums === n) return 6;
       return 0;
     },
     renderBody(bullets) {
-      const items = A.extractItems(bullets).slice(0, 8);
+      const items = A.extractItems(bullets).slice(0, 10);
       if (items.length < 2) return emptyBody();
       const values = items.map((it) => firstNumber(it.value) || 0);
       const maxV = Math.max(...values, 1);
@@ -1150,7 +1258,7 @@ window.DocAssist = window.DocAssist || {};
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const items = A.extractItems(bullets).slice(0, 8);
+      const items = A.extractItems(bullets).slice(0, 10);
       if (items.length < 2) return;
       const labels = items.map((it) => it.key);
       const values = items.map((it) => firstNumber(it.value) || 0);
@@ -1183,12 +1291,12 @@ window.DocAssist = window.DocAssist || {};
       const dateNum = items.filter((it) => A.dateTokenCount(it.key + it.value) > 0 && firstNumber(it.value) !== null).length;
       const kw = A.hasAny(text, ['推移', 'トレンド', '折れ線']);
       const n = bullets.length;
-      if (n >= 3 && n <= 8 && dateNum >= Math.ceil(n * 0.6) && kw) return 10;
-      if (n >= 3 && n <= 8 && dateNum >= Math.ceil(n * 0.6)) return 7;
+      if (n >= 3 && n <= 10 && dateNum >= Math.ceil(n * 0.6) && kw) return 10;
+      if (n >= 3 && n <= 10 && dateNum >= Math.ceil(n * 0.6)) return 7;
       return 0;
     },
     renderBody(bullets) {
-      const items = A.extractItems(bullets).slice(0, 8);
+      const items = A.extractItems(bullets).slice(0, 10);
       if (items.length < 2) return emptyBody();
       const values = items.map((it) => firstNumber(it.value) || 0);
       const maxV = Math.max(...values, 1);
@@ -1209,7 +1317,7 @@ window.DocAssist = window.DocAssist || {};
       </div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const items = A.extractItems(bullets).slice(0, 8);
+      const items = A.extractItems(bullets).slice(0, 10);
       if (items.length < 2) return;
       const labels = items.map((it) => it.key);
       const values = items.map((it) => firstNumber(it.value) || 0);
@@ -1252,7 +1360,7 @@ window.DocAssist = window.DocAssist || {};
       if (items.length < 2) return emptyBody();
       const values = items.map((it) => firstNumber(it.value) || 0);
       const total = values.reduce((a, b) => a + b, 0) || 1;
-      const colors = ['var(--primary)', 'var(--accent)', 'var(--primary-light)', '#8fb2d8', 'var(--negative)', '#a9b3c1'];
+      const colors = ['var(--primary)', 'var(--primary-light)', 'var(--accent2)', 'var(--light)', 'var(--accent)', '#a9b3c1'];
       let acc = 0;
       const stops = values
         .map((v, i) => {
@@ -1309,6 +1417,7 @@ window.DocAssist = window.DocAssist || {};
     timeline,
     timelineVertical,
     comparisonTable,
+    actionPlanTable,
     kpiSummary,
     barChart,
     lineChart,

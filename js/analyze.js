@@ -29,16 +29,24 @@ window.DocAssist = window.DocAssist || {};
     return hits / bullets.length;
   }
 
-  // 箇条書きを {key, value} の配列に変換する。KV形式でない行は
+  // 「★」または「★推奨」が含まれる行を「この項目を特に強調する（推奨案など）」の
+  // 印として扱う。マーカー自体は取り除き、item.highlight = true を立てる。
+  // 比較系パターン（ボックス比較・縦型比較・比較表など）がこれを見て、その項目だけ
+  // オレンジ等の予約色でハイライトする（多用しないための唯一のトリガー）。
+  const HIGHLIGHT_RE = /★\s*(?:推奨)?/;
+
+  // 箇条書きを {key, value, highlight} の配列に変換する。KV形式でない行は
   // 「項目N」を仮の見出しとして割り当てる。
   // 「**強調**」構文には対応していない図表系パターンで使われるため、
   // ここで一律にマーカーを取り除いておく（生の ** が出力に漏れるのを防ぐ安全策）。
   function extractItems(bullets) {
     return (bullets || []).map((b, i) => {
-      const clean = stripEmphasis(b);
+      const stripped = stripEmphasis(b);
+      const highlight = HIGHLIGHT_RE.test(stripped);
+      const clean = highlight ? stripped.replace(HIGHLIGHT_RE, '').trim() : stripped;
       const kv = splitKV(clean);
-      if (kv) return kv;
-      return { key: `項目${i + 1}`, value: clean };
+      if (kv) return Object.assign({}, kv, { highlight });
+      return { key: `項目${i + 1}`, value: clean, highlight };
     });
   }
 
