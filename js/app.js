@@ -389,34 +389,167 @@
       .join('');
   }
 
-  // 同じカテゴリ（用途）のパターンを <optgroup> でまとめ、兄弟デザインを
-  // 見つけやすくする。同一カテゴリが複数登録されているほど選択肢が増える。
-  function groupedPatternOptions(selectedId) {
-    const groups = [];
-    const byCategory = {};
-    DocAssist.patterns.forEach((p) => {
-      const cat = p.category || 'その他';
-      if (!byCategory[cat]) {
-        byCategory[cat] = [];
-        groups.push(cat);
+  // ---------------- テンプレート選択ギャラリー ----------------
+  // 用途（シーン）と役割で絞り込みながら、テンプレートを一覧から選べるようにする。
+  // サムネイルは pattern.renderBody() の出力をそのまま縮小表示しているだけなので、
+  // js/patterns.js にパターンを1つ追加すればギャラリーにも自動的に並ぶ
+  // （サムネイル画像を別途用意する必要がない）。
+  // そのスライドの実データで描けるパターンは実データで、描けないパターン
+  // （ガント・移行図など固有の記法が要るもの）はサンプルでプレビューする。
+  const THUMB_W = 460;
+
+  function chipHtml(axis, value, label, active) {
+    return `<button type="button" class="tpl-chip${active ? ' is-active' : ''}" data-axis="${axis}" data-value="${
+      value == null ? '' : escapeAttr(value)
+    }">${escapeHtml(label)}</button>`;
+  }
+
+  function openTemplatePicker(slide) {
+    const filters = { scene: null, role: null, q: '' };
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="tpl-modal">
+        <div class="tpl-head">
+          <h3>テンプレート</h3>
+          <input type="search" class="tpl-search" id="tplSearch" placeholder="テンプレート名・説明で検索">
+          <button class="btn ghost" id="tplClose">閉じる</button>
+        </div>
+        <div class="tpl-filters">
+          <div class="tpl-chip-row">
+            <span class="tpl-axis-label">用途</span>
+            ${chipHtml('scene', null, 'すべて', true)}
+            ${DocAssist.patternScenes.map((s) => chipHtml('scene', s, s, false)).join('')}
+          </div>
+          <div class="tpl-chip-row">
+            <span class="tpl-axis-label">役割</span>
+            ${chipHtml('role', null, 'すべて', true)}
+            ${DocAssist.patternRoles.map((r) => chipHtml('role', r, r, false)).join('')}
+          </div>
+        </div>
+        <div class="tpl-count" id="tplCount"></div>
+        <div class="tpl-grid" id="tplGrid"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    function close() {
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', scaleThumbs);
+      if (overlay.parentNode) document.body.removeChild(overlay);
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') close();
+    }
+
+    // サムネイルは実寸（460px幅）で組んでから、カード幅に合わせてCSSで縮小する。
+    // こうすると本番のプレビューと同じマークアップ・同じCSSをそのまま使い回せる。
+    function scaleThumbs() {
+      overlay.querySelectorAll('.tpl-thumb').forEach((thumb) => {
+        const inner = thumb.querySelector('.tpl-thumb-scale');
+        if (inner && thumb.clientWidth) inner.style.transform = `scale(${thumb.clientWidth / THUMB_W})`;
+      });
+    }
+
+    function matches(p) {
+      if (filters.scene && !(p.scenes || []).includes(filters.scene)) return false;
+      if (filters.role && p.role !== filters.role) return false;
+      if (filters.q) {
+        const hay = `${p.name} ${p.description} ${p.category} ${p.role} ${(p.scenes || []).join(' ')}`.toLowerCase();
+        if (!hay.includes(filters.q.toLowerCase())) return false;
       }
-      byCategory[cat].push(p);
+      return true;
+    }
+
+    function safeRender(pattern, bullets) {
+      try {
+        return pattern.renderBody(bullets) || '';
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function renderGrid() {
+      const grid = overlay.querySelector('#tplGrid');
+      const list = DocAssist.patterns.filter(matches);
+      overlay.querySelector('#tplCount').textContent = `${list.length}件のテンプレート`;
+      if (!list.length) {
+        grid.innerHTML = '<p class="hint">条件に合うテンプレートがありません。絞り込みを解除してください。</p>';
+        return;
+      }
+      const own = slide.bullets || [];
+      const lead = DocAssist.analyze.stripEmphasis(DocAssist.analyze.effectiveMessage(slide));
+      grid.innerHTML = list
+        .map((p) => {
+          let body = own.length ? safeRender(p, own) : '';
+          const usedOwn = !!body && !/pv-empty/.test(body);
+          if (!usedOwn) body = safeRender(p, p.sample);
+          return `
+          <button type="button" class="tpl-card${p.id === slide.patternId ? ' is-selected' : ''}" data-id="${p.id}" title="${escapeAttr(
+            p.description
+          )}">
+            <div class="tpl-thumb">
+              <div class="tpl-thumb-scale">
+                <div class="tpl-thumb-title"><span class="bar"></span>${escapeHtml(slide.heading || '見出しが入ります')}</div>
+                <div class="tpl-thumb-lead">${escapeHtml(lead || 'このスライドの結論が1文で入ります')}</div>
+                <div class="tpl-thumb-body">${body}</div>
+              </div>
+            </div>
+            <div class="tpl-card-foot">
+              <span class="tpl-card-name">${escapeHtml(p.name)}</span>
+              <span class="tpl-card-tag">${escapeHtml(p.role)}</span>
+            </div>
+            <span class="tpl-card-src">${usedOwn ? 'このスライドの内容で表示' : 'サンプル内容で表示'}</span>
+          </button>`;
+        })
+        .join('');
+      scaleThumbs();
+      grid.querySelectorAll('.tpl-card').forEach((card) => {
+        card.addEventListener('click', () => {
+          slide.patternId = card.dataset.id;
+          slide.patternSource = 'manual';
+          slide.patternReason = '';
+          close();
+          replaceCard(slide);
+        });
+      });
+      // 適用中のテンプレートは一覧の途中にあることが多いので、開いた時点で見える位置まで送る
+      const selected = grid.querySelector('.tpl-card.is-selected');
+      if (selected) selected.scrollIntoView({ block: 'nearest' });
+    }
+
+    overlay.querySelectorAll('.tpl-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const axis = chip.dataset.axis;
+        const value = chip.dataset.value || null;
+        filters[axis] = value;
+        overlay.querySelectorAll('.tpl-chip').forEach((c) => {
+          if (c.dataset.axis === axis) c.classList.toggle('is-active', (c.dataset.value || null) === value);
+        });
+        renderGrid();
+      });
     });
-    return groups
-      .map((cat) => {
-        const opts = byCategory[cat]
-          .map((p) => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`)
-          .join('');
-        return `<optgroup label="${escapeAttr(cat)}">${opts}</optgroup>`;
-      })
-      .join('');
+    const search = overlay.querySelector('#tplSearch');
+    search.addEventListener('input', () => {
+      filters.q = search.value.trim();
+      renderGrid();
+    });
+    overlay.querySelector('#tplClose').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', scaleThumbs);
+
+    renderGrid();
   }
 
   function renderSlidePreviewCard(slide, idx) {
     const wrap = document.createElement('div');
     wrap.className = 'slide-preview-card';
 
-    const options = groupedPatternOptions(slide.patternId);
+    const pattern = DocAssist.patternById[slide.patternId] || DocAssist.patternById['title-message'];
     const reasonAttr = slide.patternReason ? ` title="${escapeAttr(slide.patternReason)}"` : '';
     const message = DocAssist.analyze.effectiveMessage(slide);
     const subMessage = (slide.subMessage || '').trim();
@@ -424,7 +557,10 @@
     wrap.innerHTML = `
       <div class="slide-preview-toolbar">
         <span class="label"${reasonAttr}>${sourceLabel(slide.patternSource)}</span>
-        <select class="pattern-select">${options}</select>
+        <button type="button" class="tpl-open-btn">
+          <span class="tpl-open-name">${escapeHtml(pattern.name)}</span>
+          <span class="tpl-open-hint">テンプレートを選ぶ</span>
+        </button>
       </div>
       <div class="slide-canvas">
         <div class="slide-title-bar">
@@ -443,16 +579,8 @@
       </div>
     `;
 
-    const body = wrap.querySelector('.slide-body');
-    const pattern = DocAssist.patternById[slide.patternId] || DocAssist.patternById['title-message'];
-    body.innerHTML = pattern.renderBody(slide.bullets || []);
-
-    wrap.querySelector('.pattern-select').addEventListener('change', (e) => {
-      slide.patternId = e.target.value;
-      slide.patternSource = 'manual';
-      slide.patternReason = '';
-      replaceCard(slide);
-    });
+    wrap.querySelector('.slide-body').innerHTML = pattern.renderBody(slide.bullets || []);
+    wrap.querySelector('.tpl-open-btn').addEventListener('click', () => openTemplatePicker(slide));
 
     return wrap;
   }

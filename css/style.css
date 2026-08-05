@@ -13,6 +13,7 @@
   --card: #ffffff;
   --border: #bfbfbf;
   --light: #d6dff0;
+  --lighter: #edf1fa;
   --text: #000000;
   --subtext: #595959;
 }
@@ -1458,11 +1459,715 @@ table.pv-table tr:nth-child(even) td {
   color: #c00;
 }
 
+/* ===== テンプレート選択ギャラリー ===== */
+.tpl-open-btn {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.tpl-open-btn:hover {
+  border-color: var(--primary);
+  background: var(--lighter);
+}
+
+.tpl-open-name {
+  font-size: 12.5px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.tpl-open-hint {
+  font-size: 10.5px;
+  color: var(--subtext);
+}
+
+.tpl-modal {
+  background: #fff;
+  border-radius: 8px;
+  width: min(1180px, 94vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 22px 22px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+}
+
+.tpl-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: none;
+  margin-bottom: 14px;
+}
+
+.tpl-head h3 {
+  margin: 0;
+  font-size: 17px;
+  color: var(--text);
+  flex: none;
+}
+
+.tpl-search {
+  flex: 1;
+  max-width: 320px;
+  font-size: 13px;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: inherit;
+}
+
+.tpl-search:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.tpl-head .btn {
+  margin-left: auto;
+  flex: none;
+}
+
+.tpl-filters {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tpl-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.tpl-axis-label {
+  font-size: 11px;
+  color: var(--subtext);
+  width: 34px;
+  flex: none;
+}
+
+.tpl-chip {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.tpl-chip:hover {
+  border-color: var(--primary);
+}
+
+.tpl-chip.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: bold;
+}
+
+.tpl-count {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--subtext);
+  padding: 10px 0 8px;
+}
+
+.tpl-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 16px;
+  align-content: start;
+  padding-right: 4px;
+}
+
+.tpl-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+}
+
+.tpl-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 14px rgba(0, 15, 120, 0.14);
+  transform: translateY(-2px);
+}
+
+.tpl-card.is-selected {
+  border-color: var(--primary);
+  border-width: 2px;
+  padding: 4px;
+  box-shadow: 0 0 0 3px rgba(0, 15, 120, 0.12);
+}
+
+/* サムネイルは実寸460pxで組んでからカード幅に合わせて縮小する（JSが scale を設定）。
+   こうすることで本番プレビューと同じマークアップ・同じCSSを使い回せる。 */
+.tpl-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--border);
+  flex: none;
+}
+
+.tpl-thumb-scale {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 460px;
+  height: 258.75px;
+  transform-origin: top left;
+  display: flex;
+  flex-direction: column;
+  padding: 5% 6% 4%;
+}
+
+.tpl-thumb-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  margin-bottom: 5px;
+}
+
+.tpl-thumb-title .bar {
+  width: 3px;
+  align-self: stretch;
+  background: var(--primary);
+  flex: none;
+}
+
+.tpl-thumb-lead {
+  flex: none;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--primary);
+  line-height: 1.3;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tpl-thumb-title,
+.tpl-thumb-title .heading-text {
+  font-size: 10px;
+  font-weight: bold;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tpl-thumb-body {
+  flex: 1;
+  overflow: hidden;
+  font-size: 11px;
+}
+
+.tpl-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 3px 2px;
+}
+
+.tpl-card-name {
+  font-size: 12.5px;
+  font-weight: bold;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.tpl-card-tag {
+  font-size: 10px;
+  color: var(--primary);
+  background: var(--light);
+  border-radius: 3px;
+  padding: 2px 6px;
+  flex: none;
+}
+
+.tpl-card-src {
+  font-size: 9.5px;
+  color: var(--subtext);
+  padding: 0 3px 3px;
+}
+
+/* ===== アイコン（As-Is/To-Be構成図など） ===== */
+.pv-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--primary);
+  flex: none;
+}
+
+/* ===== As-Is / To-Be 移行図 ===== */
+.pv-a2b {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 6px;
+}
+
+.pv-a2b-row {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+}
+
+.pv-zone {
+  flex: 1;
+  background: var(--lighter);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.pv-zone-chip {
+  align-self: flex-start;
+  font-size: 8.5px;
+  font-weight: bold;
+  color: #fff;
+  padding: 2px 9px;
+  flex: none;
+}
+
+.pv-zone-chip.is-gray {
+  background: var(--gray);
+}
+
+.pv-zone-chip.is-navy {
+  background: var(--primary);
+}
+
+.pv-zone-cards {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+  min-height: 0;
+}
+
+.pv-zone-card {
+  flex: 1;
+  background: #fff;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 5px 3px;
+  min-width: 0;
+  text-align: center;
+}
+
+.pv-zone-card-main {
+  font-size: 9px;
+  font-weight: bold;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.pv-zone-card-sub {
+  font-size: 7.5px;
+  color: var(--subtext);
+  line-height: 1.2;
+}
+
+.pv-a2b-mid {
+  flex: 0 0 12%;
+  background: #fff;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 5px 2px;
+}
+
+.pv-a2b-mid-label {
+  font-size: 8.5px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.pv-a2b-arrow {
+  margin-top: auto;
+  margin-bottom: auto;
+  color: var(--primary);
+  font-size: 13px;
+}
+
+.pv-a2b-steps {
+  display: flex;
+  gap: 5px;
+  flex: none;
+}
+
+.pv-a2b-step {
+  flex: 1;
+  background: var(--light);
+  color: var(--primary);
+  font-size: 8.5px;
+  font-weight: bold;
+  padding: 4px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== 計画/実績ガント ===== */
+.pv-gantt {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-size: 9px;
+}
+
+.pv-gantt-head {
+  display: flex;
+  flex: none;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 2px;
+}
+
+.pv-gantt-cols {
+  display: flex;
+  flex: 1;
+}
+
+.pv-gantt-col {
+  flex: 1;
+  text-align: center;
+  font-size: 8px;
+  color: var(--subtext);
+}
+
+.pv-gantt-row {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  border-bottom: 1px solid #e8e8e8;
+  min-height: 0;
+}
+
+.pv-gantt-label {
+  flex: 0 0 26%;
+  font-size: 9px;
+  color: var(--text);
+  padding-right: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-gantt-label.is-highlight {
+  color: var(--highlight);
+  font-weight: bold;
+}
+
+.pv-gantt-track {
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+}
+
+.pv-gantt-grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e8e8e8;
+}
+
+.pv-gantt-bar {
+  position: absolute;
+  top: 26%;
+  height: 26%;
+  background: var(--primary);
+}
+
+.pv-gantt-bar.is-actual {
+  top: 58%;
+  background: var(--accent);
+}
+
+.pv-gantt-bar.is-highlight {
+  background: var(--highlight);
+}
+
+/* ===== マイルストーン（シェブロン） ===== */
+.pv-ms {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 2px;
+}
+
+.pv-ms-step {
+  flex: 1;
+  position: relative;
+  background: var(--primary);
+  color: #fff;
+  padding: 8px 6px 8px 14px;
+  min-width: 0;
+  text-align: center;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+}
+
+.pv-ms-step:nth-child(even) {
+  background: var(--primary-light);
+}
+
+.pv-ms-step.is-highlight {
+  background: var(--highlight);
+}
+
+.pv-ms-name {
+  font-size: 9.5px;
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+.pv-ms-title {
+  font-size: 8.5px;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.pv-ms-date {
+  font-size: 8px;
+  line-height: 1.2;
+  margin-top: 1px;
+  opacity: 0.9;
+}
+
+/* ===== 状況・影響度バッジ（タスク状況表／課題・リスク一覧） ===== */
+.pv-badge {
+  display: inline-block;
+  font-size: 8.5px;
+  font-weight: bold;
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.pv-badge.is-primary {
+  background: var(--primary);
+}
+
+.pv-badge.is-primary-light {
+  background: var(--primary-light);
+}
+
+.pv-badge.is-gray {
+  background: var(--gray);
+}
+
+.pv-badge.is-critical {
+  background: var(--critical);
+}
+
+/* ===== 意思決定依頼 ===== */
+.pv-decision {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 7px;
+}
+
+.pv-decision-ask {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--primary);
+  padding: 7px 10px;
+}
+
+.pv-decision-ask-text {
+  flex: 1;
+  font-size: 11px;
+  font-weight: bold;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.pv-decision-due {
+  flex: none;
+  background: #fff;
+  color: var(--primary);
+  font-size: 8.5px;
+  font-weight: bold;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.pv-decision-options {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+}
+
+.pv-decision-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pv-decision-option-head {
+  flex: none;
+  background: var(--primary-light);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: bold;
+  text-align: center;
+  padding: 4px 3px;
+}
+
+.pv-decision-option.is-highlight .pv-decision-option-head {
+  background: var(--highlight);
+}
+
+.pv-decision-option-title,
+.pv-decision-option-desc {
+  background: var(--light);
+  padding: 0 7px;
+}
+
+.pv-decision-option-title {
+  font-size: 9.5px;
+  font-weight: bold;
+  color: var(--text);
+  padding-top: 6px;
+  line-height: 1.3;
+}
+
+.pv-decision-option-desc {
+  flex: 1;
+  font-size: 8.5px;
+  color: var(--text);
+  padding-top: 3px;
+  padding-bottom: 6px;
+  line-height: 1.35;
+}
+
+.pv-decision-option.is-highlight .pv-decision-option-title,
+.pv-decision-option.is-highlight .pv-decision-option-desc {
+  outline: 1.5px solid var(--highlight);
+  outline-offset: -1.5px;
+}
+
+/* ===== ブロッカーと依頼 ===== */
+.pv-blocker {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 4px;
+}
+
+.pv-blocker-head {
+  display: grid;
+  grid-template-columns: 1fr 26px 1fr;
+  gap: 4px;
+  flex: none;
+  font-size: 8.5px;
+  font-weight: bold;
+  color: var(--subtext);
+}
+
+.pv-blocker-row {
+  display: grid;
+  grid-template-columns: 1fr 26px 1fr;
+  gap: 4px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
+.pv-blocker-cell {
+  display: flex;
+  align-items: center;
+  padding: 4px 7px;
+  font-size: 9px;
+  line-height: 1.3;
+  overflow: hidden;
+}
+
+.pv-blocker-cell.is-issue {
+  background: var(--lighter);
+  border-left: 3px solid var(--gray);
+  color: var(--text);
+}
+
+.pv-blocker-row.is-highlight .pv-blocker-cell.is-issue {
+  border-left-color: var(--critical);
+}
+
+.pv-blocker-cell.is-req {
+  background: var(--light);
+  color: var(--primary);
+  font-weight: bold;
+}
+
+.pv-blocker-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  font-size: 10px;
+}
+
 @media (max-width: 640px) {
   .slide-preview-card {
     width: 100%;
   }
   .export-row {
     flex-wrap: wrap;
+  }
+  .tpl-modal {
+    padding: 14px;
+  }
+  .tpl-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   }
 }

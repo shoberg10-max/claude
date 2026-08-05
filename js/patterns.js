@@ -67,6 +67,92 @@ window.DocAssist = window.DocAssist || {};
     return runs;
   }
 
+  // ---------- アイコン ----------
+  // PowerPoint標準のプリセット図形でアイコンを描く。画像を貼り込まないので、
+  // 書き出したあともPowerPoint上で色・サイズをそのまま編集できる。
+  // プレビュー側は同じ意味を持つ線画SVGで揃える。
+  const ICONS = {
+    process: { shape: 'flowChartProcess', svg: '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 10h18"/>' },
+    doc: { shape: 'flowChartDocument', svg: '<path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4"/>' },
+    db: { shape: 'flowChartMagneticDisk', svg: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/>' },
+    server: { shape: 'can', svg: '<ellipse cx="12" cy="5" rx="7" ry="2.5"/><path d="M5 5v14c0 1.4 3 2.5 7 2.5s7-1.1 7-2.5V5"/><path d="M5 12c0 1.4 3 2.5 7 2.5s7-1.1 7-2.5"/>' },
+    cloud: { shape: 'cloud', svg: '<path d="M7 19h10a4 4 0 0 0 .3-8 6 6 0 0 0-11.4-1.4A4 4 0 0 0 7 19z"/>' },
+    gear: { shape: 'gear6', svg: '<circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1M18.7 18.7l-2.1-2.1M7.4 7.4L5.3 5.3"/>' },
+    folder: { shape: 'folderCorner', svg: '<path d="M3 6h6l2 2h10v12H3z"/>' },
+    decision: { shape: 'flowChartDecision', svg: '<path d="M12 3l9 9-9 9-9-9z"/>' },
+  };
+
+  // ラベルの語句からふさわしいアイコンを推測する（構成図で明示指定させないための補助）。
+  const ICON_HINTS = [
+    [/クラウド|SaaS|Cloud|AWS|Azure|GCP/i, 'cloud'],
+    [/DB|ＤＢ|データベース|データ|Oracle|SQL|マスタ/i, 'db'],
+    [/サーバ|基盤|インフラ|オンプレ/, 'server'],
+    [/帳票|書類|ファイル|ドキュメント|資料|Excel/i, 'doc'],
+    [/業務|運用|プロセス|手作業|自動化/, 'gear'],
+    [/フォルダ|共有|格納|ストレージ/, 'folder'],
+    [/判断|審査|承認|チェック/, 'decision'],
+  ];
+  function guessIcon(label) {
+    const hit = ICON_HINTS.find(([re]) => re.test(String(label || '')));
+    return hit ? hit[1] : 'process';
+  }
+  function iconSvg(key) {
+    const icon = ICONS[key] || ICONS.process;
+    return `<svg class="pv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${icon.svg}</svg>`;
+  }
+  function addIcon(slide, key, box, theme) {
+    const icon = ICONS[key] || ICONS.process;
+    slide.addShape(icon.shape, {
+      x: box.x, y: box.y, w: box.w, h: box.h,
+      fill: { color: theme.light }, line: { color: theme.primary, width: 1 },
+    });
+  }
+
+  // 複合レイアウトで使う共通の区切り。「／」は1グループ内の要素、「｜」は列・段階を表す。
+  function splitGroupItems(value) {
+    return String(value == null ? '' : value).split(/[／/]/).map((s) => s.trim()).filter(Boolean);
+  }
+  function splitFields(value) {
+    return String(value == null ? '' : value).split(/[｜|]/).map((s) => s.trim()).filter(Boolean);
+  }
+  // 「顧客DB（Oracle）」→ { main: '顧客DB', sub: 'Oracle' }。括弧書きを補足行として扱う。
+  function splitItemSub(text) {
+    const m = String(text == null ? '' : text).match(/^(.*?)[（(]([^）)]*)[）)]\s*$/);
+    if (m && m[1].trim()) return { main: m[1].trim(), sub: m[2].trim() };
+    return { main: String(text == null ? '' : text).trim(), sub: '' };
+  }
+
+  // 進捗系パターンの状態バッジ色。「遅延」は例外的にレッドを使う（本当に注意喚起が
+  // 必要な箇所のみ予約色を使う、というテーマ方針に沿った唯一の用途）。
+  function statusTone(text, theme) {
+    const s = String(text == null ? '' : text);
+    if (/遅延|遅れ|超過|危険|Delayed|At ?Risk/i.test(s)) return theme.critical;
+    if (/完了|済|Done|クローズ|Closed/i.test(s)) return theme.primary;
+    if (/進行|対応中|着手|WIP|In ?Progress/i.test(s)) return theme.primaryLight;
+    return theme.gray;
+  }
+  // 影響度・重要度バッジ色（高＝レッド、中＝ブルー、低＝グレー）。
+  function severityTone(text, theme) {
+    const s = String(text == null ? '' : text);
+    if (/^\s*(高|大|重大|High|Critical)/i.test(s)) return theme.critical;
+    if (/^\s*(中|Medium|Mid)/i.test(s)) return theme.primaryLight;
+    return theme.gray;
+  }
+  // プレビューHTML側は同じ判定をCSSクラスに落とす（PPTX側の色と1対1で対応させる）。
+  function statusCls(text) {
+    const s = String(text == null ? '' : text);
+    if (/遅延|遅れ|超過|危険|Delayed|At ?Risk/i.test(s)) return 'is-critical';
+    if (/完了|済|Done|クローズ|Closed/i.test(s)) return 'is-primary';
+    if (/進行|対応中|着手|WIP|In ?Progress/i.test(s)) return 'is-primary-light';
+    return 'is-gray';
+  }
+  function severityCls(text) {
+    const s = String(text == null ? '' : text);
+    if (/^\s*(高|大|重大|High|Critical)/i.test(s)) return 'is-critical';
+    if (/^\s*(中|Medium|Mid)/i.test(s)) return 'is-primary-light';
+    return 'is-gray';
+  }
+
   // ---------- タイトル＋メッセージ（フォールバック） ----------
   // リード文はスライド上部の共通メッセージ帯（pptxExport.js）が既に表示しているので、
   // ここでは箇条書きをシンプルに並べるだけにする（メッセージを重複表示しない）。
@@ -1397,6 +1483,612 @@ window.DocAssist = window.DocAssist || {};
     },
   };
 
+  // ---------- As-Is / To-Be 移行図 ----------
+  // 現行構成と移行後構成を左右のゾーンで対比し、中央に移行の向き、下部に移行ステップを置く複合図。
+  // 入力形式：
+  //   - As-Is：基幹システム（オンプレ）／顧客DB（Oracle）
+  //   - To-Be：SaaS基幹システム／クラウドDB（PostgreSQL）
+  //   - 移行ステップ：現行分析｜データ移行｜並行稼働
+  // 「／」でゾーン内の要素を、「｜」で移行ステップを区切る。括弧書きは各要素の補足行になる。
+  function parseAsIsToBe(bullets) {
+    const items = A.extractItems(bullets);
+    const pick = (re) => items.find((it) => re.test(it.key));
+    const asIs = pick(/as-?is|現状|現行|旧/i);
+    const toBe = pick(/to-?be|将来|あるべき|移行後|新/i);
+    const steps = pick(/移行|ステップ|経路|フェーズ|段階/);
+    const rest = items.filter((it) => it !== asIs && it !== toBe && it !== steps);
+    const fallback = (i) => (rest[i] ? rest[i].value : '');
+    return {
+      asIsLabel: asIs ? asIs.key : 'As-Is',
+      asIsItems: splitGroupItems(asIs ? asIs.value : fallback(0)).slice(0, 3),
+      toBeLabel: toBe ? toBe.key : 'To-Be',
+      toBeItems: splitGroupItems(toBe ? toBe.value : fallback(1)).slice(0, 3),
+      steps: splitFields(steps ? steps.value : '').slice(0, 4),
+    };
+  }
+
+  const asIsToBe = {
+    id: 'as-is-to-be',
+    name: 'As-Is／To-Be 移行図',
+    category: '変化・対比',
+    description: '現行構成と移行後構成をアイコン付きのゾーンで左右に対比し、下部に移行ステップを並べる構成図。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.countAny(text, ['As-Is', 'as-is', 'To-Be', 'to-be', '移行', '現行', 'あるべき姿', '構成図']);
+      const hasZone = /[／/]/.test(text);
+      if (kw >= 2 && hasZone) return 10;
+      if (kw >= 2) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      const d = parseAsIsToBe(bullets);
+      if (!d.asIsItems.length && !d.toBeItems.length) return emptyBody();
+      const zone = (label, list, toneCls) => `
+        <div class="pv-zone">
+          <div class="pv-zone-chip ${toneCls}">${esc(label)}</div>
+          <div class="pv-zone-cards">${list
+            .map((raw) => {
+              const it = splitItemSub(raw);
+              return `<div class="pv-zone-card">${iconSvg(guessIcon(it.main))}<div class="pv-zone-card-main">${esc(it.main)}</div>${
+                it.sub ? `<div class="pv-zone-card-sub">${esc(it.sub)}</div>` : ''
+              }</div>`;
+            })
+            .join('')}</div>
+        </div>`;
+      return `<div class="pv-a2b">
+        <div class="pv-a2b-row">
+          ${zone(d.asIsLabel, d.asIsItems, 'is-gray')}
+          <div class="pv-a2b-mid"><div class="pv-a2b-mid-label">移行</div><div class="pv-a2b-arrow">▶</div></div>
+          ${zone(d.toBeLabel, d.toBeItems, 'is-navy')}
+        </div>
+        ${
+          d.steps.length
+            ? `<div class="pv-a2b-steps">${d.steps
+                .map((s, i) => `<div class="pv-a2b-step"><b>${i + 1}.</b> ${esc(s)}</div>`)
+                .join('')}</div>`
+            : ''
+        }
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const d = parseAsIsToBe(bullets);
+      if (!d.asIsItems.length && !d.toBeItems.length) return;
+      const stepH = d.steps.length ? 0.62 : 0;
+      const zoneH = box.h - stepH;
+      const midW = Math.min(1.35, box.w * 0.12);
+      const gap = 0.16;
+      const zoneW = (box.w - midW - gap * 2) / 2;
+      const zones = [
+        { x: box.x, label: d.asIsLabel, items: d.asIsItems, tone: theme.gray },
+        { x: box.x + zoneW + gap + midW + gap, label: d.toBeLabel, items: d.toBeItems, tone: theme.primary },
+      ];
+      zones.forEach((z) => {
+        slide.addShape('rect', { x: z.x, y: box.y, w: zoneW, h: zoneH, fill: { color: theme.lighter }, line: { type: 'none' } });
+        const chipW = Math.min(1.15, zoneW * 0.42);
+        slide.addShape('rect', { x: z.x + 0.1, y: box.y + 0.1, w: chipW, h: 0.26, fill: { color: z.tone }, line: { type: 'none' } });
+        slide.addText(z.label, { x: z.x + 0.1, y: box.y + 0.1, w: chipW, h: 0.26, fontSize: 9.5, bold: true, color: theme.white, align: 'center', valign: 'middle' });
+        const n = z.items.length || 1;
+        const cardGap = 0.12;
+        const cardW = (zoneW - 0.24 - cardGap * (n - 1)) / n;
+        const cardY = box.y + 0.46;
+        const cardH = zoneH - 0.58;
+        z.items.forEach((raw, i) => {
+          const it = splitItemSub(raw);
+          const x = z.x + 0.12 + i * (cardW + cardGap);
+          slide.addShape('rect', { x, y: cardY, w: cardW, h: cardH, fill: { color: theme.white }, line: { color: theme.border, width: 0.75 } });
+          const iconSize = Math.min(0.4, cardW * 0.38, cardH * 0.34);
+          addIcon(slide, guessIcon(it.main), { x: x + cardW / 2 - iconSize / 2, y: cardY + 0.14, w: iconSize, h: iconSize }, theme);
+          const textY = cardY + iconSize + 0.22;
+          slide.addText(it.main, { x: x + 0.05, y: textY, w: cardW - 0.1, h: 0.4, fontSize: 9.5, bold: true, color: theme.text, align: 'center', valign: 'top' });
+          if (it.sub) {
+            slide.addText(it.sub, { x: x + 0.05, y: textY + 0.38, w: cardW - 0.1, h: 0.28, fontSize: 8, color: theme.subtext, align: 'center', valign: 'top' });
+          }
+        });
+      });
+      const midX = box.x + zoneW + gap;
+      slide.addShape('rect', { x: midX, y: box.y, w: midW, h: zoneH, fill: { color: theme.white }, line: { color: theme.border, width: 0.75 } });
+      slide.addText('移行', { x: midX, y: box.y + 0.1, w: midW, h: 0.26, fontSize: 9, bold: true, color: theme.primary, align: 'center', valign: 'middle' });
+      slide.addShape('rightArrow', { x: midX + midW * 0.14, y: box.y + zoneH / 2 - 0.15, w: midW * 0.72, h: 0.3, fill: { color: theme.primary }, line: { type: 'none' } });
+      if (d.steps.length) {
+        const sy = box.y + zoneH + 0.16;
+        const sn = d.steps.length;
+        const sGap = 0.12;
+        const sw = (box.w - sGap * (sn - 1)) / sn;
+        d.steps.forEach((s, i) => {
+          const x = box.x + i * (sw + sGap);
+          slide.addShape('rect', { x, y: sy, w: sw, h: 0.34, fill: { color: theme.light }, line: { type: 'none' } });
+          slide.addText(`${i + 1}. ${s}`, { x: x + 0.08, y: sy, w: sw - 0.16, h: 0.34, fontSize: 9, bold: true, color: theme.primary, valign: 'middle' });
+        });
+      }
+    },
+  };
+
+  // ---------- 計画/実績ガント ----------
+  // 入力形式：
+  //   - 期間：4月｜5月｜6月｜7月｜8月     ← 列見出し（省略時は 1,2,3… になる）
+  //   - 要件定義：1-2                     ← 計画のみ
+  //   - 設計・開発：2-4｜2-5               ← 計画｜実績（2本目を書くと実績バーが下に並ぶ）
+  function parseSpan(text) {
+    const m = String(text == null ? '' : text).match(/(\d+)\s*[-–~〜]\s*(\d+)/);
+    if (!m) return null;
+    const from = parseInt(m[1], 10);
+    const to = parseInt(m[2], 10);
+    if (!(from >= 1) || !(to >= from)) return null;
+    return { from, to };
+  }
+  function parseGantt(bullets) {
+    const items = A.extractItems(bullets);
+    let cols = [];
+    const rows = [];
+    items.forEach((it) => {
+      if (/^(期間|列|軸|スケール|月)/.test(it.key) && !parseSpan(it.value)) {
+        cols = splitFields(it.value);
+        return;
+      }
+      const spans = splitFields(it.value).map(parseSpan).filter(Boolean);
+      if (spans.length) rows.push({ label: it.key, plan: spans[0], actual: spans[1] || null, highlight: it.highlight });
+    });
+    const maxCol = rows.reduce((m, r) => Math.max(m, r.plan.to, r.actual ? r.actual.to : 0), 1);
+    if (!cols.length) cols = Array.from({ length: maxCol }, (_, i) => String(i + 1));
+    while (cols.length < maxCol) cols.push(String(cols.length + 1));
+    return { cols, rows: rows.slice(0, 8) };
+  }
+
+  const ganttChart = {
+    id: 'gantt-chart',
+    name: '計画/実績ガント',
+    category: '時系列',
+    description: 'タスクごとの計画期間（と実績期間）を横棒で並べるガントチャート。「タスク：2-4｜2-5」の形式で書く。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ガント', '工程', 'スケジュール', '計画/実績', '計画・実績']);
+      const g = parseGantt(bullets);
+      if (g.rows.length >= 3 && kw) return 10;
+      if (g.rows.length >= 3) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      const g = parseGantt(bullets);
+      if (!g.rows.length) return emptyBody();
+      const n = g.cols.length;
+      const pct = (v) => (v / n) * 100;
+      return `<div class="pv-gantt">
+        <div class="pv-gantt-head"><div class="pv-gantt-label"></div><div class="pv-gantt-cols">${g.cols
+          .map((c) => `<div class="pv-gantt-col">${esc(c)}</div>`)
+          .join('')}</div></div>
+        ${g.rows
+          .map(
+            (r) => `<div class="pv-gantt-row">
+          <div class="pv-gantt-label${r.highlight ? ' is-highlight' : ''}">${esc(r.label)}</div>
+          <div class="pv-gantt-track">
+            ${g.cols.map((_, i) => `<span class="pv-gantt-grid" style="left:${pct(i)}%;"></span>`).join('')}
+            <div class="pv-gantt-bar${r.highlight ? ' is-highlight' : ''}" style="left:${pct(r.plan.from - 1)}%;width:${pct(r.plan.to - r.plan.from + 1)}%;"></div>
+            ${
+              r.actual
+                ? `<div class="pv-gantt-bar is-actual" style="left:${pct(r.actual.from - 1)}%;width:${pct(r.actual.to - r.actual.from + 1)}%;"></div>`
+                : ''
+            }
+          </div>
+        </div>`
+          )
+          .join('')}
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const g = parseGantt(bullets);
+      if (!g.rows.length) return;
+      const hasActual = g.rows.some((r) => r.actual);
+      const legendH = hasActual ? 0.24 : 0;
+      const labelW = box.w * 0.26;
+      const gridX = box.x + labelW;
+      const gridW = box.w - labelW;
+      const colW = gridW / g.cols.length;
+      const headH = 0.3;
+      const bodyH = box.h - headH - legendH;
+      const rowH = Math.min(0.5, bodyH / g.rows.length);
+      const gridBottom = box.y + headH + rowH * g.rows.length;
+      g.cols.forEach((c, i) => {
+        slide.addText(c, { x: gridX + i * colW, y: box.y, w: colW, h: headH, fontSize: 8.5, color: theme.subtext, align: 'center', valign: 'middle' });
+        slide.addShape('line', { x: gridX + i * colW, y: box.y + headH, w: 0, h: gridBottom - (box.y + headH), line: { color: theme.border, width: 0.5 } });
+      });
+      slide.addShape('line', { x: gridX + gridW, y: box.y + headH, w: 0, h: gridBottom - (box.y + headH), line: { color: theme.border, width: 0.5 } });
+      slide.addShape('line', { x: box.x, y: box.y + headH, w: box.w, h: 0, line: { color: theme.border, width: 0.75 } });
+      g.rows.forEach((r, i) => {
+        const y = box.y + headH + i * rowH;
+        slide.addText(r.label, {
+          x: box.x, y, w: labelW - 0.12, h: rowH,
+          fontSize: 9.5, bold: !!r.highlight, color: r.highlight ? theme.highlight : theme.text, valign: 'middle',
+        });
+        const barH = r.actual ? rowH * 0.28 : rowH * 0.4;
+        const planY = r.actual ? y + rowH * 0.16 : y + rowH / 2 - barH / 2;
+        slide.addShape('rect', {
+          x: gridX + (r.plan.from - 1) * colW + 0.02, y: planY,
+          w: (r.plan.to - r.plan.from + 1) * colW - 0.04, h: barH,
+          fill: { color: r.highlight ? theme.highlight : theme.primary }, line: { type: 'none' },
+        });
+        if (r.actual) {
+          slide.addShape('rect', {
+            x: gridX + (r.actual.from - 1) * colW + 0.02, y: planY + barH + rowH * 0.08,
+            w: (r.actual.to - r.actual.from + 1) * colW - 0.04, h: barH,
+            fill: { color: theme.accent }, line: { type: 'none' },
+          });
+        }
+        slide.addShape('line', { x: box.x, y: y + rowH, w: box.w, h: 0, line: { color: theme.border, width: 0.4 } });
+      });
+      if (hasActual) {
+        const ly = gridBottom + 0.06;
+        slide.addShape('rect', { x: gridX, y: ly + 0.05, w: 0.18, h: 0.1, fill: { color: theme.primary }, line: { type: 'none' } });
+        slide.addText('計画', { x: gridX + 0.24, y: ly, w: 0.6, h: 0.2, fontSize: 8, color: theme.subtext, valign: 'middle' });
+        slide.addShape('rect', { x: gridX + 0.86, y: ly + 0.05, w: 0.18, h: 0.1, fill: { color: theme.accent }, line: { type: 'none' } });
+        slide.addText('実績', { x: gridX + 1.1, y: ly, w: 0.6, h: 0.2, fontSize: 8, color: theme.subtext, valign: 'middle' });
+      }
+    },
+  };
+
+  // ---------- マイルストーン（シェブロン） ----------
+  // 入力形式： - 要件確定：2026年3月  ／  - M1：要件確定｜2026年3月
+  function parseMilestones(bullets) {
+    return A.extractItems(bullets)
+      .slice(0, 6)
+      .map((it) => {
+        const f = splitFields(it.value);
+        return f.length >= 2
+          ? { name: it.key, title: f[0], date: f[1], highlight: it.highlight }
+          : { name: it.key, title: '', date: f[0] || '', highlight: it.highlight };
+      });
+  }
+
+  const milestoneChevron = {
+    id: 'milestone-chevron',
+    name: 'マイルストーン（シェブロン）',
+    category: '時系列',
+    description: '節目を矢羽根（シェブロン）で連ねて示す。到達点と時期を短く並べたいときに使う。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['マイルストーン', '節目', 'ゲート', 'Milestone']);
+      const n = bullets.length;
+      if (kw && n >= 3 && n <= 6) return 10;
+      if (kw && n >= 2) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const ms = parseMilestones(bullets);
+      if (!ms.length) return emptyBody();
+      return `<div class="pv-ms">${ms
+        .map(
+          (m) => `<div class="pv-ms-step${m.highlight ? ' is-highlight' : ''}">
+          <div class="pv-ms-name">${esc(m.name)}</div>
+          ${m.title ? `<div class="pv-ms-title">${esc(m.title)}</div>` : ''}
+          ${m.date ? `<div class="pv-ms-date">${esc(m.date)}</div>` : ''}
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const ms = parseMilestones(bullets);
+      if (!ms.length) return;
+      const n = ms.length;
+      const overlap = 0.12;
+      const stepW = (box.w + overlap * (n - 1)) / n;
+      const h = Math.min(1.05, box.h);
+      const y = box.y + (box.h - h) / 2;
+      ms.forEach((m, i) => {
+        const x = box.x + i * (stepW - overlap);
+        const fill = m.highlight ? theme.highlight : i % 2 === 0 ? theme.primary : theme.primaryLight;
+        slide.addShape(i === 0 ? 'homePlate' : 'chevron', { x, y, w: stepW, h, fill: { color: fill }, line: { type: 'none' } });
+        const runs = [{ text: m.name, options: { bold: true, fontSize: 10.5, breakLine: true } }];
+        if (m.title) runs.push({ text: m.title, options: { fontSize: 9, breakLine: true } });
+        if (m.date) runs.push({ text: m.date, options: { fontSize: 8.5 } });
+        slide.addText(runs, {
+          x: x + overlap + 0.06, y, w: stepW - overlap * 2 - 0.12, h,
+          color: theme.white, align: 'center', valign: 'middle', lineSpacingMultiple: 1.1,
+        });
+      });
+    },
+  };
+
+  // ---------- タスク状況表 ----------
+  // 入力形式： - 要件定義：山田｜完了｜3/10   （タスク名：担当｜状況｜期限）
+  const taskStatusTable = {
+    id: 'task-status-table',
+    name: 'タスク状況表',
+    category: 'アクションプラン',
+    description: '進捗MTG向けに、タスクの担当・状況・期限を一覧化する。状況は完了／進行中／未着手／遅延で色分けされる。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['進捗', 'ステータス', '状況', 'タスク一覧']);
+      const items = A.extractItems(bullets);
+      const withStatus = items.filter((it) => /完了|進行|未着手|遅延|対応中/.test(it.value)).length;
+      const n = bullets.length;
+      if (n >= 3 && withStatus >= Math.ceil(n * 0.6) && kw) return 10;
+      if (n >= 3 && withStatus >= Math.ceil(n * 0.6)) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (!items.length) return emptyBody();
+      return `<table class="pv-table"><thead><tr><th>タスク</th><th style="width:16%;">担当</th><th style="width:16%;">状況</th><th style="width:18%;">期限</th></tr></thead><tbody>
+        ${items
+          .map((it) => {
+            const f = splitFields(it.value);
+            const status = f[1] || '';
+            return `<tr><td>${esc(it.key)}</td><td>${esc(f[0] || '')}</td><td><span class="pv-badge ${statusCls(status)}">${esc(status)}</span></td><td>${esc(f[2] || '')}</td></tr>`;
+          })
+          .join('')}
+      </tbody></table>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (!items.length) return;
+      const head = { bold: true, color: theme.white, fill: { color: theme.primary } };
+      const rows = [
+        [
+          { text: 'タスク', options: head },
+          { text: '担当', options: head },
+          { text: '状況', options: head },
+          { text: '期限', options: head },
+        ],
+        ...items.map((it, i) => {
+          const f = splitFields(it.value);
+          const status = f[1] || '';
+          const fill = { color: i % 2 ? theme.lighter : theme.white };
+          return [
+            { text: it.key, options: { fill } },
+            { text: f[0] || '', options: { fill, align: 'center' } },
+            { text: status, options: { fill: { color: statusTone(status, theme) }, color: theme.white, bold: true, align: 'center' } },
+            { text: f[2] || '', options: { fill, align: 'center' } },
+          ];
+        }),
+      ];
+      slide.addTable(rows, {
+        x: box.x, y: box.y, w: box.w,
+        colW: [box.w * 0.46, box.w * 0.16, box.w * 0.18, box.w * 0.2],
+        fontSize: 11, color: theme.text,
+        border: { type: 'solid', color: theme.white, pt: 1.5 },
+        valign: 'middle', autoPage: false,
+      });
+    },
+  };
+
+  // ---------- 課題・リスク一覧 ----------
+  // 入力形式： - 要件の認識齟齬：部門間で解釈が異なる｜高｜3/5に合同レビュー
+  const issueRiskList = {
+    id: 'issue-risk-list',
+    name: '課題・リスク一覧',
+    category: 'アクションプラン',
+    description: '課題・リスクを内容／影響度／対応方針の3列で一覧化する。影響度「高」だけがレッドで強調される。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['課題', 'リスク', '懸念', 'Issue', 'Risk']);
+      const items = A.extractItems(bullets);
+      const withSeverity = items.filter((it) => splitFields(it.value).length >= 2).length;
+      const n = bullets.length;
+      if (n >= 2 && kw && withSeverity >= Math.ceil(n * 0.6)) return 10;
+      if (n >= 2 && kw) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 7);
+      if (!items.length) return emptyBody();
+      return `<table class="pv-table"><thead><tr><th style="width:24%;">課題・リスク</th><th>内容</th><th style="width:12%;">影響度</th><th style="width:26%;">対応方針</th></tr></thead><tbody>
+        ${items
+          .map((it) => {
+            const f = splitFields(it.value);
+            const sev = f[1] || '';
+            return `<tr><td>${esc(it.key)}</td><td>${esc(f[0] || '')}</td><td><span class="pv-badge ${severityCls(sev)}">${esc(sev)}</span></td><td>${esc(f[2] || '')}</td></tr>`;
+          })
+          .join('')}
+      </tbody></table>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 7);
+      if (!items.length) return;
+      const head = { bold: true, color: theme.white, fill: { color: theme.primary } };
+      const rows = [
+        [
+          { text: '課題・リスク', options: head },
+          { text: '内容', options: head },
+          { text: '影響度', options: head },
+          { text: '対応方針', options: head },
+        ],
+        ...items.map((it, i) => {
+          const f = splitFields(it.value);
+          const sev = f[1] || '';
+          const fill = { color: i % 2 ? theme.lighter : theme.white };
+          return [
+            { text: it.key, options: { fill, bold: true } },
+            { text: f[0] || '', options: { fill } },
+            { text: sev, options: { fill: { color: severityTone(sev, theme) }, color: theme.white, bold: true, align: 'center' } },
+            { text: f[2] || '', options: { fill } },
+          ];
+        }),
+      ];
+      slide.addTable(rows, {
+        x: box.x, y: box.y, w: box.w,
+        colW: [box.w * 0.24, box.w * 0.38, box.w * 0.12, box.w * 0.26],
+        fontSize: 10.5, color: theme.text,
+        border: { type: 'solid', color: theme.white, pt: 1.5 },
+        valign: 'middle', autoPage: false,
+      });
+    },
+  };
+
+  // ---------- 意思決定依頼 ----------
+  // 入力形式：
+  //   - 依頼事項：B社CRMの採用可否をご判断いただきたい
+  //   - 期限：2026年3月10日
+  //   - A案：A社CRM｜低コストだが拡張性に課題
+  //   - B案：★推奨 B社CRM｜コストと機能のバランスが良い
+  function parseDecisionRequest(bullets) {
+    const items = A.extractItems(bullets);
+    const ask = items.find((it) => /依頼|決定|判断|論点|ご確認/.test(it.key));
+    const due = items.find((it) => /期限|期日|回答|Deadline/i.test(it.key));
+    const options = items.filter((it) => it !== ask && it !== due).slice(0, 3);
+    return {
+      ask: ask ? ask.value : '',
+      due: due ? due.value : '',
+      options: options.map((it) => {
+        const f = splitFields(it.value);
+        return { label: it.key, title: f[0] || it.value, desc: f[1] || '', highlight: it.highlight };
+      }),
+    };
+  }
+
+  const decisionRequest = {
+    id: 'decision-request',
+    name: '意思決定依頼',
+    category: '比較',
+    description: '依頼事項と回答期限を上部の帯で示し、選択肢を並べて意思決定を促す。推奨案は「★推奨」でハイライトされる。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.countAny(text, ['ご判断', '意思決定', '依頼事項', 'ご承認', '決裁', 'ご確認いただきたい']);
+      const d = parseDecisionRequest(section.bullets || []);
+      if (kw >= 1 && d.ask && d.options.length >= 2) return 10;
+      if (kw >= 1 && d.options.length >= 2) return 8;
+      if (kw >= 1) return 6;
+      return 0;
+    },
+    renderBody(bullets) {
+      const d = parseDecisionRequest(bullets);
+      if (!d.ask && !d.options.length) return emptyBody();
+      return `<div class="pv-decision">
+        ${
+          d.ask
+            ? `<div class="pv-decision-ask"><span class="pv-decision-ask-text">${esc(d.ask)}</span>${
+                d.due ? `<span class="pv-decision-due">期限：${esc(d.due)}</span>` : ''
+              }</div>`
+            : ''
+        }
+        <div class="pv-decision-options">${d.options
+          .map(
+            (o) => `<div class="pv-decision-option${o.highlight ? ' is-highlight' : ''}">
+            <div class="pv-decision-option-head">${o.highlight ? '★ ' : ''}${esc(o.label)}</div>
+            <div class="pv-decision-option-title">${esc(o.title)}</div>
+            ${o.desc ? `<div class="pv-decision-option-desc">${esc(o.desc)}</div>` : ''}
+          </div>`
+          )
+          .join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const d = parseDecisionRequest(bullets);
+      if (!d.ask && !d.options.length) return;
+      let y = box.y;
+      if (d.ask) {
+        const askH = 0.62;
+        slide.addShape('rect', { x: box.x, y, w: box.w, h: askH, fill: { color: theme.primary }, line: { type: 'none' } });
+        const dueW = d.due ? Math.min(2.5, box.w * 0.26) : 0;
+        slide.addText(d.ask, {
+          x: box.x + 0.18, y, w: box.w - dueW - 0.36, h: askH,
+          fontSize: 13, bold: true, color: theme.white, valign: 'middle',
+        });
+        if (d.due) {
+          slide.addShape('rect', { x: box.x + box.w - dueW - 0.12, y: y + 0.13, w: dueW, h: askH - 0.26, fill: { color: theme.white }, line: { type: 'none' } });
+          slide.addText(`期限：${d.due}`, {
+            x: box.x + box.w - dueW - 0.12, y: y + 0.13, w: dueW, h: askH - 0.26,
+            fontSize: 10, bold: true, color: theme.primary, align: 'center', valign: 'middle',
+          });
+        }
+        y += askH + 0.2;
+      }
+      const opts = d.options;
+      if (!opts.length) return;
+      const n = opts.length;
+      const gap = 0.2;
+      const w = (box.w - gap * (n - 1)) / n;
+      const h = box.y + box.h - y;
+      opts.forEach((o, i) => {
+        const x = box.x + i * (w + gap);
+        const tone = o.highlight ? theme.highlight : theme.primaryLight;
+        slide.addShape('rect', { x, y, w, h: 0.42, fill: { color: tone }, line: { type: 'none' } });
+        slide.addText(`${o.highlight ? '★ ' : ''}${o.label}`, {
+          x, y, w, h: 0.42, fontSize: 11.5, bold: true, color: theme.white, align: 'center', valign: 'middle',
+        });
+        slide.addShape('rect', {
+          x, y: y + 0.42, w, h: h - 0.42, fill: { color: theme.light },
+          line: o.highlight ? { color: theme.highlight, width: 1.5 } : { type: 'none' },
+        });
+        const runs = [{ text: o.title, options: { bold: true, fontSize: 11.5, breakLine: true, paraSpaceAfter: 6 } }];
+        if (o.desc) runs.push({ text: o.desc, options: { fontSize: 10 } });
+        slide.addText(runs, { x: x + 0.14, y: y + 0.56, w: w - 0.28, h: h - 0.68, color: theme.text, valign: 'top' });
+      });
+    },
+  };
+
+  // ---------- ブロッカーと依頼 ----------
+  // 入力形式： - 要件確定の遅れ｜業務部門から3/10までにご回答いただきたい
+  function parseBlockerPairs(bullets) {
+    return (bullets || [])
+      .map((b) => {
+        const stripped = A.stripEmphasis(b);
+        const highlight = /★\s*(?:推奨)?/.test(stripped);
+        const clean = highlight ? stripped.replace(/★\s*(?:推奨)?/, '').trim() : stripped;
+        const f = splitFields(clean);
+        return { blocker: f[0] || clean, request: f[1] || '', highlight };
+      })
+      .filter((p) => p.blocker)
+      .slice(0, 5);
+  }
+
+  const blockerRequest = {
+    id: 'blocker-request',
+    name: 'ブロッカーと依頼',
+    category: 'アクションプラン',
+    description: '進行を止めている事象と、それを解消するための依頼を左右で対にして示す。「ブロッカー｜依頼内容」の形式で書く。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ブロッカー', '障害', '止まって', 'ご依頼', 'お願いしたい', 'Blocker']);
+      const pairs = parseBlockerPairs(section.bullets || []);
+      const withReq = pairs.filter((p) => p.request).length;
+      if (kw && withReq >= 2) return 10;
+      if (kw && pairs.length >= 2) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const pairs = parseBlockerPairs(bullets);
+      if (!pairs.length) return emptyBody();
+      return `<div class="pv-blocker">
+        <div class="pv-blocker-head"><div>ブロッカー</div><div></div><div>ご依頼事項</div></div>
+        ${pairs
+          .map(
+            (p) => `<div class="pv-blocker-row${p.highlight ? ' is-highlight' : ''}">
+          <div class="pv-blocker-cell is-issue">${esc(p.blocker)}</div>
+          <div class="pv-blocker-arrow">▶</div>
+          <div class="pv-blocker-cell is-req">${esc(p.request)}</div>
+        </div>`
+          )
+          .join('')}
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const pairs = parseBlockerPairs(bullets);
+      if (!pairs.length) return;
+      const headH = 0.3;
+      const arrowW = 0.42;
+      const colW = (box.w - arrowW) / 2;
+      const rightX = box.x + colW + arrowW;
+      slide.addText('ブロッカー', { x: box.x, y: box.y, w: colW, h: headH, fontSize: 10, bold: true, color: theme.subtext, valign: 'middle' });
+      slide.addText('ご依頼事項', { x: rightX, y: box.y, w: colW, h: headH, fontSize: 10, bold: true, color: theme.subtext, valign: 'middle' });
+      const n = pairs.length;
+      const gap = 0.1;
+      const rowH = (box.h - headH - gap * (n - 1)) / n;
+      pairs.forEach((p, i) => {
+        const y = box.y + headH + i * (rowH + gap);
+        const issueTone = p.highlight ? theme.critical : theme.gray;
+        slide.addShape('rect', { x: box.x, y, w: 0.05, h: rowH, fill: { color: issueTone }, line: { type: 'none' } });
+        slide.addShape('rect', { x: box.x + 0.05, y, w: colW - 0.05, h: rowH, fill: { color: theme.lighter }, line: { type: 'none' } });
+        slide.addText(p.blocker, { x: box.x + 0.16, y, w: colW - 0.28, h: rowH, fontSize: 10.5, color: theme.text, valign: 'middle' });
+        slide.addShape('rightArrow', { x: box.x + colW + 0.08, y: y + rowH / 2 - 0.1, w: arrowW - 0.16, h: 0.2, fill: { color: theme.primary }, line: { type: 'none' } });
+        slide.addShape('rect', { x: rightX, y, w: colW, h: rowH, fill: { color: theme.light }, line: { type: 'none' } });
+        slide.addText(p.request, { x: rightX + 0.12, y, w: colW - 0.24, h: rowH, fontSize: 10.5, bold: true, color: theme.primary, valign: 'middle' });
+      });
+    },
+  };
+
   DocAssist.patterns = [
     titleMessage,
     agenda,
@@ -1417,14 +2109,108 @@ window.DocAssist = window.DocAssist || {};
     timeline,
     timelineVertical,
     comparisonTable,
+    decisionRequest,
     actionPlanTable,
+    taskStatusTable,
+    issueRiskList,
+    blockerRequest,
+    asIsToBe,
+    ganttChart,
+    milestoneChevron,
     kpiSummary,
     barChart,
     lineChart,
     pieChart,
   ];
+
+  // テンプレート選択ギャラリー（app.jsのモーダル）の絞り込み軸。
+  //   scenes … どの会議・資料で使うか（1パターンが複数のシーンに属してよい）
+  //   role   … 資料の中でどの役割を担うスライドか
+  // パターン定義そのものには持たせず、ここで一括して付与する。軸を増やしたいときも
+  // この表だけを直せばよく、24種を超えるパターン定義に手を入れずに済む。
+  const SCENES = ['提案書', '進捗MTG', '報告書', 'キックオフ', '経営・定例報告', '構成図', '汎用ロジック図解', 'データ提示'];
+  const ROLES = ['目次', '本文', '比較', '計画', 'KPI', '表', '図解'];
+
+  const PATTERN_META = {
+    'title-message': { scenes: ['提案書', '報告書', '進捗MTG', 'キックオフ', '経営・定例報告'], role: '本文' },
+    agenda: { scenes: ['提案書', '報告書', 'キックオフ', '進捗MTG'], role: '目次' },
+    'box-compare': { scenes: ['提案書', '報告書'], role: '比較' },
+    'compare-vertical': { scenes: ['提案書', '報告書'], role: '比較' },
+    'comparison-table': { scenes: ['提案書', '報告書'], role: '表' },
+    'decision-request': { scenes: ['進捗MTG', '提案書', '経営・定例報告'], role: '比較' },
+    'before-after': { scenes: ['提案書', '報告書'], role: '比較' },
+    'as-is-to-be': { scenes: ['提案書', '構成図', 'キックオフ'], role: '図解' },
+    swot: { scenes: ['提案書', '経営・定例報告'], role: '図解' },
+    'matrix-2x2': { scenes: ['提案書', '汎用ロジック図解'], role: '図解' },
+    'positioning-map': { scenes: ['提案書', 'データ提示'], role: '図解' },
+    'process-flow': { scenes: ['提案書', 'キックオフ', '構成図'], role: '図解' },
+    'flow-vertical': { scenes: ['提案書', 'キックオフ', '構成図'], role: '図解' },
+    cycle: { scenes: ['提案書', '汎用ロジック図解'], role: '図解' },
+    funnel: { scenes: ['データ提示', '経営・定例報告'], role: '図解' },
+    waterfall: { scenes: ['データ提示', '経営・定例報告'], role: 'KPI' },
+    pyramid: { scenes: ['提案書', '報告書', '汎用ロジック図解'], role: '図解' },
+    'pyramid-tiered': { scenes: ['提案書', '経営・定例報告', '汎用ロジック図解'], role: '図解' },
+    'logic-tree': { scenes: ['汎用ロジック図解', '報告書'], role: '図解' },
+    timeline: { scenes: ['提案書', 'キックオフ', '進捗MTG'], role: '計画' },
+    'timeline-vertical': { scenes: ['提案書', 'キックオフ', '進捗MTG'], role: '計画' },
+    'gantt-chart': { scenes: ['進捗MTG', 'キックオフ', '報告書'], role: '計画' },
+    'milestone-chevron': { scenes: ['進捗MTG', 'キックオフ', '経営・定例報告'], role: '計画' },
+    'action-plan-table': { scenes: ['提案書', 'キックオフ', '進捗MTG'], role: '計画' },
+    'task-status-table': { scenes: ['進捗MTG', '報告書'], role: '表' },
+    'issue-risk-list': { scenes: ['進捗MTG', '報告書'], role: '表' },
+    'blocker-request': { scenes: ['進捗MTG'], role: '表' },
+    'kpi-summary': { scenes: ['経営・定例報告', 'データ提示', '進捗MTG'], role: 'KPI' },
+    'bar-chart': { scenes: ['データ提示', '経営・定例報告'], role: 'KPI' },
+    'line-chart': { scenes: ['データ提示', '経営・定例報告'], role: 'KPI' },
+    'pie-chart': { scenes: ['データ提示', '経営・定例報告'], role: 'KPI' },
+  };
+
+  // テンプレート選択ギャラリーのサムネイル用サンプル。特殊な記法を要求するパターン
+  // （ガント・移行図・状況表など）は、その記法どおりのサンプルを持たせないと
+  // サムネイルが空になってしまうため個別に定義する。それ以外は共通サンプルを使う。
+  const DEFAULT_SAMPLE = ['項目A：説明テキストが入ります', '項目B：説明テキストが入ります', '項目C：説明テキストが入ります'];
+  const SAMPLES = {
+    'title-message': ['**重要な語句**を含む説明が入ります', '補足の説明テキストが入ります', '3点目の説明が入ります'],
+    agenda: ['本日の論点', '現状と課題', 'ご提案', '今後の進め方'],
+    'box-compare': ['A案：低コストだが拡張性に課題', 'B案：★推奨 バランスが最も良い', 'C案：高機能だが過剰投資'],
+    'compare-vertical': ['初期費用：A社30万円、B社50万円', '運用コスト：A社1万円、B社3万円', '拡張性：★推奨 B社はオプションで拡張可能', 'サポート：B社は電話・チャット対応'],
+    'comparison-table': ['初期費用：50万円', '運用コスト：月額3万円', '導入期間：2ヶ月', '拡張性：オプションで拡張可能', 'サポート：電話・チャット対応'],
+    'decision-request': ['依頼事項：導入ベンダーをB社に確定することをご承認いただきたい', '期限：2026年3月10日', 'A案：A社CRM｜低コストだが拡張性に課題', 'B案：★推奨 B社CRM｜バランスが最も良い'],
+    'before-after': ['現状：手作業で平均15分を要している', '導入後：自動化により平均2分に短縮される'],
+    'as-is-to-be': ['As-Is：基幹システム（オンプレミス）／顧客DB（Oracle）', 'To-Be：SaaS基幹システム（クラウド）／顧客DB（PostgreSQL）', '移行ステップ：現行分析｜データ移行｜並行稼働'],
+    swot: ['強み：ブランド認知度が高い', '弱み：デジタル対応が遅れている', '機会：市場が拡大している', '脅威：新規参入が増えている'],
+    'matrix-2x2': ['重要度高・緊急度高：即時対応', '重要度高・緊急度低：計画的に対応', '重要度低・緊急度高：委任する', '重要度低・緊急度低：対応しない'],
+    'positioning-map': ['A社：高価格・高機能', 'B社：中価格・標準機能', 'C社：低価格・限定機能', '自社：中価格・高機能'],
+    'process-flow': ['ステップ1：現状分析', 'ステップ2：要件定義', 'ステップ3：設計・開発', 'ステップ4：全社展開'],
+    'flow-vertical': ['ステップ1：現状分析', 'ステップ2：要件定義', 'ステップ3：設計・開発', 'ステップ4：試験運用', 'ステップ5：全社展開'],
+    cycle: ['Plan：計画を立てる', 'Do：実行する', 'Check：効果を測定する', 'Action：改善する'],
+    funnel: ['認知：10000件', '検討：4000件', '商談：1200件', '受注：300件'],
+    waterfall: ['期首：100', '新規獲得：+40', '解約：-15', '期末：125'],
+    pyramid: ['結論：市場拡大を優先すべきである', '根拠1：市場が年10%成長している', '根拠2：自社シェアに伸びしろがある', '根拠3：競合の本格参入前である'],
+    'pyramid-tiered': ['ビジョン：業界No.1のサービス品質', '戦略：デジタル基盤への集中投資', '施策：CRM導入と業務標準化'],
+    'logic-tree': ['売上：既存顧客と新規顧客に分解', 'コスト：固定費と変動費に分解', '人員：営業部門と管理部門に分解'],
+    timeline: ['2026年9月：要件定義', '2026年10月：データ移行', '2026年11月：試験運用', '2026年12月：全社展開'],
+    'timeline-vertical': ['2026年9月：要件定義とベンダー選定', '2026年10月：データ移行と初期設定', '2026年11月：一部部署での試験運用', '2026年12月：全社展開と定着支援'],
+    'gantt-chart': ['期間：9月｜10月｜11月｜12月', '要件定義：1-2｜1-3', 'データ移行：2-3｜2-3', '試験運用：3-3', '全社展開：3-4'],
+    'milestone-chevron': ['M1：要件確定｜9月末', 'M2：契約締結｜10月末', 'M3：試験運用｜11月末', 'M4：全社展開｜12月末'],
+    'action-plan-table': ['要件定義を完了する｜山田｜2026年9月末', 'データ移行を実施する｜佐藤｜2026年10月末', '全社展開を行う｜鈴木｜2026年12月末'],
+    'task-status-table': ['要件定義書の作成：山田｜完了｜9/10', '業務要件の確定：業務部門｜遅延｜9/30', 'データ移行設計：鈴木｜進行中｜10/15', 'テスト計画策定：田中｜未着手｜10/31'],
+    'issue-risk-list': ['要件の認識齟齬：部門間で解釈が異なる｜高｜合同レビューを実施', 'データ移行の品質：重複レコードが存在する｜中｜事前にクレンジング', '現場の習熟度：一時的な生産性低下｜低｜研修で対応'],
+    'blocker-request': ['業務要件が確定せず設計に着手できない｜業務部門より3/10までにご回答いただきたい', 'テスト環境が未整備｜情報システム部にて3/15までに構築をお願いしたい'],
+    'kpi-summary': ['対応リードタイム：50%短縮', '解約率：20%改善', '商談数：15%増加'],
+    'bar-chart': ['A地域：120', 'B地域：85', 'C地域：60', 'D地域：45'],
+    'line-chart': ['2023年：100', '2024年：130', '2025年：160', '2026年：190'],
+    'pie-chart': ['直販：45%', '代理店：30%', 'オンライン：25%'],
+  };
+
   DocAssist.patternById = {};
   DocAssist.patterns.forEach((p) => {
+    const meta = PATTERN_META[p.id] || {};
+    p.scenes = meta.scenes || [];
+    p.role = meta.role || '本文';
+    p.sample = SAMPLES[p.id] || DEFAULT_SAMPLE;
     DocAssist.patternById[p.id] = p;
   });
+  DocAssist.patternScenes = SCENES;
+  DocAssist.patternRoles = ROLES;
 })();
