@@ -2,33 +2,35 @@
 (function () {
   const SAMPLE_NOTES = `# 新規顧客管理システム導入に関する検討報告
 
-## [pattern: pyramid] 現状の課題と対応方針
-> 顧客情報の分散管理が対応品質の低下と解約率上昇を招いており、クラウド型CRMによる一元化が急務である
+## [pattern: pyramid] （１）現状の課題｜①課題認識と対応方針
+> 顧客情報の分散管理が対応品質の低下と解約率上昇を招いており、**クラウド型CRM**による一元化が急務である
 >> 現行体制のまま推移した場合、来期の解約率はさらに悪化する見込みである
-- 課題：顧客対応の質と速度が低下し、顧客満足度調査のスコアが前年比8ポイント低下している
+- 課題：顧客対応の質と速度が低下し、顧客満足度調査のスコアが**前年比8ポイント低下**している
 - 原因：顧客情報が担当者個人のPC・Excelに分散し、組織的な検索・共有ができていない
 - 対策：クラウド型CRMを導入し、顧客情報と対応履歴を全社で一元管理する体制を構築する
+出所：社内顧客満足度調査（2026年1月実施）
 
-## [pattern: box-compare] 導入候補ツールの比較検討
-> 3社を比較した結果、機能とコストのバランスからB社CRMが最も現実的な選択肢である
+## [pattern: box-compare] （２）導入検討｜①候補ツールの比較検討
+> 3社を比較した結果、機能とコストのバランスから**B社CRM**が最も現実的な選択肢である
 - A社CRM：低コストだが分析機能が限定的で、将来的な拡張性に課題がある
 - B社CRM：コストは中程度で、必要な機能を標準搭載しており拡張性も高い
 - C社CRM：高コストだが分析機能が充実しており、大規模組織向けの構成である
 
-## [pattern: timeline] 導入スケジュール
+## [pattern: timeline] （２）導入検討｜②導入スケジュール
 > 4フェーズ・約4ヶ月の計画とし、全社展開前に試験運用で定着度を確認する
 - フェーズ1（2026年9月）：要件定義・ベンダー選定・契約締結
 - フェーズ2（2026年10月）：既存データ移行・初期設定・管理者研修
 - フェーズ3（2026年11月）：一部部署での試験運用と課題の洗い出し
 - フェーズ4（2026年12月）：全社展開および利用ルールの周知徹底
 
-## [pattern: kpi-summary] 導入後に見込まれる効果
+## [pattern: kpi-summary] （３）導入効果｜①定量効果の見込み
 > 対応品質と業務効率の両面で定量的な改善効果が見込まれる
 - 顧客対応リードタイム：50%短縮（平均対応時間 30分→15分）
 - 解約率：20%改善（対応履歴の一元化により解約予兆を早期検知）
 - 営業一人あたり商談数：15%増加（情報検索時間の削減により商談準備時間を確保）
+出所：NRI「CRM導入効果調査」2024年版
 
-## [pattern: before-after] 情報検索にかかる時間の変化
+## [pattern: before-after] （３）導入効果｜②情報検索にかかる時間の変化
 > 情報検索の一元化により、担当者1人あたり年間換算で約50時間の業務時間削減が見込まれる
 現状：情報を探すために複数の担当者に確認する必要があり、平均15分を要している
 導入後：CRM上で即座に検索でき、平均2分に短縮される見込みである
@@ -410,14 +412,18 @@
       </div>
       <div class="slide-canvas">
         <div class="slide-title-bar">
+          <span class="bar"></span>
           <span class="heading-text">${escapeHtml(slide.heading || '(見出し未設定)')}</span>
-          <span class="page-num">${idx + 1}</span>
         </div>
         <div class="slide-message-block">
-          <div class="slide-message-lead">${escapeHtml(message)}</div>
-          ${subMessage ? `<div class="slide-message-sub">${escapeHtml(subMessage)}</div>` : ''}
+          <div class="slide-message-lead">${emphasisHtml(message)}</div>
+          ${subMessage ? `<div class="slide-message-sub">${emphasisHtml(subMessage)}</div>` : ''}
         </div>
         <div class="slide-body"></div>
+        <div class="slide-footer">
+          <span class="source-note">${slide.sourceNote ? '出所：' + escapeHtml(slide.sourceNote) : ''}</span>
+          <span class="page-num">${idx + 1}</span>
+        </div>
       </div>
     `;
 
@@ -443,6 +449,12 @@
   }
   function escapeAttr(s) {
     return escapeHtml(s);
+  }
+  function emphasisHtml(s) {
+    return DocAssist.analyze
+      .parseEmphasisTokens(s)
+      .map((t) => (t.bold ? `<b class="em">${escapeHtml(t.text)}</b>` : escapeHtml(t.text)))
+      .join('');
   }
 
   render();

@@ -31,11 +31,14 @@ window.DocAssist = window.DocAssist || {};
 
   // 箇条書きを {key, value} の配列に変換する。KV形式でない行は
   // 「項目N」を仮の見出しとして割り当てる。
+  // 「**強調**」構文には対応していない図表系パターンで使われるため、
+  // ここで一律にマーカーを取り除いておく（生の ** が出力に漏れるのを防ぐ安全策）。
   function extractItems(bullets) {
     return (bullets || []).map((b, i) => {
-      const kv = splitKV(b);
+      const clean = stripEmphasis(b);
+      const kv = splitKV(clean);
       if (kv) return kv;
-      return { key: `項目${i + 1}`, value: b };
+      return { key: `項目${i + 1}`, value: clean };
     });
   }
 
@@ -61,6 +64,37 @@ window.DocAssist = window.DocAssist || {};
     return (bullets || []).filter((b) => NUMBERED_BULLET_RE.test(b)).length;
   }
 
+  // 「**強調したい語句**」の形式で書かれた文章を、太字部分とそれ以外に分解する。
+  // NRIの報告書に見られる「文中の重要な語句だけ太字＋ネイビーにする」表現を
+  // 再現するための共通パーサー。プレビュー用HTML描画（<b>タグ）とPPTX書き出し
+  // （text runの配列）の両方でこの分解結果を使う。
+  function parseEmphasisTokens(text) {
+    const parts = String(text == null ? '' : text).split(/(\*\*[^*]+\*\*)/g).filter((p) => p !== '');
+    if (!parts.length) return [{ text: '', bold: false }];
+    return parts.map((part) => {
+      const m = part.match(/^\*\*([^*]+)\*\*$/);
+      return m ? { text: m[1], bold: true } : { text: part, bold: false };
+    });
+  }
+
+  function stripEmphasis(text) {
+    return String(text == null ? '' : text).replace(/\*\*([^*]+)\*\*/g, '$1');
+  }
+
+  // parseEmphasisTokens を PptxGenJS の text run 配列に変換する共通ヘルパー。
+  // 強調部分には bold:true と boldColor（指定時）を追加する。
+  function emphasisRuns(text, boldColor, baseOptions) {
+    const base = baseOptions || {};
+    return parseEmphasisTokens(text).map((t) => {
+      const opts = Object.assign({}, base);
+      if (t.bold) {
+        opts.bold = true;
+        if (boldColor) opts.color = boldColor;
+      }
+      return { text: t.text, options: opts };
+    });
+  }
+
   // スライドに明示的なリード文（message）が無い場合のフォールバック。
   // 官公庁向け報告書の「タイトル→メッセージ→ボディ」の型を崩さないよう、
   // 未入力でも空欄のまま出力しないためのもの（先頭の箇条書き、それも無ければ見出しを流用）。
@@ -82,5 +116,8 @@ window.DocAssist = window.DocAssist || {};
     sequenceWordCount,
     numberedBulletCount,
     effectiveMessage,
+    parseEmphasisTokens,
+    stripEmphasis,
+    emphasisRuns,
   };
 })();

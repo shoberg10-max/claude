@@ -34,6 +34,39 @@ window.DocAssist = window.DocAssist || {};
     return `<div class="pv-empty">${esc(message || '内容がありません')}</div>`;
   }
 
+  // 「**強調**」構文を含む文字列を、プレビュー用HTML（<b class="em">）に変換する。
+  function emphasisHtml(text) {
+    return A.parseEmphasisTokens(text)
+      .map((t) => (t.bold ? `<b class="em">${esc(t.text)}</b>` : esc(t.text)))
+      .join('');
+  }
+
+  // ■ を箇条書きマーカーに使う（NRI報告書の本文で多用される記号）。
+  const SQUARE_BULLET = { code: '25A0', indent: 14 };
+
+  // 箇条書き配列（**強調**構文を含みうる）を、PptxGenJSのtext run配列に変換する。
+  // 強調部分は太字＋ネイビーになる。複数のパターンから共通で使う。
+  function bulletTextRuns(bullets, theme, opts) {
+    const fontSize = (opts && opts.fontSize) || 14;
+    const spaceAfter = (opts && opts.spaceAfter) || 12;
+    const bulletChar = (opts && opts.bulletChar) || SQUARE_BULLET;
+    const runs = [];
+    (bullets || []).forEach((b) => {
+      const tokens = A.parseEmphasisTokens(b);
+      tokens.forEach((t, ti) => {
+        const isLast = ti === tokens.length - 1;
+        const runOpts = { fontSize, bullet: bulletChar, color: t.bold ? theme.primary : theme.text };
+        if (t.bold) runOpts.bold = true;
+        if (isLast) {
+          runOpts.breakLine = true;
+          runOpts.paraSpaceAfter = spaceAfter;
+        }
+        runs.push({ text: t.text, options: runOpts });
+      });
+    });
+    return runs;
+  }
+
   // ---------- タイトル＋メッセージ（フォールバック） ----------
   // リード文はスライド上部の共通メッセージ帯（pptxExport.js）が既に表示しているので、
   // ここでは箇条書きをシンプルに並べるだけにする（メッセージを重複表示しない）。
@@ -48,14 +81,11 @@ window.DocAssist = window.DocAssist || {};
     },
     renderBody(bullets) {
       if (!bullets.length) return emptyBody();
-      return `<ul class="pv-bullets">${bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`;
+      return `<ul class="pv-bullets pv-bullets-square">${bullets.map((b) => `<li>${emphasisHtml(b)}</li>`).join('')}</ul>`;
     },
     buildBody(slide, bullets, theme, box) {
       if (!bullets.length) return;
-      slide.addText(
-        bullets.map((b) => ({ text: b, options: { bullet: { code: '25AA', indent: 14 }, breakLine: true, paraSpaceAfter: 12 } })),
-        { x: box.x, y: box.y, w: box.w, h: box.h, fontSize: 14, color: theme.text, valign: 'top' }
-      );
+      slide.addText(bulletTextRuns(bullets, theme), { x: box.x, y: box.y, w: box.w, h: box.h, valign: 'top' });
     },
   };
 
@@ -94,10 +124,13 @@ window.DocAssist = window.DocAssist || {};
       const boxW = (box.w - gap * (n - 1)) / n;
       items.forEach((it, i) => {
         const x = box.x + i * (boxW + gap);
-        slide.addShape('rect', { x, y: box.y, w: boxW, h: 0.6, fill: { color: theme.primary } });
-        slide.addText(it.key, { x, y: box.y, w: boxW, h: 0.6, fontSize: 13, bold: true, color: theme.white, align: 'center', valign: 'middle' });
-        slide.addShape('rect', { x, y: box.y + 0.6, w: boxW, h: box.h - 0.6, fill: { color: theme.light }, line: { color: theme.border, width: 1 } });
-        slide.addText(it.value, { x: x + 0.12, y: box.y + 0.75, w: boxW - 0.24, h: box.h - 0.9, fontSize: 12, color: theme.text, valign: 'top' });
+        slide.addShape('rect', { x, y: box.y, w: boxW, h: 0.5, fill: { color: theme.primary } });
+        slide.addText(it.key, { x, y: box.y, w: boxW, h: 0.5, fontSize: 13, bold: true, color: theme.white, align: 'center', valign: 'middle' });
+        slide.addShape('rect', { x, y: box.y + 0.5, w: boxW, h: box.h - 0.5, fill: { color: theme.light }, line: { type: 'none' } });
+        slide.addText(
+          [{ text: it.value, options: { bullet: SQUARE_BULLET } }],
+          { x: x + 0.15, y: box.y + 0.62, w: boxW - 0.28, h: box.h - 0.74, fontSize: 11.5, color: theme.text, valign: 'top' }
+        );
       });
     },
   };
@@ -228,10 +261,10 @@ window.DocAssist = window.DocAssist || {};
       const apexText = base.length ? apex : '結論';
       return `
         <div class="pv-pyramid">
-          <div class="pv-pyramid-apex">${esc(apexText)}</div>
+          <div class="pv-pyramid-apex">${emphasisHtml(apexText)}</div>
           <div class="pv-pyramid-base">${baseItems
             .slice(0, 4)
-            .map((b) => `<div class="pv-pyramid-cell">${esc(b)}</div>`)
+            .map((b) => `<div class="pv-pyramid-cell">${emphasisHtml(b)}</div>`)
             .join('')}</div>
         </div>`;
     },
@@ -242,15 +275,15 @@ window.DocAssist = window.DocAssist || {};
       const apexText = base.length ? apex : '結論';
       const apexW = box.w * 0.55;
       slide.addShape('rect', { x: box.x + (box.w - apexW) / 2, y: box.y, w: apexW, h: 0.9, fill: { color: theme.primary } });
-      slide.addText(apexText, { x: box.x + (box.w - apexW) / 2 + 0.15, y: box.y, w: apexW - 0.3, h: 0.9, fontSize: 15, bold: true, color: theme.white, valign: 'middle' });
+      slide.addText(A.emphasisRuns(apexText, null, { bold: true }), { x: box.x + (box.w - apexW) / 2 + 0.15, y: box.y, w: apexW - 0.3, h: 0.9, fontSize: 15, color: theme.white, valign: 'middle' });
       const n = baseItems.length;
       const gap = 0.2;
       const cw = (box.w - gap * (n - 1)) / n;
       const y2 = box.y + 1.3;
       baseItems.forEach((b, i) => {
         const x = box.x + i * (cw + gap);
-        slide.addShape('rect', { x, y: y2, w: cw, h: box.h - 1.3, fill: { color: theme.light }, line: { color: theme.accent, width: 1 } });
-        slide.addText(b, { x: x + 0.1, y: y2 + 0.1, w: cw - 0.2, h: box.h - 1.5, fontSize: 12, color: theme.text, valign: 'top' });
+        slide.addShape('rect', { x, y: y2, w: cw, h: box.h - 1.3, fill: { color: theme.light }, line: { type: 'none' } });
+        slide.addText(A.emphasisRuns(b, theme.primary, { fontSize: 12 }), { x: x + 0.1, y: y2 + 0.1, w: cw - 0.2, h: box.h - 1.5, color: theme.text, valign: 'top' });
       });
     },
   };
@@ -394,8 +427,8 @@ window.DocAssist = window.DocAssist || {};
         w: box.w,
         colW: [box.w * 0.3, box.w * 0.7],
         fontSize: 12,
-        color: '333333',
-        border: { type: 'solid', color: theme.border, pt: 0.5 },
+        color: theme.text,
+        border: { type: 'solid', color: theme.white, pt: 1.5 },
         valign: 'middle',
         autoPage: false,
       });
@@ -715,7 +748,7 @@ window.DocAssist = window.DocAssist || {};
         const x = box.x + i * (colW + gap);
         const h = Math.max(0.15, ((b.to - b.from) / maxVal) * chartH);
         const y = chartBottom - (b.to / maxVal) * chartH;
-        const color = b.isTotal ? theme.primary : b.isIncrease ? theme.accent : theme.negative;
+        const color = b.isTotal ? theme.primary : b.isIncrease ? theme.primaryLight : theme.accent;
         slide.addShape('rect', { x, y, w: colW, h, fill: { color } });
         slide.addText(`${b.key}\n${b.value}`, { x, y: chartBottom + 0.05, w: colW, h: 0.8, fontSize: 8, color: theme.text, align: 'center', valign: 'top' });
       });
@@ -724,9 +757,8 @@ window.DocAssist = window.DocAssist || {};
 
   // ---------- SWOT分析 ----------
   const SWOT_LABELS = ['強み', '弱み', '機会', '脅威'];
-  // 強み=青（濃）／弱み=スレートグレー／機会=青（中）／脅威=スレートグレー（濃）
-  // theme.js の primaryLight / negative / accent と揃えている（青基調・モノトーン）。
-  const SWOT_COLORS = ['1F4E8C', '6B7787', '2E6DA4', '48505C'];
+  // 強み=ネイビー／弱み=ミディアムブルー／機会=青紫／脅威=オレンジ（NRIパレットの強調色）
+  const SWOT_COLORS = ['000F78', '3C64AA', '5A63A7', 'F59637'];
   function mapToSwot(items) {
     const slots = [null, null, null, null];
     const rest = [];
@@ -810,7 +842,7 @@ window.DocAssist = window.DocAssist || {};
     renderBody(bullets) {
       const list = (bullets || []).slice(0, 8);
       if (!list.length) return emptyBody();
-      return `<ol class="pv-agenda">${list.map((b) => `<li>${esc(b)}</li>`).join('')}</ol>`;
+      return `<ol class="pv-agenda">${list.map((b) => `<li>${emphasisHtml(b)}</li>`).join('')}</ol>`;
     },
     buildBody(slide, bullets, theme, box) {
       const list = (bullets || []).slice(0, 8);
@@ -820,7 +852,7 @@ window.DocAssist = window.DocAssist || {};
         const y = box.y + i * rowH;
         slide.addShape('oval', { x: box.x, y: y + rowH / 2 - 0.2, w: 0.4, h: 0.4, fill: { color: theme.primary } });
         slide.addText(String(i + 1), { x: box.x, y: y + rowH / 2 - 0.2, w: 0.4, h: 0.4, fontSize: 12, bold: true, color: theme.white, align: 'center', valign: 'middle' });
-        slide.addText(b, { x: box.x + 0.6, y, w: box.w - 0.6, h: rowH, fontSize: 14, color: theme.text, valign: 'middle' });
+        slide.addText(A.emphasisRuns(b, theme.primary), { x: box.x + 0.6, y, w: box.w - 0.6, h: rowH, fontSize: 14, color: theme.text, valign: 'middle' });
         if (i < list.length - 1) {
           slide.addShape('line', { x: box.x, y: y + rowH, w: box.w, h: 0, line: { color: theme.border, width: 0.75 } });
         }
@@ -1242,7 +1274,7 @@ window.DocAssist = window.DocAssist || {};
       if (items.length < 2) return;
       const labels = items.map((it) => it.key);
       const values = items.map((it) => firstNumber(it.value) || 0);
-      const colors = [theme.primary, theme.accent, theme.primaryLight, '8FB2D8', theme.negative, 'A9B3C1'];
+      const colors = [theme.primary, theme.primaryLight, theme.accent2, theme.light, theme.accent, 'A9B3C1'];
       slide.addChart('doughnut', [{ name: '構成比', labels, values }], {
         x: box.x, y: box.y, w: box.w, h: box.h,
         showLegend: true,

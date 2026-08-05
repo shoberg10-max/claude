@@ -1,15 +1,16 @@
 :root {
-  --primary: #0f2c52;
-  --primary-light: #1f4e8c;
-  --accent: #2e6da4;
-  --accent2: #5b93c7;
-  --positive: #1f4e8c;
-  --negative: #6b7787;
+  --primary: #000f78;
+  --primary-light: #3c64aa;
+  --accent: #f59637;
+  --accent2: #5a63a7;
+  --positive: #000f78;
+  --negative: #f59637;
   --bg: #f4f6fa;
   --card: #ffffff;
-  --border: #c7d2e0;
-  --text: #242b38;
-  --subtext: #5b6472;
+  --border: #bfbfbf;
+  --light: #d6dff0;
+  --text: #000000;
+  --subtext: #595959;
 }
 
 * {
@@ -445,12 +446,17 @@ textarea.bullets {
 
 .slide-title-bar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
   flex: none;
-  padding-bottom: 4px;
-  border-bottom: 1.5px solid var(--primary);
-  margin-bottom: 8px;
+  margin-bottom: 5px;
+}
+
+.slide-title-bar .bar {
+  width: 3px;
+  align-self: stretch;
+  background: var(--primary);
+  flex: none;
 }
 
 .slide-title-bar .heading-text {
@@ -458,31 +464,22 @@ textarea.bullets {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: bold;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--subtext);
-}
-
-.slide-title-bar .page-num {
-  font-weight: normal;
-  color: var(--subtext);
-  font-size: 9px;
-  flex: none;
+  color: var(--text);
 }
 
 .slide-message-block {
   flex: none;
-  padding-bottom: 8px;
+  padding-bottom: 7px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 10px;
 }
 
 .slide-message-lead {
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: bold;
-  color: var(--text);
+  color: var(--primary);
   line-height: 1.35;
 }
 
@@ -499,6 +496,31 @@ textarea.bullets {
   font-size: 11px;
 }
 
+.slide-footer {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 4px;
+}
+
+.slide-footer .source-note {
+  font-size: 7px;
+  color: var(--subtext);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.slide-footer .page-num {
+  font-size: 8px;
+  color: var(--subtext);
+  flex: none;
+}
+
 /* --- パターン別プレビュー --- */
 .pv-empty {
   color: var(--subtext);
@@ -513,6 +535,43 @@ textarea.bullets {
   line-height: 1.7;
 }
 
+.pv-bullets-square {
+  list-style: none;
+  padding-left: 0;
+}
+
+.pv-bullets-square li {
+  position: relative;
+  padding-left: 16px;
+}
+
+.pv-bullets-square li::before {
+  content: '■';
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 7px;
+  color: var(--primary);
+  line-height: 1.9;
+}
+
+/* デフォルトは太字のみ（周囲の文字色を継承）。ネイビー背景に白文字の要素の中では
+   周囲の色をそのまま引き継ぐことで、白文字の上にネイビーの強調を重ねて
+   見えなくなる事故を避ける。淡い背景の本文エリアだけ、明示的にネイビーへ強調する。 */
+.em,
+b.em {
+  font-weight: bold;
+}
+
+.pv-bullets .em,
+.pv-pyramid-cell .em,
+.pv-box-body .em,
+.pv-compare-v-desc .em,
+.pv-tree-leaf .em,
+.slide-message-sub .em {
+  color: var(--primary);
+}
+
 .pv-box-row {
   display: flex;
   gap: 8px;
@@ -521,8 +580,6 @@ textarea.bullets {
 
 .pv-box {
   flex: 1;
-  border: 1px solid var(--border);
-  border-radius: 4px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -538,10 +595,20 @@ textarea.bullets {
 }
 
 .pv-box-body {
-  padding: 8px;
+  padding: 8px 8px 8px 20px;
   font-size: 10.5px;
-  background: #f7f8fb;
+  background: var(--light);
   flex: 1;
+  position: relative;
+}
+
+.pv-box-body::before {
+  content: '■';
+  position: absolute;
+  left: 8px;
+  top: 9px;
+  font-size: 6px;
+  color: var(--primary);
 }
 
 .pv-matrix {
@@ -643,7 +710,7 @@ textarea.bullets {
 
 .pv-pyramid-cell {
   flex: 1;
-  background: #eef2f8;
+  background: var(--light);
   border: 1px solid var(--accent);
   border-radius: 4px;
   padding: 6px;
@@ -682,7 +749,7 @@ textarea.bullets {
 }
 
 .pv-ba-value {
-  background: #f7f8fb;
+  background: var(--light);
   flex: 1;
   padding: 8px;
   font-size: 10.5px;
@@ -749,7 +816,7 @@ table.pv-table td {
 }
 
 table.pv-table tr:nth-child(even) td {
-  background: #f7f8fb;
+  background: var(--light);
 }
 
 .pv-kpi-grid {
@@ -871,7 +938,7 @@ table.pv-table tr:nth-child(even) td {
 
 .pv-tree-leaf {
   margin-top: 6px;
-  background: #eef2f8;
+  background: var(--light);
   border: 1px solid var(--accent);
   border-radius: 4px;
   padding: 5px 6px;
@@ -933,11 +1000,11 @@ table.pv-table tr:nth-child(even) td {
 }
 
 .pv-wf-bar.up {
-  background: var(--accent);
+  background: var(--primary-light);
 }
 
 .pv-wf-bar.down {
-  background: var(--negative);
+  background: var(--accent);
 }
 
 .pv-wf-label {
@@ -948,19 +1015,19 @@ table.pv-table tr:nth-child(even) td {
 }
 
 .pv-swot-0 {
-  background: var(--primary-light);
+  background: var(--primary);
 }
 
 .pv-swot-1 {
-  background: var(--negative);
+  background: var(--primary-light);
 }
 
 .pv-swot-2 {
-  background: var(--accent);
+  background: var(--accent2);
 }
 
 .pv-swot-3 {
-  background: #48505c;
+  background: var(--accent);
 }
 
 .pv-agenda {
@@ -1070,7 +1137,7 @@ table.pv-table tr:nth-child(even) td {
 
 .pv-compare-v-desc {
   flex: 1;
-  background: #f7f8fb;
+  background: var(--light);
   font-size: 10px;
   display: flex;
   align-items: center;

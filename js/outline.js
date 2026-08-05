@@ -55,6 +55,15 @@ window.DocAssist = window.DocAssist || {};
     return line.replace(/^>>\s*/, '').trim();
   }
 
+  // 「出所：」「出典：」で始まる行を出所表記として取り出し、箇条書きから除外する。
+  function extractSourceNote(lines) {
+    const idx = lines.findIndex((l) => /^(出所|出典)[：:]/.test(l));
+    if (idx === -1) return { sourceNote: '', rest: lines };
+    const sourceNote = lines[idx].replace(/^(出所|出典)[：:]\s*/, '').trim();
+    const rest = lines.slice(0, idx).concat(lines.slice(idx + 1));
+    return { sourceNote, rest };
+  }
+
   // 見出しの直後に並ぶ ">" / ">>" 行をリード文・サブメッセージとして取り出し、
   // 残りを本文（箇条書き候補の行）として返す。
   function extractMessage(bodyLines) {
@@ -121,11 +130,13 @@ window.DocAssist = window.DocAssist || {};
 
       const { patternId, heading } = extractPatternTag(rawHeading);
       const { message, subMessage, rest } = extractMessage(bodyLines);
+      const { sourceNote, rest: bulletLines } = extractSourceNote(rest);
       const slide = {
         heading: heading || '(見出し未設定)',
         message,
         subMessage,
-        bullets: rest.map(stripBullet).filter(Boolean),
+        sourceNote,
+        bullets: bulletLines.map(stripBullet).filter(Boolean),
       };
       if (patternId) slide.taggedPatternId = patternId;
       slides.push(slide);
