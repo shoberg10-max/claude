@@ -2213,4 +2213,27 @@ window.DocAssist = window.DocAssist || {};
   });
   DocAssist.patternScenes = SCENES;
   DocAssist.patternRoles = ROLES;
+  DocAssist.patternCategories = ['汎用', '比較', 'マトリクス／ポジショニング', 'フロー・プロセス', '構造・ロジック', '変化・対比', '時系列', 'アクションプラン', '数値・グラフ'];
+
+  // ユーザー定義テンプレート（js/templateSpec.js）が同じ描画部品を使えるように、
+  // ここで組み立てに使っている共通ヘルパーを公開する。
+  // 組み込みパターンと自作テンプレートで見た目の作法を揃えるための共有点。
+  DocAssist.patternHelpers = {
+    esc,
+    emptyBody,
+    emphasisHtml,
+    bulletTextRuns,
+    SQUARE_BULLET,
+    splitGroupItems,
+    splitFields,
+    splitItemSub,
+    guessIcon,
+    iconSvg,
+    addIcon,
+    statusTone,
+    severityTone,
+    statusCls,
+    severityCls,
+    ICON_KEYS: Object.keys(ICONS),
+  };
 })();

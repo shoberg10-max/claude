@@ -428,8 +428,16 @@
             ${DocAssist.patternRoles.map((r) => chipHtml('role', r, r, false)).join('')}
           </div>
         </div>
-        <div class="tpl-count" id="tplCount"></div>
+        <div class="tpl-actions">
+          <span class="tpl-count" id="tplCount"></span>
+          <div class="tpl-action-btns">
+            <button type="button" class="btn secondary" id="tplNew">＋ テンプレートを追加</button>
+            <button type="button" class="btn ghost" id="tplImport">読み込み</button>
+            <button type="button" class="btn ghost" id="tplExport">書き出し</button>
+          </div>
+        </div>
         <div class="tpl-grid" id="tplGrid"></div>
+        <input type="file" id="tplFile" accept="application/json,.json" hidden>
       </div>
     `;
     document.body.appendChild(overlay);
@@ -440,7 +448,8 @@
       if (overlay.parentNode) document.body.removeChild(overlay);
     }
     function onKey(e) {
-      if (e.key === 'Escape') close();
+      // テンプレート作成画面が上に開いているときは、そちらのEscを優先する
+      if (e.key === 'Escape' && !document.querySelector('.tb-modal')) close();
     }
 
     // サムネイルは実寸（460px幅）で組んでから、カード幅に合わせてCSSで縮小する。
@@ -486,7 +495,7 @@
           const usedOwn = !!body && !/pv-empty/.test(body);
           if (!usedOwn) body = safeRender(p, p.sample);
           return `
-          <button type="button" class="tpl-card${p.id === slide.patternId ? ' is-selected' : ''}" data-id="${p.id}" title="${escapeAttr(
+          <div role="button" tabindex="0" class="tpl-card${p.id === slide.patternId ? ' is-selected' : ''}" data-id="${p.id}" title="${escapeAttr(
             p.description
           )}">
             <div class="tpl-thumb">
@@ -501,17 +510,57 @@
               <span class="tpl-card-tag">${escapeHtml(p.role)}</span>
             </div>
             <span class="tpl-card-src">${usedOwn ? 'このスライドの内容で表示' : 'サンプル内容で表示'}</span>
-          </button>`;
+            ${
+              p.isCustom
+                ? `<span class="tpl-card-custom">自作</span>
+                   <span class="tpl-card-actions">
+                     <button type="button" class="tpl-mini" data-act="edit" title="編集">編集</button>
+                     <button type="button" class="tpl-mini danger" data-act="del" title="削除">削除</button>
+                   </span>`
+                : ''
+            }
+          </div>`;
         })
         .join('');
       scaleThumbs();
       grid.querySelectorAll('.tpl-card').forEach((card) => {
-        card.addEventListener('click', () => {
+        const apply = () => {
           slide.patternId = card.dataset.id;
           slide.patternSource = 'manual';
           slide.patternReason = '';
           close();
           replaceCard(slide);
+        };
+        card.addEventListener('click', (e) => {
+          const actionBtn = e.target.closest('[data-act]');
+          if (!actionBtn) {
+            apply();
+            return;
+          }
+          e.stopPropagation();
+          const id = card.dataset.id;
+          if (actionBtn.dataset.act === 'edit') {
+            openTemplateBuilder(DocAssist.customTemplates.getSpec(id), () => renderGrid());
+          } else if (actionBtn.dataset.act === 'del') {
+            const p = DocAssist.patternById[id];
+            if (window.confirm(`テンプレート「${p ? p.name : id}」を削除します。よろしいですか？`)) {
+              DocAssist.customTemplates.deleteSpec(id);
+              // 削除したテンプレートを使っていたスライドは既定のパターンに戻す
+              state.outline.slides.forEach((s) => {
+                if (s.patternId === id) {
+                  s.patternId = 'title-message';
+                  s.patternSource = 'auto';
+                }
+              });
+              renderGrid();
+            }
+          }
+        });
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            apply();
+          }
         });
       });
       // 適用中のテンプレートは一覧の途中にあることが多いので、開いた時点で見える位置まで送る
@@ -542,7 +591,380 @@
     document.addEventListener('keydown', onKey);
     window.addEventListener('resize', scaleThumbs);
 
+    // 新規作成
+    overlay.querySelector('#tplNew').addEventListener('click', () => {
+      openTemplateBuilder(null, (savedSpec) => {
+        renderGrid();
+        // 作った直後はそのテンプレートを見つけやすいよう、名前で絞り込んでおく
+        if (savedSpec) {
+          search.value = savedSpec.name;
+          filters.q = savedSpec.name;
+          renderGrid();
+        }
+      });
+    });
+
+    // JSONファイルとして書き出し（同僚への共有・バックアップ用）
+    overlay.querySelector('#tplExport').addEventListener('click', () => {
+      const specs = DocAssist.customTemplates.listSpecs();
+      if (!specs.length) {
+        window.alert('書き出せる自作テンプレートがありません。先に「＋ テンプレートを追加」で作成してください。');
+        return;
+      }
+      const blob = new Blob([DocAssist.customTemplates.exportJson()], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'docassist-templates.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // JSONファイルの読み込み
+    const fileInput = overlay.querySelector('#tplFile');
+    overlay.querySelector('#tplImport').addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const r = DocAssist.customTemplates.importJson(String(reader.result));
+          renderGrid();
+          window.alert(`テンプレートを読み込みました（新規${r.added}件 / 更新${r.updated}件${r.skipped ? ` / 対象外${r.skipped}件` : ''}）。`);
+        } catch (e) {
+          window.alert('読み込みに失敗しました：' + e.message);
+        }
+        fileInput.value = '';
+      };
+      reader.readAsText(file);
+    });
+
     renderGrid();
+  }
+
+  // ---------------- テンプレート作成・編集 ----------------
+  // レイアウトの仕様（js/templateSpec.js）をフォームで組み立て、右側にその場で
+  // プレビューしながら自作テンプレートを作る画面。コードを書かずに型を増やせる
+  // ようにするための入口。
+  const FROM_OPTIONS = [
+    ['key', '見出し（「A：B」のA）'],
+    ['value', '内容（「A：B」のB）'],
+    ['field:0', '内容の1番目（｜区切り）'],
+    ['field:1', '内容の2番目（｜区切り）'],
+    ['field:2', '内容の3番目（｜区切り）'],
+    ['field:3', '内容の4番目（｜区切り）'],
+    ['index', '連番'],
+  ];
+  const FILL_OPTIONS = [
+    ['primary', 'ネイビー'],
+    ['primaryLight', 'ミディアムブルー'],
+    ['accent', 'ライトブルー'],
+    ['gray', 'グレー'],
+    ['light', '淡いブルー（塗り）'],
+    ['lighter', 'さらに淡いブルー'],
+    ['white', '白'],
+    ['highlight', 'オレンジ（強調）'],
+  ];
+
+  function optionsHtml(pairs, selected) {
+    return pairs
+      .map(([v, label]) => `<option value="${escapeAttr(v)}"${v === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`)
+      .join('');
+  }
+
+  function openTemplateBuilder(existingSpec, onSaved) {
+    const editing = !!existingSpec;
+    const spec = DocAssist.templateSpec.normalizeSpec(
+      existingSpec || {
+        name: '',
+        category: '比較',
+        role: '比較',
+        scenes: ['提案書'],
+        layout: { kind: 'cards', direction: 'row', head: { show: true, from: 'key', fill: 'primary' }, body: { from: 'value', fill: 'light' } },
+      }
+    );
+    const L = spec.layout;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="tb-modal">
+        <div class="tb-head">
+          <h3>${editing ? 'テンプレートを編集' : 'テンプレートを追加'}</h3>
+          <span class="hint">左で設定すると右のプレビューがその場で変わります。</span>
+        </div>
+        <div class="tb-cols">
+          <div class="tb-form" id="tbForm">
+
+            <div class="tb-section">基本情報</div>
+            <label class="tb-field"><span>テンプレート名</span>
+              <input type="text" name="name" value="${escapeAttr(spec.name)}" placeholder="例：3案の横並び比較"></label>
+            <label class="tb-field"><span>説明</span>
+              <input type="text" name="description" value="${escapeAttr(spec.description)}" placeholder="どんなときに使う型か"></label>
+            <div class="tb-row">
+              <label class="tb-field"><span>カテゴリ</span>
+                <select name="category">${optionsHtml(DocAssist.patternCategories.map((c) => [c, c]), spec.category)}</select></label>
+              <label class="tb-field"><span>役割</span>
+                <select name="role">${optionsHtml(DocAssist.patternRoles.map((r) => [r, r]), spec.role)}</select></label>
+            </div>
+            <div class="tb-field"><span>用途（ギャラリーの絞り込み）</span>
+              <div class="tb-chips">${DocAssist.patternScenes
+                .map(
+                  (s) =>
+                    `<label class="tb-chip"><input type="checkbox" name="scene" value="${escapeAttr(s)}"${
+                      spec.scenes.indexOf(s) !== -1 ? ' checked' : ''
+                    }><span>${escapeHtml(s)}</span></label>`
+                )
+                .join('')}</div></div>
+
+            <div class="tb-section">レイアウト</div>
+            <div class="tb-field"><span>種類</span>
+              <div class="tb-radios">
+                <label><input type="radio" name="kind" value="cards"${L.kind === 'cards' ? ' checked' : ''}> カード（1項目＝1枚）</label>
+                <label><input type="radio" name="kind" value="table"${L.kind === 'table' ? ' checked' : ''}> 表（1項目＝1行）</label>
+              </div></div>
+
+            <div id="tbCards" class="tb-subform">
+              <div class="tb-row">
+                <label class="tb-field"><span>並べる向き</span>
+                  <select name="direction">${optionsHtml([['row', '横に並べる'], ['column', '縦に並べる']], L.direction)}</select></label>
+                <label class="tb-field"><span>図形</span>
+                  <select name="shape">${optionsHtml([['rect', '四角'], ['roundRect', '角丸'], ['chevron', '矢羽根（横のみ）']], L.shape)}</select></label>
+              </div>
+              <div class="tb-row">
+                <label class="tb-check"><input type="checkbox" name="headShow"${L.head && L.head.show ? ' checked' : ''}> 見出し帯をつける</label>
+                <label class="tb-check"><input type="checkbox" name="bullet"${L.body && L.body.bullet ? ' checked' : ''}> 本文に■をつける</label>
+              </div>
+              <div class="tb-row">
+                <label class="tb-field"><span>見出しに使うデータ</span>
+                  <select name="headFrom">${optionsHtml(FROM_OPTIONS, L.head && L.head.from)}</select></label>
+                <label class="tb-field"><span>見出しの色</span>
+                  <select name="headFill">${optionsHtml(FILL_OPTIONS, L.head && L.head.fill)}</select></label>
+              </div>
+              <div class="tb-row">
+                <label class="tb-field"><span>本文に使うデータ</span>
+                  <select name="bodyFrom">${optionsHtml(FROM_OPTIONS, L.body && L.body.from)}</select></label>
+                <label class="tb-field"><span>本文の塗り</span>
+                  <select name="bodyFill">${optionsHtml(FILL_OPTIONS, L.body && L.body.fill)}</select></label>
+              </div>
+              <div class="tb-row">
+                <label class="tb-check"><input type="checkbox" name="numbered"${L.numbered ? ' checked' : ''}> 連番をつける</label>
+                <label class="tb-check"><input type="checkbox" name="icon"${L.icon ? ' checked' : ''}> アイコンを自動でつける</label>
+                <label class="tb-check"><input type="checkbox" name="connector"${L.connector === 'arrow' ? ' checked' : ''}> 矢印でつなぐ</label>
+              </div>
+            </div>
+
+            <div id="tbTable" class="tb-subform">
+              <label class="tb-check"><input type="checkbox" name="zebra"${L.zebra !== false ? ' checked' : ''}> 1行おきに色を敷く</label>
+              <div class="tb-field"><span>列の設定</span><div id="tbCols" class="tb-cols-editor"></div>
+                <button type="button" class="btn ghost tb-addcol" id="tbAddCol">＋ 列を追加</button></div>
+            </div>
+
+            <div class="tb-section">自動選択とサンプル</div>
+            <label class="tb-field"><span>自動選択のキーワード（読点区切り・空欄なら手動選択のみ）</span>
+              <input type="text" name="keywords" value="${escapeAttr(spec.keywords.join('、'))}" placeholder="例：比較、検討、案"></label>
+            <div class="tb-row">
+              <label class="tb-field"><span>最小件数</span><input type="number" name="minItems" min="1" max="12" value="${spec.minItems}"></label>
+              <label class="tb-field"><span>最大件数</span><input type="number" name="maxItems" min="1" max="12" value="${spec.maxItems}"></label>
+            </div>
+            <label class="tb-field"><span>プレビュー用サンプル（1行に1項目）</span>
+              <textarea name="sample" rows="4">${escapeHtml(spec.sample.join('\n'))}</textarea></label>
+          </div>
+
+          <div class="tb-preview">
+            <div class="tb-preview-label">プレビュー</div>
+            <div class="slide-canvas">
+              <div class="slide-title-bar"><span class="bar"></span><span class="heading-text">見出しが入ります</span></div>
+              <div class="slide-message-block">
+                <div class="slide-message-lead">このスライドの結論が1文で入ります</div>
+              </div>
+              <div class="slide-body" id="tbBody"></div>
+              <div class="slide-footer"><span class="source-note"></span><span class="page-num">1</span></div>
+            </div>
+            <p class="hint" id="tbWarn"></p>
+          </div>
+        </div>
+        <div class="btn-row">
+          <span class="status-msg" id="tbStatus"></span>
+          <div style="display:flex;gap:10px;">
+            ${editing ? '<button type="button" class="btn ghost" id="tbDelete">削除</button>' : ''}
+            <button type="button" class="btn ghost" id="tbCancel">キャンセル</button>
+            <button type="button" class="btn" id="tbSave">${editing ? '上書き保存' : '保存して追加'}</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const form = overlay.querySelector('#tbForm');
+    const colsEditor = overlay.querySelector('#tbCols');
+    let columns = (L.columns || [{ label: '項目', from: 'key', width: 0.3 }, { label: '内容', from: 'value', width: 0.7 }]).map((c) =>
+      Object.assign({}, c)
+    );
+
+    function renderColumns() {
+      colsEditor.innerHTML = columns
+        .map(
+          (c, i) => `
+        <div class="tb-col-row" data-i="${i}">
+          <input type="text" class="tb-col-label" value="${escapeAttr(c.label)}" placeholder="列見出し">
+          <select class="tb-col-from">${optionsHtml(FROM_OPTIONS, c.from)}</select>
+          <select class="tb-col-badge">${optionsHtml(
+            [['', 'バッジなし'], ['status', '状況バッジ'], ['severity', '影響度バッジ']],
+            c.badge || ''
+          )}</select>
+          <input type="number" class="tb-col-width" min="1" max="100" value="${Math.round((c.width || 0.2) * 100)}" title="幅の比率">
+          <button type="button" class="tpl-mini danger tb-col-del"${columns.length <= 1 ? ' disabled' : ''}>✕</button>
+        </div>`
+        )
+        .join('');
+    }
+
+    function readColumns() {
+      return Array.from(colsEditor.querySelectorAll('.tb-col-row')).map((row) => ({
+        label: row.querySelector('.tb-col-label').value,
+        from: row.querySelector('.tb-col-from').value,
+        badge: row.querySelector('.tb-col-badge').value,
+        width: Math.max(1, parseInt(row.querySelector('.tb-col-width').value, 10) || 20) / 100,
+      }));
+    }
+
+    function val(name) {
+      const el = form.querySelector(`[name="${name}"]`);
+      if (!el) return '';
+      return el.type === 'checkbox' ? el.checked : el.value;
+    }
+
+    function readForm() {
+      const kind = form.querySelector('[name="kind"]:checked').value;
+      const sample = String(val('sample'))
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const layout =
+        kind === 'table'
+          ? { kind: 'table', zebra: !!val('zebra'), columns: readColumns() }
+          : {
+              kind: 'cards',
+              direction: val('direction'),
+              shape: val('shape'),
+              numbered: !!val('numbered'),
+              icon: !!val('icon'),
+              connector: val('connector') ? 'arrow' : 'none',
+              head: { show: !!val('headShow'), from: val('headFrom'), fill: val('headFill') },
+              body: { from: val('bodyFrom'), fill: val('bodyFill'), bullet: !!val('bullet') },
+            };
+      return {
+        id: spec.id && editing ? spec.id : undefined,
+        name: String(val('name')).trim(),
+        description: String(val('description')).trim(),
+        category: val('category'),
+        role: val('role'),
+        scenes: Array.from(form.querySelectorAll('[name="scene"]:checked')).map((c) => c.value),
+        keywords: String(val('keywords'))
+          .split(/[、,]/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+        minItems: parseInt(val('minItems'), 10) || 1,
+        maxItems: parseInt(val('maxItems'), 10) || 6,
+        sample: sample.length ? sample : undefined,
+        layout,
+      };
+    }
+
+    function syncSubforms() {
+      const kind = form.querySelector('[name="kind"]:checked').value;
+      overlay.querySelector('#tbCards').style.display = kind === 'cards' ? '' : 'none';
+      overlay.querySelector('#tbTable').style.display = kind === 'table' ? '' : 'none';
+      // 矢羽根は横並び専用なので、選ばれたら向きの選択を固定する
+      const dirSel = form.querySelector('[name="direction"]');
+      const isChevron = val('shape') === 'chevron';
+      if (dirSel) {
+        dirSel.disabled = isChevron;
+        if (isChevron) dirSel.value = 'row';
+      }
+    }
+
+    function refreshPreview() {
+      syncSubforms();
+      const draft = readForm();
+      const pattern = DocAssist.templateSpec.createPatternFromSpec(draft);
+      const body = overlay.querySelector('#tbBody');
+      try {
+        body.innerHTML = pattern.renderBody(pattern.sample);
+      } catch (e) {
+        body.innerHTML = '<div class="pv-empty">プレビューを描画できませんでした</div>';
+      }
+      const warn = overlay.querySelector('#tbWarn');
+      const n = pattern.sample.length;
+      const notes = [];
+      if (n > draft.maxItems) notes.push(`サンプルが${n}件ありますが、最大件数${draft.maxItems}件までしか表示されません。`);
+      if (!draft.keywords.length) notes.push('キーワードが未設定のため、このテンプレートは自動選択の候補になりません（ギャラリーから手動で選べます）。');
+      warn.textContent = notes.join(' ');
+    }
+
+    renderColumns();
+    refreshPreview();
+
+    form.addEventListener('input', refreshPreview);
+    form.addEventListener('change', refreshPreview);
+    colsEditor.addEventListener('input', refreshPreview);
+    colsEditor.addEventListener('change', refreshPreview);
+    colsEditor.addEventListener('click', (e) => {
+      const del = e.target.closest('.tb-col-del');
+      if (!del) return;
+      const i = parseInt(del.closest('.tb-col-row').dataset.i, 10);
+      columns = readColumns();
+      columns.splice(i, 1);
+      renderColumns();
+      refreshPreview();
+    });
+    overlay.querySelector('#tbAddCol').addEventListener('click', () => {
+      columns = readColumns();
+      columns.push({ label: '列' + (columns.length + 1), from: 'value', width: 0.2 });
+      renderColumns();
+      refreshPreview();
+    });
+
+    function closeBuilder() {
+      document.removeEventListener('keydown', onBuilderKey);
+      if (overlay.parentNode) document.body.removeChild(overlay);
+    }
+    function onBuilderKey(e) {
+      if (e.key === 'Escape') closeBuilder();
+    }
+    document.addEventListener('keydown', onBuilderKey);
+    overlay.querySelector('#tbCancel').addEventListener('click', closeBuilder);
+
+    overlay.querySelector('#tbSave').addEventListener('click', () => {
+      const draft = readForm();
+      const statusEl = overlay.querySelector('#tbStatus');
+      if (!draft.name) {
+        statusEl.textContent = 'テンプレート名を入力してください。';
+        statusEl.classList.add('error');
+        return;
+      }
+      const saved = DocAssist.customTemplates.saveSpec(draft);
+      closeBuilder();
+      if (onSaved) onSaved(saved);
+    });
+
+    const delBtn = overlay.querySelector('#tbDelete');
+    if (delBtn) {
+      delBtn.addEventListener('click', () => {
+        if (!window.confirm(`テンプレート「${spec.name}」を削除します。よろしいですか？`)) return;
+        DocAssist.customTemplates.deleteSpec(spec.id);
+        state.outline.slides.forEach((s) => {
+          if (s.patternId === spec.id) {
+            s.patternId = 'title-message';
+            s.patternSource = 'auto';
+          }
+        });
+        closeBuilder();
+        if (onSaved) onSaved(null);
+      });
+    }
   }
 
   function renderSlidePreviewCard(slide, idx) {

@@ -2157,6 +2157,428 @@ table.pv-table tr:nth-child(even) td {
   font-size: 10px;
 }
 
+/* ===== 仕様ベースの自作テンプレート描画（js/templateSpec.js） ===== */
+.ts-cards {
+  display: flex;
+  height: 100%;
+  gap: 8px;
+}
+
+.ts-cards.is-row {
+  flex-direction: row;
+}
+
+.ts-cards.is-column {
+  flex-direction: column;
+}
+
+.ts-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ts-cards.is-column .ts-card {
+  flex-direction: row;
+}
+
+.ts-card.is-round {
+  border-radius: 4px;
+}
+
+.ts-card.is-round .ts-card-head {
+  border-radius: 4px 4px 0 0;
+}
+
+.ts-card.is-round .ts-card-body {
+  border-radius: 0 0 4px 4px;
+}
+
+.ts-card.is-highlight {
+  outline: 1.5px solid var(--highlight);
+  outline-offset: -1.5px;
+}
+
+.ts-card-head {
+  flex: none;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 5px 7px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  overflow: hidden;
+}
+
+.ts-cards.is-column .ts-card-head {
+  flex: 0 0 26%;
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.ts-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+  font-size: 8.5px;
+  flex: none;
+}
+
+.ts-card-body {
+  flex: 1;
+  font-size: 9.5px;
+  line-height: 1.35;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.ts-cards.is-column .ts-card-body {
+  flex-direction: row;
+  align-items: center;
+  text-align: left;
+}
+
+.ts-card-body > span {
+  width: 100%;
+}
+
+.ts-cards.is-row .ts-card-body > span {
+  text-align: center;
+}
+
+.ts-card-body.is-bullet > span {
+  position: relative;
+  padding-left: 11px;
+  text-align: left;
+}
+
+.ts-card-body.is-bullet > span::before {
+  content: '■';
+  position: absolute;
+  left: 0;
+  top: 1px;
+  font-size: 6px;
+  opacity: 0.75;
+}
+
+/* 矢羽根は clip-path で先端を作り、隣とわずかに重ねて連続させる */
+.ts-card.is-chevron {
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+  padding-left: 8px;
+  margin-right: -6px;
+}
+
+.ts-card.is-chevron .ts-card-head,
+.ts-card.is-chevron .ts-card-body {
+  background: transparent !important;
+}
+
+.ts-card.is-chevron:nth-child(odd) {
+  background: var(--primary);
+}
+
+.ts-card.is-chevron:nth-child(even) {
+  background: var(--primary-light);
+}
+
+.ts-card.is-chevron .ts-card-head,
+.ts-card.is-chevron .ts-card-body {
+  color: #fff !important;
+  justify-content: center;
+}
+
+.ts-arrow {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  font-size: 10px;
+}
+
+/* ===== テンプレート作成・編集画面 ===== */
+.tpl-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  padding: 10px 0 8px;
+}
+
+.tpl-actions .tpl-count {
+  padding: 0;
+}
+
+.tpl-action-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.tpl-action-btns .btn {
+  font-size: 12px;
+  padding: 5px 12px;
+}
+
+.tpl-card-custom {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 9px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.tpl-card-actions {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.tpl-card:hover .tpl-card-actions,
+.tpl-card:focus-within .tpl-card-actions {
+  opacity: 1;
+}
+
+.tpl-mini {
+  font-family: inherit;
+  font-size: 10px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.tpl-mini:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.tpl-mini.danger:hover {
+  border-color: var(--critical);
+  color: var(--critical);
+}
+
+.tpl-mini[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tb-modal {
+  background: #fff;
+  border-radius: 8px;
+  width: min(1080px, 95vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.24);
+}
+
+.tb-head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tb-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.tb-cols {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  gap: 20px;
+  min-height: 0;
+}
+
+.tb-form {
+  overflow-y: auto;
+  padding-right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.tb-section {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--primary);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  margin-top: 4px;
+}
+
+.tb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tb-field > span {
+  font-size: 11px;
+  color: var(--subtext);
+}
+
+.tb-field input[type='text'],
+.tb-field input[type='number'],
+.tb-field select,
+.tb-field textarea {
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tb-field textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.tb-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.tb-check,
+.tb-radios label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tb-radios {
+  display: flex;
+  gap: 14px;
+}
+
+.tb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.tb-chip input {
+  margin: 0;
+}
+
+.tb-chip:has(input:checked) {
+  background: var(--light);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: bold;
+}
+
+.tb-subform {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 10px;
+  background: var(--lighter);
+  border-radius: 5px;
+}
+
+.tb-cols-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tb-col-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 1fr) 58px 28px;
+  gap: 5px;
+  align-items: center;
+}
+
+.tb-col-row input,
+.tb-col-row select {
+  font-family: inherit;
+  font-size: 11.5px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tb-addcol {
+  align-self: flex-start;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  margin-top: 5px;
+}
+
+.tb-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.tb-preview-label {
+  font-size: 11px;
+  color: var(--subtext);
+  flex: none;
+}
+
+.tb-preview .slide-canvas {
+  flex: none;
+}
+
+.tb-preview .hint {
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0;
+}
+
 @media (max-width: 640px) {
   .slide-preview-card {
     width: 100%;
@@ -2169,5 +2591,11 @@ table.pv-table tr:nth-child(even) td {
   }
   .tpl-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+  .tb-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tpl-actions {
+    flex-wrap: wrap;
   }
 }
