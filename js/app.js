@@ -410,7 +410,6 @@
       </div>
       <div class="slide-canvas">
         <div class="slide-title-bar">
-          <span class="chip"></span>
           <span class="heading-text">${escapeHtml(slide.heading || '(見出し未設定)')}</span>
           <span class="page-num">${idx + 1}</span>
         </div>

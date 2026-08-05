@@ -12,54 +12,64 @@ window.DocAssist = window.DocAssist || {};
   const SLIDE_W = 13.33;
   const SLIDE_H = 7.5;
 
-  const HEADER_Y = 0;
-  const HEADER_H = 0.52;
-  const MESSAGE_Y = HEADER_H + 0.1;
-  const MESSAGE_H_SHORT = 0.62;
-  const MESSAGE_H_TALL = 1.05;
+  // MBB/Big4系の報告書に典型的な、装飾を抑えたレイアウト。
+  // タイポグラフィと細い罫線（ヘアライン）だけで階層を作り、色つきボックスや
+  // 角丸カード、太い枠線は使わない（「テンプレート感」の最大の原因になるため）。
+  const MARGIN_X = 0.6;
+  const BODY_X = MARGIN_X;
+  const BODY_W = SLIDE_W - MARGIN_X * 2;
+
+  const HEADER_Y = 0.32;
+  const HEADER_H = 0.34;
+  const RULE_GAP = 0.1;
+  const MESSAGE_Y = HEADER_Y + HEADER_H + RULE_GAP + 0.14;
+  const MESSAGE_H_SHORT = 0.46;
+  const MESSAGE_H_TALL = 0.86;
+  const MESSAGE_RULE_GAP = 0.16;
   const BODY_GAP = 0.14;
-  const BODY_BOTTOM_MARGIN = 0.32;
-  const BODY_X = 0.5;
-  const BODY_W = SLIDE_W - 1.0;
-  const BODY_PADDING = 0.16;
+  const BODY_BOTTOM_MARGIN = 0.34;
+  const BODY_PADDING = 0.06;
 
   // タイトル（トピックラベル）とページ番号だけの控えめなヘッダー。
-  // 官公庁向け資料でよく見る「太字の帯」ではなく、細い罫線＋小さな見出しにしている。
+  // 色つきの帯やアイコンは使わず、細い罫線と控えめな文字だけで構成する。
   function addHeader(slide, heading, pageNum, theme) {
-    slide.addShape('rect', { x: 0, y: HEADER_Y, w: SLIDE_W, h: 0.035, fill: { color: theme.primary }, line: { type: 'none' } });
-    slide.addShape('rect', { x: 0.5, y: 0.16, w: 0.12, h: 0.12, fill: { color: theme.accent }, line: { type: 'none' } });
-    slide.addText(heading || '(見出し未設定)', {
-      x: 0.74, y: 0.06, w: SLIDE_W - 2.2, h: 0.36,
-      fontSize: 14, bold: true, color: theme.primary, valign: 'middle', fontFace: 'Meiryo UI',
+    slide.addText((heading || '(見出し未設定)').toUpperCase(), {
+      x: BODY_X, y: HEADER_Y, w: SLIDE_W - MARGIN_X - 1.2, h: HEADER_H,
+      fontSize: 10.5, bold: true, color: theme.subtext, charSpacing: 1, valign: 'bottom', fontFace: 'Meiryo UI',
     });
     if (pageNum) {
       slide.addText(String(pageNum), {
-        x: SLIDE_W - 1.2, y: 0.06, w: 0.7, h: 0.36,
-        fontSize: 10, color: theme.subtext, align: 'right', valign: 'middle',
+        x: SLIDE_W - MARGIN_X - 0.6, y: HEADER_Y, w: 0.6, h: HEADER_H,
+        fontSize: 9, color: theme.subtext, align: 'right', valign: 'bottom',
       });
     }
-    slide.addShape('line', { x: 0, y: HEADER_H, w: SLIDE_W, h: 0, line: { color: theme.border, width: 0.75 } });
+    slide.addShape('line', {
+      x: BODY_X, y: HEADER_Y + HEADER_H + RULE_GAP, w: BODY_W, h: 0,
+      line: { color: theme.primary, width: 1.25 },
+    });
   }
 
-  // リード文（結論）＋サブメッセージの帯。左に太いアクセントバーを置く
-  // 「メッセージ・ボックス」型で、コンサルティングファームの報告書に多い形式。
+  // リード文（結論）＋サブメッセージ。色つきの箱には入れず、太字の地の文として
+  // 大きく置き、下に細いヘアラインを1本引いてボディと区切るだけにする。
   function addMessageBlock(slide, message, subMessage, theme) {
     const hasSub = !!(subMessage && subMessage.trim());
     const h = hasSub ? MESSAGE_H_TALL : MESSAGE_H_SHORT;
-    slide.addShape('rect', { x: BODY_X, y: MESSAGE_Y, w: BODY_W, h, fill: { color: theme.light }, line: { type: 'none' } });
-    slide.addShape('rect', { x: BODY_X, y: MESSAGE_Y, w: 0.07, h, fill: { color: theme.primaryLight }, line: { type: 'none' } });
     slide.addText(message || '', {
-      x: BODY_X + 0.28, y: MESSAGE_Y + (hasSub ? 0.08 : 0.05),
-      w: BODY_W - 0.5, h: hasSub ? 0.5 : h - 0.1,
-      fontSize: 15, bold: true, color: theme.primary, valign: hasSub ? 'top' : 'middle', fontFace: 'Meiryo UI',
+      x: BODY_X, y: MESSAGE_Y, w: BODY_W, h: hasSub ? 0.5 : h,
+      fontSize: 17, bold: true, color: theme.text, valign: hasSub ? 'top' : 'middle',
+      fontFace: 'Meiryo UI', lineSpacingMultiple: 1.12,
     });
     if (hasSub) {
       slide.addText(subMessage, {
-        x: BODY_X + 0.28, y: MESSAGE_Y + 0.58, w: BODY_W - 0.5, h: 0.4,
+        x: BODY_X, y: MESSAGE_Y + 0.52, w: BODY_W, h: 0.34,
         fontSize: 11, color: theme.subtext, valign: 'top',
       });
     }
-    return h;
+    slide.addShape('line', {
+      x: BODY_X, y: MESSAGE_Y + h + MESSAGE_RULE_GAP, w: BODY_W, h: 0,
+      line: { color: theme.border, width: 0.75 },
+    });
+    return h + MESSAGE_RULE_GAP;
   }
 
   function bodyBoxAfterMessage(messageH) {
@@ -71,10 +81,10 @@ window.DocAssist = window.DocAssist || {};
   function addCoverSlide(pptx, title, theme) {
     const slide = pptx.addSlide();
     slide.addShape('rect', { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, fill: { color: theme.primary }, line: { type: 'none' } });
-    slide.addShape('rect', { x: 0, y: SLIDE_H / 2 + 0.6, w: 2.2, h: 0.08, fill: { color: theme.accent }, line: { type: 'none' } });
+    slide.addShape('rect', { x: MARGIN_X, y: SLIDE_H / 2 + 0.62, w: 1.1, h: 0.045, fill: { color: theme.white }, line: { type: 'none' } });
     slide.addText(title || '資料構成案', {
-      x: 1.0, y: SLIDE_H / 2 - 1.0, w: SLIDE_W - 2.0, h: 1.6,
-      fontSize: 32, bold: true, color: theme.white, fontFace: 'Meiryo UI',
+      x: MARGIN_X, y: SLIDE_H / 2 - 1.0, w: SLIDE_W - MARGIN_X * 2, h: 1.6,
+      fontSize: 30, bold: true, color: theme.white, fontFace: 'Meiryo UI',
     });
   }
 
@@ -100,10 +110,6 @@ window.DocAssist = window.DocAssist || {};
       addHeader(slide, s.heading, idx + 1, theme);
       const messageH = addMessageBlock(slide, A.effectiveMessage(s), s.subMessage, theme);
       const outerBox = bodyBoxAfterMessage(messageH);
-      slide.addShape('rect', {
-        x: outerBox.x, y: outerBox.y, w: outerBox.w, h: outerBox.h,
-        fill: { type: 'none' }, line: { color: theme.border, width: 0.75 },
-      });
       const innerBox = {
         x: outerBox.x + BODY_PADDING,
         y: outerBox.y + BODY_PADDING,

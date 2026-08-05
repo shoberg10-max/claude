@@ -35,34 +35,27 @@ window.DocAssist = window.DocAssist || {};
   }
 
   // ---------- タイトル＋メッセージ（フォールバック） ----------
+  // リード文はスライド上部の共通メッセージ帯（pptxExport.js）が既に表示しているので、
+  // ここでは箇条書きをシンプルに並べるだけにする（メッセージを重複表示しない）。
   const titleMessage = {
     id: 'title-message',
     name: 'タイトル＋メッセージ',
     category: '汎用',
-    description: 'キーメッセージ1行と補足の箇条書き。どんな内容にも使える汎用パターン。',
+    description: '補足の箇条書きのみのシンプルな本文。どんな内容にも使える汎用パターン。',
     score(section) {
       const n = (section.bullets || []).length;
       return n <= 4 ? 3 : 2;
     },
     renderBody(bullets) {
       if (!bullets.length) return emptyBody();
-      const [msg, ...rest] = bullets;
-      const restHtml = rest.length
-        ? `<ul class="pv-bullets">${rest.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`
-        : '';
-      return `<div class="pv-message-box">${esc(msg)}</div>${restHtml}`;
+      return `<ul class="pv-bullets">${bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`;
     },
     buildBody(slide, bullets, theme, box) {
       if (!bullets.length) return;
-      const [msg, ...rest] = bullets;
-      slide.addShape('roundRect', { x: box.x, y: box.y, w: box.w, h: 1.0, fill: { color: theme.light }, line: { color: theme.accent, width: 1 }, rectRadius: 0.06 });
-      slide.addText(msg, { x: box.x + 0.2, y: box.y, w: box.w - 0.4, h: 1.0, fontSize: 18, bold: true, color: theme.primary, valign: 'middle' });
-      if (rest.length) {
-        slide.addText(
-          rest.map((b) => ({ text: b, options: { bullet: true, breakLine: true, paraSpaceAfter: 8 } })),
-          { x: box.x + 0.1, y: box.y + 1.3, w: box.w - 0.2, h: box.h - 1.3, fontSize: 14, color: theme.text, valign: 'top' }
-        );
-      }
+      slide.addText(
+        bullets.map((b) => ({ text: b, options: { bullet: { code: '25AA', indent: 14 }, breakLine: true, paraSpaceAfter: 12 } })),
+        { x: box.x, y: box.y, w: box.w, h: box.h, fontSize: 14, color: theme.text, valign: 'top' }
+      );
     },
   };
 
@@ -203,7 +196,7 @@ window.DocAssist = window.DocAssist || {};
       items.forEach((it, i) => {
         const x = box.x + i * (stepW + arrowW);
         const label = it.value === it.key ? it.key : `${it.key}\n${it.value}`;
-        slide.addShape('roundRect', { x, y: box.y + 0.6, w: stepW, h: box.h - 0.6, fill: { color: theme.accent }, line: { type: 'none' }, rectRadius: 0.06 });
+        slide.addShape('rect', { x, y: box.y + 0.6, w: stepW, h: box.h - 0.6, fill: { color: theme.accent }, line: { type: 'none' } });
         slide.addShape('oval', { x: x + stepW / 2 - 0.25, y: box.y, w: 0.5, h: 0.5, fill: { color: theme.primary } });
         slide.addText(String(i + 1), { x: x + stepW / 2 - 0.25, y: box.y, w: 0.5, h: 0.5, fontSize: 14, bold: true, color: theme.white, align: 'center', valign: 'middle' });
         slide.addText(label, { x: x + 0.1, y: box.y + 0.7, w: stepW - 0.2, h: box.h - 0.8, fontSize: 11, color: theme.white, align: 'center', valign: 'top' });
@@ -248,7 +241,7 @@ window.DocAssist = window.DocAssist || {};
       const baseItems = (base.length ? base : [apex]).slice(0, 4);
       const apexText = base.length ? apex : '結論';
       const apexW = box.w * 0.55;
-      slide.addShape('roundRect', { x: box.x + (box.w - apexW) / 2, y: box.y, w: apexW, h: 0.9, fill: { color: theme.primary }, rectRadius: 0.06 });
+      slide.addShape('rect', { x: box.x + (box.w - apexW) / 2, y: box.y, w: apexW, h: 0.9, fill: { color: theme.primary } });
       slide.addText(apexText, { x: box.x + (box.w - apexW) / 2 + 0.15, y: box.y, w: apexW - 0.3, h: 0.9, fontSize: 15, bold: true, color: theme.white, valign: 'middle' });
       const n = baseItems.length;
       const gap = 0.2;
@@ -444,19 +437,20 @@ window.DocAssist = window.DocAssist || {};
       const n = items.length;
       const cols = n <= 3 ? n : Math.ceil(n / 2);
       const rowsN = Math.ceil(n / cols);
-      const gap = 0.2;
+      const gap = 0.3;
+      const rowGap = 0.25;
       const cw = (box.w - gap * (cols - 1)) / cols;
-      const ch = (box.h - gap * (rowsN - 1)) / rowsN;
+      const ch = (box.h - rowGap * (rowsN - 1)) / rowsN;
       items.forEach((it, i) => {
         const col = i % cols;
         const row = Math.floor(i / cols);
         const x = box.x + col * (cw + gap);
-        const y = box.y + row * (ch + gap);
+        const y = box.y + row * (ch + rowGap);
         const numMatch = it.value.match(/[\d.,]+\s*(?:%|％|億|万|千|件|人|円|pt)?/);
         const big = numMatch ? numMatch[0] : it.value;
-        slide.addShape('roundRect', { x, y, w: cw, h: ch, fill: { color: theme.light }, line: { color: theme.accent, width: 1 }, rectRadius: 0.06 });
-        slide.addText(big, { x: x + 0.1, y: y + 0.1, w: cw - 0.2, h: ch * 0.6, fontSize: 22, bold: true, color: theme.primary, align: 'center', valign: 'bottom' });
-        slide.addText(it.key, { x: x + 0.1, y: y + ch * 0.65, w: cw - 0.2, h: ch * 0.3, fontSize: 11, color: theme.text, align: 'center', valign: 'top' });
+        slide.addText(big, { x, y, w: cw, h: ch * 0.6, fontSize: 26, bold: true, color: theme.primary, align: 'center', valign: 'bottom' });
+        slide.addShape('line', { x: x + cw * 0.3, y: y + ch * 0.64, w: cw * 0.4, h: 0, line: { color: theme.border, width: 0.75 } });
+        slide.addText(it.key, { x, y: y + ch * 0.68, w: cw, h: ch * 0.3, fontSize: 10.5, color: theme.subtext, align: 'center', valign: 'top' });
       });
     },
   };
