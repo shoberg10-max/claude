@@ -14,6 +14,10 @@
   --border: #bfbfbf;
   --light: #d6dff0;
   --lighter: #edf1fa;
+  --mid: #6c8cc9;
+  --soft-blue: #9db4dc;
+  --pale: #f5f7fc;
+  --pale-gray: #ececec;
   --text: #000000;
   --subtext: #595959;
 }
@@ -640,23 +644,27 @@ b.em {
 .pv-matrix-cell {
   border-radius: 4px;
   padding: 8px;
-  color: #fff;
+  color: var(--text);
   font-size: 10.5px;
 }
 
-.pv-matrix-0,
-.pv-matrix-3 {
-  background: var(--accent);
+.pv-matrix-0 {
+  background: var(--light);
 }
 
 .pv-matrix-1,
 .pv-matrix-2 {
-  background: var(--primary);
+  background: var(--lighter);
+}
+
+.pv-matrix-3 {
+  background: var(--pale);
 }
 
 .pv-matrix-key {
   font-weight: bold;
   margin-bottom: 3px;
+  color: var(--primary);
 }
 
 .pv-flow {
@@ -668,9 +676,9 @@ b.em {
 
 .pv-flow-step {
   flex: 1;
-  background: var(--accent);
-  border-radius: 5px;
-  color: #fff;
+  background: var(--light);
+  border-radius: 4px;
+  color: var(--text);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -684,7 +692,10 @@ b.em {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--primary);
+  background: #fff;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -692,12 +703,13 @@ b.em {
   flex: none;
 }
 
+/* 「→」の文字ではなく小さな三角形で区切る（PPTX側の描画と揃える） */
 .pv-flow-arrow {
-  display: flex;
-  align-items: center;
-  color: var(--primary);
-  font-weight: bold;
-  font-size: 13px;
+  align-self: center;
+  flex: 0 0 9px;
+  height: 11px;
+  background: var(--primary);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
 .pv-pyramid {
@@ -889,7 +901,7 @@ table.pv-table tr:nth-child(even) td {
 .pv-cycle-ring {
   position: absolute;
   inset: 16%;
-  border: 2px dashed var(--accent);
+  border: 7px solid var(--lighter);
   border-radius: 50%;
 }
 
@@ -905,8 +917,10 @@ table.pv-table tr:nth-child(even) td {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--primary);
-  color: #fff;
+  background: #fff;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1045,19 +1059,32 @@ table.pv-table tr:nth-child(even) td {
 }
 
 .pv-swot-0 {
-  background: var(--primary);
+  background: var(--light);
+}
+
+.pv-swot-0 .pv-matrix-key {
+  color: var(--primary);
 }
 
 .pv-swot-1 {
-  background: var(--gray);
+  background: var(--pale-gray);
+}
+
+.pv-swot-1 .pv-matrix-key,
+.pv-swot-3 .pv-matrix-key {
+  color: var(--gray-dark);
 }
 
 .pv-swot-2 {
-  background: var(--primary-light);
+  background: var(--lighter);
+}
+
+.pv-swot-2 .pv-matrix-key {
+  color: var(--primary-light);
 }
 
 .pv-swot-3 {
-  background: var(--gray-dark);
+  background: #f4f4f4;
 }
 
 .pv-agenda {
@@ -1089,8 +1116,12 @@ table.pv-table tr:nth-child(even) td {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--primary);
-  color: #fff;
+  background: #fff;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
   font-weight: bold;
   display: flex;
@@ -1130,8 +1161,10 @@ table.pv-table tr:nth-child(even) td {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--primary);
-  color: #fff;
+  background: #fff;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2155,6 +2188,506 @@ table.pv-table tr:nth-child(even) td {
   justify-content: center;
   color: var(--primary);
   font-size: 10px;
+}
+
+/* ===== 入れ子シェブロン ===== */
+.pv-cf {
+  display: flex;
+  height: 100%;
+  gap: 3px;
+}
+
+.pv-cf-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.pv-cf-band {
+  flex: 0 0 38%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: bold;
+  padding: 0 12px;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%, 9px 50%);
+}
+
+.pv-cf-group:first-child .pv-cf-band {
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%);
+}
+
+.pv-cf-steps {
+  flex: 1;
+  display: flex;
+  gap: 1px;
+  min-height: 0;
+}
+
+/* clip-path は border を切り落とすため、色付きシェブロンの内側に1px小さい白い
+   シェブロンを重ねて「細い輪郭線」に見せる */
+.pv-cf-step {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  background: var(--accent);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%, 7px 50%);
+}
+
+.pv-cf-step::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  background: #fff;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%, 7px 50%);
+}
+
+.pv-cf-step > span {
+  position: relative;
+  text-align: center;
+  font-size: 8.5px;
+  line-height: 1.25;
+  color: var(--text);
+  padding: 3px 9px;
+}
+
+/* ===== 菱形フロー ===== */
+.pv-df {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.pv-df-band {
+  display: flex;
+  height: 22px;
+  align-items: stretch;
+}
+
+.pv-df-seg {
+  flex: 1;
+}
+
+.pv-df-arrow {
+  flex: 0 0 26px;
+  background: var(--primary-light);
+  clip-path: polygon(0 -60%, 100% 50%, 0 160%);
+}
+
+/* 帯を基準に菱形を重ねる（帯と一緒に上下中央で揃える） */
+.pv-df-track {
+  position: relative;
+}
+
+.pv-df-nodes {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 26px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+}
+
+.pv-df-node {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 外側の四角を45度回して菱形にし、中の文字は逆に45度戻して水平に保つ */
+.pv-df-node > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  transform: rotate(45deg);
+  background: var(--light);
+  border: 2px solid #fff;
+}
+
+.pv-df-node i {
+  transform: rotate(-45deg);
+  font-style: normal;
+  display: block;
+  width: 62px;
+  text-align: center;
+  font-size: 8px;
+  font-weight: bold;
+  color: var(--primary);
+  line-height: 1.15;
+}
+
+.pv-df-node i::first-letter {
+  font-size: 12.5px;
+}
+
+.pv-df-captions {
+  display: flex;
+  margin-top: 36px;
+  padding-right: 26px;
+}
+
+.pv-df-captions > div {
+  flex: 1;
+  text-align: center;
+  font-size: 8px;
+  color: var(--subtext);
+  line-height: 1.3;
+  padding: 0 4px;
+}
+
+/* ===== STEPフロー ===== */
+.pv-sa {
+  display: flex;
+  align-items: flex-start;
+  height: 100%;
+  gap: 2px;
+}
+
+.pv-sa-col {
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+}
+
+.pv-sa-head {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--primary);
+  margin-bottom: 5px;
+}
+
+.pv-sa-head.is-highlight {
+  color: var(--highlight);
+}
+
+.pv-sa-line {
+  font-size: 8.5px;
+  color: var(--subtext);
+  line-height: 1.45;
+}
+
+.pv-sa-tri {
+  flex: 0 0 16px;
+  height: 12px;
+  margin-top: 2px;
+  background: var(--gray);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+/* ===== 4分割サイクル ===== */
+.pv-cq {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 幅ではなく高さを基準に円を組む（本文領域は横長なので、幅基準だと上下が切れる） */
+.pv-cq-ring {
+  position: absolute;
+  height: min(100%, 190px);
+  aspect-ratio: 1;
+  border: 13px solid var(--accent);
+  border-radius: 50%;
+}
+
+.pv-cq-grid {
+  position: relative;
+  height: min(70%, 132px);
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 3px;
+}
+
+.pv-cq-cell {
+  background: #fff;
+  border: 1px solid var(--light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 8.5px;
+  line-height: 1.25;
+  padding: 3px;
+}
+
+/* ===== 三角ピラミッド ===== */
+.pv-tt {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.pv-tt-tier {
+  width: min(100%, 240px);
+  flex: 1;
+  max-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.pv-tt-tier:last-child {
+  color: var(--text);
+}
+
+/* ===== 三者関係図 ===== */
+.pv-tr {
+  position: relative;
+  height: 100%;
+}
+
+/* clip-path の二重掛けだと辺ごとに線幅が変わってしまうため、SVGで均一な三角形を描く */
+.pv-tr-line {
+  position: absolute;
+  inset: 0;
+}
+
+.pv-tr-line svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pv-tr-node {
+  position: absolute;
+  background: #fff;
+  border: 1px solid var(--primary-light);
+  border-radius: 3px;
+  font-size: 9.5px;
+  font-weight: bold;
+  color: var(--primary);
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.pv-tr-node.is-top {
+  left: 50%;
+  top: 8%;
+  transform: translateX(-50%);
+}
+
+.pv-tr-node.is-left {
+  left: 8%;
+  bottom: 8%;
+}
+
+.pv-tr-node.is-right {
+  right: 8%;
+  bottom: 8%;
+}
+
+.pv-tr-center {
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.pv-tr-center::before {
+  content: '“';
+}
+
+.pv-tr-center::after {
+  content: '”';
+}
+
+/* ===== 優先度マトリクス ===== */
+.pv-qp {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.pv-qp-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+}
+
+.pv-qp-0 {
+  background: var(--light);
+}
+
+.pv-qp-1 {
+  background: var(--lighter);
+}
+
+.pv-qp-2 {
+  background: var(--pale);
+}
+
+.pv-qp-3 {
+  background: var(--pale-gray);
+}
+
+.pv-qp-pri {
+  position: absolute;
+  font-size: 8px;
+  color: var(--subtext);
+  top: 5px;
+  left: 7px;
+}
+
+.pv-qp-1 .pv-qp-pri,
+.pv-qp-3 .pv-qp-pri {
+  left: auto;
+  right: 7px;
+}
+
+.pv-qp-2 .pv-qp-pri,
+.pv-qp-3 .pv-qp-pri {
+  top: auto;
+  bottom: 5px;
+}
+
+.pv-qp-pri b {
+  font-size: 10.5px;
+  color: var(--primary);
+}
+
+.pv-qp-box {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 8.5px;
+  line-height: 1.3;
+  padding: 4px 8px;
+  text-align: center;
+  max-width: 82%;
+}
+
+.pv-qp-axis-x,
+.pv-qp-axis-y {
+  position: absolute;
+  background: var(--subtext);
+  pointer-events: none;
+}
+
+.pv-qp-axis-x {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+}
+
+.pv-qp-axis-y {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+}
+
+/* ===== 年表 ===== */
+.pv-yt {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.pv-yt-axis {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 52%;
+  height: 1.5px;
+  background: var(--accent);
+}
+
+.pv-yt-items {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+/* 各項目を本文の高さいっぱいに取り、軸(52%)を基準に丸・年・出来事を絶対配置する。
+   出来事は1つおきに高さを変えて、隣同士がぶつからないようにする。 */
+.pv-yt-item {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.pv-yt-label {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 52%;
+  margin-bottom: 16px;
+  font-size: 7.5px;
+  color: var(--subtext);
+  text-align: center;
+  line-height: 1.25;
+  width: 150%;
+}
+
+.pv-yt-item.is-below .pv-yt-label {
+  margin-bottom: 40px;
+}
+
+.pv-yt-item.is-below::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 52%;
+  margin-bottom: 6px;
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+}
+
+.pv-yt-dot {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.25px solid var(--accent);
+}
+
+.pv-yt-year {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  font-size: 7.5px;
+  color: var(--text);
+  white-space: nowrap;
 }
 
 /* ===== 仕様ベースの自作テンプレート描画（js/templateSpec.js） ===== */

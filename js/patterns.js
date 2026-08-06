@@ -44,6 +44,47 @@ window.DocAssist = window.DocAssist || {};
   // ■ を箇条書きマーカーに使う（NRI報告書の本文で多用される記号）。
   const SQUARE_BULLET = { code: '25A0', indent: 14 };
 
+  // 洗練された見た目のための共通スタイル定数。
+  // 参考にしたパーツテンプレート集の特徴：角はごくわずかに丸め、罫線は髪の毛のように細く、
+  // 番号は塗りつぶさず輪郭の丸で示す。数値を1箇所にまとめ、全パターンで統一する。
+  const ROUND = 0.04;        // コンテンツボックスの角丸（帯・シェブロン・表には使わない）
+  const HAIRLINE = 0.75;     // 標準の罫線の太さ（pt）
+  const HAIRLINE_THIN = 0.5; // 補助的な罫線（目盛り・区切り）
+
+  // 輪郭だけの番号丸。塗りつぶしバッジより軽く見え、淡い背景の上でも沈まない。
+  function addNumberCircle(slide, n, box, theme, opts) {
+    const o = opts || {};
+    const color = o.color || theme.primary;
+    slide.addShape('oval', {
+      x: box.x, y: box.y, w: box.w, h: box.h,
+      fill: { color: o.fill || theme.white },
+      line: { color, width: o.width || 1 },
+    });
+    slide.addText(String(n), {
+      x: box.x, y: box.y, w: box.w, h: box.h,
+      fontSize: o.fontSize || 11, bold: true, color,
+      align: 'center', valign: 'middle',
+    });
+  }
+
+  // 同系色を段階的に変化させる（帯や円弧を「進むほど濃く」見せるための階調）。
+  const BLUE_SCALE = ['light', 'softBlue', 'accent', 'mid', 'primaryLight', 'primary'];
+  function scaleColor(theme, i, n, reverse) {
+    if (n <= 1) return theme.primaryLight;
+    const t = reverse ? 1 - i / (n - 1) : i / (n - 1);
+    const idx = Math.round(t * (BLUE_SCALE.length - 1));
+    return theme[BLUE_SCALE[idx]];
+  }
+  function scaleCssVar(i, n, reverse) {
+    const MAP = {
+      light: 'var(--light)', softBlue: 'var(--soft-blue)', accent: 'var(--accent)',
+      mid: 'var(--mid)', primaryLight: 'var(--primary-light)', primary: 'var(--primary)',
+    };
+    if (n <= 1) return MAP.primaryLight;
+    const t = reverse ? 1 - i / (n - 1) : i / (n - 1);
+    return MAP[BLUE_SCALE[Math.round(t * (BLUE_SCALE.length - 1))]];
+  }
+
   // 箇条書き配列（**強調**構文を含みうる）を、PptxGenJSのtext run配列に変換する。
   // 強調部分は太字＋ネイビーになる。複数のパターンから共通で使う。
   function bulletTextRuns(bullets, theme, opts) {
@@ -266,16 +307,18 @@ window.DocAssist = window.DocAssist || {};
         [box.x, box.y + ch + gap],
         [box.x + cw + gap, box.y + ch + gap],
       ];
-      const colors = [theme.accent, theme.primary, theme.primary, theme.accent];
+      // ベタ塗り＋白文字ではなく、淡い塗り＋濃い文字にする（参考パーツ集の4象限の作法）。
+      // 象限ごとの区別は塗りの濃淡だけで付け、文字は常に読みやすい濃さを保つ。
+      const fills = [theme.light, theme.lighter, theme.lighter, theme.pale];
       items.forEach((it, i) => {
         const [x, y] = positions[i];
-        slide.addShape('rect', { x, y, w: cw, h: ch, fill: { color: colors[i] }, line: { color: theme.white, width: 2 } });
+        slide.addShape('rect', { x, y, w: cw, h: ch, fill: { color: fills[i] }, line: { color: theme.white, width: 2 } });
         slide.addText(
           [
-            { text: it.key + '\n', options: { bold: true, fontSize: 13 } },
-            { text: it.value, options: { fontSize: 11 } },
+            { text: it.key + '\n', options: { bold: true, fontSize: 13, color: theme.primary } },
+            { text: it.value, options: { fontSize: 11, color: theme.text } },
           ],
-          { x: x + 0.15, y: y + 0.15, w: cw - 0.3, h: ch - 0.3, color: theme.white, valign: 'top' }
+          { x: x + 0.18, y: y + 0.15, w: cw - 0.36, h: ch - 0.3, valign: 'top' }
         );
       });
     },
@@ -308,7 +351,7 @@ window.DocAssist = window.DocAssist || {};
           <div class="pv-flow-num">${i + 1}</div>
           <div class="pv-flow-label">${esc(label)}</div>
         </div>
-        ${i < items.length - 1 ? '<div class="pv-flow-arrow">→</div>' : ''}`;
+        ${i < items.length - 1 ? '<div class="pv-flow-arrow"></div>' : ''}`;
         })
         .join('')}</div>`;
     },
@@ -322,12 +365,19 @@ window.DocAssist = window.DocAssist || {};
       items.forEach((it, i) => {
         const x = box.x + i * (stepW + arrowW);
         const label = it.value === it.key ? it.key : `${it.key}\n${it.value}`;
-        slide.addShape('rect', { x, y: box.y + 0.6, w: stepW, h: box.h - 0.6, fill: { color: theme.accent }, line: { type: 'none' } });
-        slide.addShape('oval', { x: x + stepW / 2 - 0.25, y: box.y, w: 0.5, h: 0.5, fill: { color: theme.primary } });
-        slide.addText(String(i + 1), { x: x + stepW / 2 - 0.25, y: box.y, w: 0.5, h: 0.5, fontSize: 14, bold: true, color: theme.white, align: 'center', valign: 'middle' });
-        slide.addText(label, { x: x + 0.1, y: box.y + 0.7, w: stepW - 0.2, h: box.h - 0.8, fontSize: labelFontSize, color: theme.white, align: 'center', valign: 'top' });
+        // 淡い塗り＋濃い文字の角丸ボックスに、輪郭だけの番号丸を重ねる
+        slide.addShape('roundRect', {
+          x, y: box.y + 0.6, w: stepW, h: box.h - 0.6, rectRadius: ROUND,
+          fill: { color: theme.light }, line: { type: 'none' },
+        });
+        addNumberCircle(slide, i + 1, { x: x + stepW / 2 - 0.25, y: box.y, w: 0.5, h: 0.5 }, theme, { fontSize: 13 });
+        slide.addText(label, { x: x + 0.12, y: box.y + 0.72, w: stepW - 0.24, h: box.h - 0.84, fontSize: labelFontSize, color: theme.text, align: 'center', valign: 'top' });
         if (i < n - 1) {
-          slide.addText('→', { x: x + stepW, y: box.y + 0.6, w: arrowW, h: box.h - 0.6, fontSize: 16, bold: true, color: theme.primary, align: 'center', valign: 'middle' });
+          // 「→」の文字ではなく小さな三角形にする（参考パーツ集の区切り記号）
+          slide.addShape('triangle', {
+            x: x + stepW + arrowW / 2 - 0.09, y: box.y + 0.6 + (box.h - 0.6) / 2 - 0.09, w: 0.18, h: 0.18,
+            rotate: 90, fill: { color: theme.primary }, line: { type: 'none' },
+          });
         }
       });
     },
@@ -719,15 +769,24 @@ window.DocAssist = window.DocAssist || {};
       const cx = box.x + box.w / 2;
       const cy = box.y + box.h / 2;
       const R = (Math.min(box.w, box.h) / 2) * 0.66;
-      slide.addShape('oval', { x: cx - R, y: cy - R, w: R * 2, h: R * 2, fill: { type: 'none' }, line: { color: theme.accent, width: 1.5, dashType: 'dash' } });
+      // 破線ではなく淡い実線の輪でつなぐ。ノードは進むほど濃くして順序を色でも示す。
+      const ringW = 0.14;
+      slide.addShape('donut', {
+        x: cx - R - ringW, y: cy - R - ringW, w: (R + ringW) * 2, h: (R + ringW) * 2,
+        fill: { color: theme.lighter }, line: { type: 'none' },
+      });
       const nodeW = Math.min(2.4, (box.w / n) * 1.3);
-      const nodeH = 0.9;
+      const nodeH = 0.86;
       items.forEach((it, i) => {
         const angle = ((-90 + (360 / n) * i) * Math.PI) / 180;
         const x = cx + R * Math.cos(angle) - nodeW / 2;
         const y = cy + R * Math.sin(angle) - nodeH / 2;
-        slide.addShape('roundRect', { x, y, w: nodeW, h: nodeH, fill: { color: theme.primary }, rectRadius: 0.5 });
-        slide.addText(`${i + 1}. ${it.key}`, { x, y, w: nodeW, h: nodeH, fontSize: 11, bold: true, color: theme.white, align: 'center', valign: 'middle' });
+        const fill = scaleColor(theme, i, n);
+        slide.addShape('roundRect', { x, y, w: nodeW, h: nodeH, fill: { color: fill }, line: { color: theme.white, width: 1.5 }, rectRadius: 0.4 });
+        slide.addText(`${i + 1}. ${it.key}`, {
+          x: x + 0.08, y, w: nodeW - 0.16, h: nodeH,
+          fontSize: 11, bold: true, color: i <= 1 ? theme.text : theme.white, align: 'center', valign: 'middle',
+        });
       });
     },
   };
@@ -990,8 +1049,10 @@ window.DocAssist = window.DocAssist || {};
       const slots = mapToSwot(items);
       if (slots.every((s) => !s)) return;
       // SWOT_LABELSの並び順（強み・弱み・機会・脅威）に対応。
-      // ポジティブ（強み・機会）=青の濃淡、要注意（弱み・脅威）=グレーの濃淡で、色相を変えずに区別する。
-      const swotColors = [theme.primary, theme.gray, theme.primaryLight, '6B7480'];
+      // 塗りは淡くし、ポジティブ（強み・機会）=青系、要注意（弱み・脅威）=グレー系という
+      // 区別は見出し文字の色で付ける。ベタ塗りより落ち着き、本文も読みやすい。
+      const swotFills = [theme.light, theme.paleGray, theme.lighter, 'F4F4F4'];
+      const swotLabelColors = [theme.primary, '6B7480', theme.primaryLight, '6B7480'];
       const gap = 0.2;
       const cw = (box.w - gap) / 2;
       const ch = (box.h - gap) / 2;
@@ -1003,13 +1064,13 @@ window.DocAssist = window.DocAssist || {};
       ];
       slots.forEach((s, i) => {
         const [x, y] = positions[i];
-        slide.addShape('rect', { x, y, w: cw, h: ch, fill: { color: swotColors[i] }, line: { color: theme.white, width: 2 } });
+        slide.addShape('rect', { x, y, w: cw, h: ch, fill: { color: swotFills[i] }, line: { color: theme.white, width: 2 } });
         slide.addText(
           [
-            { text: SWOT_LABELS[i] + '\n', options: { bold: true, fontSize: 13 } },
-            { text: s ? s.value : '', options: { fontSize: 11 } },
+            { text: SWOT_LABELS[i] + '\n', options: { bold: true, fontSize: 13, color: swotLabelColors[i] } },
+            { text: s ? s.value : '', options: { fontSize: 11, color: theme.text } },
           ],
-          { x: x + 0.15, y: y + 0.15, w: cw - 0.3, h: ch - 0.3, color: theme.white, valign: 'top' }
+          { x: x + 0.18, y: y + 0.15, w: cw - 0.36, h: ch - 0.3, valign: 'top' }
         );
       });
     },
@@ -1037,8 +1098,7 @@ window.DocAssist = window.DocAssist || {};
       const rowH = box.h / list.length;
       list.forEach((b, i) => {
         const y = box.y + i * rowH;
-        slide.addShape('oval', { x: box.x, y: y + rowH / 2 - 0.2, w: 0.4, h: 0.4, fill: { color: theme.primary } });
-        slide.addText(String(i + 1), { x: box.x, y: y + rowH / 2 - 0.2, w: 0.4, h: 0.4, fontSize: 12, bold: true, color: theme.white, align: 'center', valign: 'middle' });
+        addNumberCircle(slide, i + 1, { x: box.x, y: y + rowH / 2 - 0.2, w: 0.4, h: 0.4 }, theme, { fontSize: 11 });
         slide.addText(A.emphasisRuns(b, theme.primary), { x: box.x + 0.6, y, w: box.w - 0.6, h: rowH, fontSize: 14, color: theme.text, valign: 'middle' });
         if (i < list.length - 1) {
           slide.addShape('line', { x: box.x, y: y + rowH, w: box.w, h: 0, line: { color: theme.border, width: 0.75 } });
@@ -1087,8 +1147,7 @@ window.DocAssist = window.DocAssist || {};
       items.forEach((it, i) => {
         const y = box.y + i * rowH;
         const cy = y + rowH / 2;
-        slide.addShape('oval', { x: lineX - 0.18, y: cy - 0.18, w: 0.36, h: 0.36, fill: { color: theme.primary } });
-        slide.addText(String(i + 1), { x: lineX - 0.18, y: cy - 0.18, w: 0.36, h: 0.36, fontSize: 11, bold: true, color: theme.white, align: 'center', valign: 'middle' });
+        addNumberCircle(slide, i + 1, { x: lineX - 0.18, y: cy - 0.18, w: 0.36, h: 0.36 }, theme, { fontSize: 10 });
         const label = it.value !== it.key ? `${it.key}：${it.value}` : it.key;
         slide.addText(label, { x: lineX + 0.35, y: y + 0.03, w: box.x + box.w - (lineX + 0.35), h: rowH - 0.06, fontSize: 11, color: theme.text, valign: 'middle' });
       });
@@ -2089,6 +2148,598 @@ window.DocAssist = window.DocAssist || {};
     },
   };
 
+  // ---------- 入れ子シェブロン ----------
+  // 大きな流れ（外側の帯）と、その中の工程（内側の白いシェブロン）を二段で示す。
+  // 入力形式： - フェーズ1：現行分析｜要件定義
+  function parseChevronGroups(bullets) {
+    return A.extractItems(bullets)
+      .slice(0, 4)
+      .map((it) => ({ label: it.key, steps: splitFields(it.value).slice(0, 4), highlight: it.highlight }))
+      .filter((g) => g.label);
+  }
+
+  const chevronFlow = {
+    id: 'chevron-flow',
+    name: '入れ子シェブロン',
+    category: 'フロー・プロセス',
+    description: '大きな流れを外側の帯、その中の工程を内側のシェブロンで二段に示す。「フェーズ：工程｜工程」の形式。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['フェーズ', '工程', '段階', 'ステージ']);
+      const groups = parseChevronGroups(section.bullets || []);
+      const nested = groups.filter((g) => g.steps.length >= 2).length;
+      if (kw && nested >= 2) return 10;
+      if (nested >= 2) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      const groups = parseChevronGroups(bullets);
+      if (!groups.length) return emptyBody();
+      return `<div class="pv-cf">${groups
+        .map(
+          (g, i) => `
+        <div class="pv-cf-group">
+          <div class="pv-cf-band" style="background:${g.highlight ? 'var(--highlight)' : scaleCssVar(i, groups.length)};">${esc(g.label)}</div>
+          <div class="pv-cf-steps">${g.steps.map((s) => `<div class="pv-cf-step"><span>${esc(s)}</span></div>`).join('')}</div>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const groups = parseChevronGroups(bullets);
+      if (!groups.length) return;
+      const n = groups.length;
+      const gap = 0.08;
+      const groupW = (box.w - gap * (n - 1)) / n;
+      const bandH = Math.min(0.66, box.h * 0.38);
+      const stepY = box.y + bandH + 0.12;
+      const stepH = Math.min(0.72, box.h - bandH - 0.24);
+      groups.forEach((g, gi) => {
+        const gx = box.x + gi * (groupW + gap);
+        const bandColor = g.highlight ? theme.highlight : scaleColor(theme, gi, n);
+        slide.addShape(gi === 0 ? 'homePlate' : 'chevron', {
+          x: gx, y: box.y, w: groupW, h: bandH,
+          fill: { color: bandColor }, line: { type: 'none' },
+        });
+        slide.addText(g.label, {
+          x: gx + 0.22, y: box.y, w: groupW - 0.44, h: bandH,
+          fontSize: 12, bold: true, color: theme.white, align: 'center', valign: 'middle',
+        });
+        const sn = g.steps.length;
+        if (!sn) return;
+        const overlap = 0.1;
+        const stepW = (groupW + overlap * (sn - 1)) / sn;
+        g.steps.forEach((s, si) => {
+          const sx = gx + si * (stepW - overlap);
+          slide.addShape(si === 0 ? 'homePlate' : 'chevron', {
+            x: sx, y: stepY, w: stepW, h: stepH,
+            fill: { color: theme.white }, line: { color: bandColor, width: HAIRLINE },
+          });
+          slide.addText(s, {
+            x: sx + 0.16, y: stepY, w: stepW - 0.32, h: stepH,
+            fontSize: 9.5, color: theme.text, align: 'center', valign: 'middle',
+          });
+        });
+      });
+    },
+  };
+
+  // ---------- 菱形フロー ----------
+  // 段階的に濃くなる帯の上に菱形を置く。STP（Segmentation→Targeting→Positioning）のような
+  // 「3〜4語で言い切る流れ」を象徴的に見せるための型。
+  // 英字ラベルは頭文字だけ大きくする（参考テンプレートの表現）。
+  function initialRuns(label, theme, big, small) {
+    const s = String(label || '');
+    if (/^[A-Za-z]/.test(s) && s.length > 1) {
+      return [
+        { text: s.charAt(0), options: { fontSize: big, bold: true, color: theme.primary } },
+        { text: s.slice(1), options: { fontSize: small, color: theme.primary } },
+      ];
+    }
+    return [{ text: s, options: { fontSize: small + 1, bold: true, color: theme.primary } }];
+  }
+
+  const diamondFlow = {
+    id: 'diamond-flow',
+    name: '菱形フロー',
+    category: 'フロー・プロセス',
+    description: '段階的に濃くなる帯の上に菱形を並べ、3〜4段階の流れを象徴的に示す（STPなど）。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['STP', 'ステップ', '流れ', 'プロセス', '段階']);
+      const n = bullets.length;
+      if (kw && n >= 3 && n <= 4) return 9;
+      if (n === 3) return 5;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (!items.length) return emptyBody();
+      const n = items.length;
+      return `<div class="pv-df">
+        <div class="pv-df-track">
+          <div class="pv-df-band">${items
+            .map((_, i) => `<div class="pv-df-seg" style="background:${scaleCssVar(i, n)};"></div>`)
+            .join('')}<div class="pv-df-arrow"></div></div>
+          <div class="pv-df-nodes">${items
+            .map((it) => `<div class="pv-df-node"><span><i>${esc(it.key)}</i></span></div>`)
+            .join('')}</div>
+        </div>
+        <div class="pv-df-captions">${items.map((it) => `<div>${esc(it.value !== it.key ? it.value : '')}</div>`).join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (!items.length) return;
+      const n = items.length;
+      const bandH = Math.min(0.5, box.h * 0.26);
+      const bandY = box.y + Math.min(1.0, box.h * 0.34);
+      const arrowW = 0.55;
+      const segW = (box.w - arrowW) / n;
+      items.forEach((_, i) => {
+        slide.addShape('rect', {
+          x: box.x + i * segW, y: bandY, w: segW + 0.01, h: bandH,
+          fill: { color: scaleColor(theme, i, n) }, line: { type: 'none' },
+        });
+      });
+      slide.addShape('rightArrow', {
+        x: box.x + box.w - arrowW - 0.1, y: bandY - bandH * 0.32, w: arrowW + 0.1, h: bandH * 1.64,
+        fill: { color: theme.primaryLight }, line: { type: 'none' },
+      });
+      const dSize = Math.min(1.7, segW * 0.92, box.h * 0.62);
+      items.forEach((it, i) => {
+        const cx = box.x + i * segW + segW / 2;
+        const dy = bandY + bandH / 2 - dSize / 2;
+        slide.addShape('diamond', {
+          x: cx - dSize / 2, y: dy, w: dSize, h: dSize,
+          fill: { color: theme.light }, line: { color: theme.white, width: 1.5 },
+        });
+        slide.addText(initialRuns(it.key, theme, 17, 11), {
+          x: cx - dSize / 2, y: dy, w: dSize, h: dSize,
+          align: 'center', valign: 'middle',
+        });
+        if (it.value && it.value !== it.key) {
+          slide.addText(it.value, {
+            x: cx - segW / 2 + 0.06, y: dy + dSize + 0.06, w: segW - 0.12, h: 0.46,
+            fontSize: 9, color: theme.subtext, align: 'center', valign: 'top',
+          });
+        }
+      });
+    },
+  };
+
+  // ---------- STEPフロー ----------
+  // 「STEP1／見出し／補足」を三角形の区切りで並べる、説明の細かい手順向けの型。
+  // 入力形式： - STEP1：要件定義｜関係者ヒアリング｜要件定義書の作成
+  const stepArrows = {
+    id: 'step-arrows',
+    name: 'STEPフロー',
+    category: 'フロー・プロセス',
+    description: 'STEP見出しと複数行の補足を、三角形の区切りで横に並べる。手順の中身まで書きたいときに使う。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = /STEP\s*\d|ステップ\s*\d/i.test(text);
+      const items = A.extractItems(bullets);
+      const detailed = items.filter((it) => splitFields(it.value).length >= 2).length;
+      const n = bullets.length;
+      if (kw && n >= 3 && n <= 5) return 10;
+      if (detailed >= 2 && n >= 3 && n <= 5) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 5);
+      if (!items.length) return emptyBody();
+      return `<div class="pv-sa">${items
+        .map((it, i) => {
+          const lines = splitFields(it.value);
+          const col = `<div class="pv-sa-col">
+            <div class="pv-sa-head${it.highlight ? ' is-highlight' : ''}">${esc(it.key)}</div>
+            ${lines.map((l) => `<div class="pv-sa-line">${esc(l)}</div>`).join('')}
+          </div>`;
+          return col + (i < items.length - 1 ? '<div class="pv-sa-tri"></div>' : '');
+        })
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 5);
+      if (!items.length) return;
+      const n = items.length;
+      const triW = 0.34;
+      const colW = (box.w - triW * (n - 1)) / n;
+      items.forEach((it, i) => {
+        const x = box.x + i * (colW + triW);
+        slide.addText(it.key, {
+          x, y: box.y, w: colW, h: 0.34,
+          fontSize: 12, bold: true, color: it.highlight ? theme.highlight : theme.primary,
+          align: 'center', valign: 'middle',
+        });
+        const lines = splitFields(it.value);
+        if (lines.length) {
+          slide.addText(
+            lines.map((l, li) => ({ text: l, options: { fontSize: 9.5, breakLine: li < lines.length - 1, paraSpaceAfter: 3 } })),
+            { x: x + 0.06, y: box.y + 0.4, w: colW - 0.12, h: box.h - 0.46, color: theme.subtext, align: 'center', valign: 'top' }
+          );
+        }
+        if (i < n - 1) {
+          slide.addShape('triangle', {
+            x: x + colW + 0.04, y: box.y + 0.06, w: triW - 0.08, h: 0.26,
+            rotate: 90, fill: { color: theme.gray }, line: { type: 'none' },
+          });
+        }
+      });
+    },
+  };
+
+  // ---------- 4分割サイクル ----------
+  // 太い円環と4象限のラベルで、繰り返すプロセスを示す。
+  const cycleQuadrant = {
+    id: 'cycle-quadrant',
+    name: '4分割サイクル',
+    category: 'フロー・プロセス',
+    description: '太い円環の中を4象限に区切り、繰り返すプロセスを示す（4項目専用）。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['サイクル', 'PDCA', '循環', '繰り返し']);
+      if (kw && bullets.length === 4) return 10;
+      if (bullets.length === 4) return 4;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (items.length < 2) return emptyBody();
+      return `<div class="pv-cq">
+        <div class="pv-cq-ring"></div>
+        <div class="pv-cq-grid">${items
+          .map((it) => `<div class="pv-cq-cell">${esc(it.key)}</div>`)
+          .join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (items.length < 2) return;
+      const size = Math.min(box.w, box.h);
+      const cx = box.x + box.w / 2;
+      const cy = box.y + box.h / 2;
+      const R = size / 2;
+      slide.addShape('donut', {
+        x: cx - R, y: cy - R, w: R * 2, h: R * 2,
+        fill: { color: theme.accent }, line: { type: 'none' },
+      });
+      // 円環の上下左右に矢じりを置いて、回る向きを示す
+      const head = R * 0.2;
+      [
+        { x: cx, y: cy - R, rotate: 90 },
+        { x: cx + R, y: cy, rotate: 180 },
+        { x: cx, y: cy + R, rotate: 270 },
+        { x: cx - R, y: cy, rotate: 0 },
+      ].forEach((p) => {
+        slide.addShape('triangle', {
+          x: p.x - head / 2, y: p.y - head / 2, w: head, h: head,
+          rotate: p.rotate, fill: { color: theme.accent }, line: { type: 'none' },
+        });
+      });
+      // 内側の2×2ラベル
+      const inner = R * 0.66;
+      const cellW = inner;
+      const cellH = inner;
+      const pos = [
+        [cx - inner, cy - inner],
+        [cx, cy - inner],
+        [cx - inner, cy],
+        [cx, cy],
+      ];
+      items.forEach((it, i) => {
+        const [x, y] = pos[i];
+        slide.addShape('rect', {
+          x: x + 0.03, y: y + 0.03, w: cellW - 0.06, h: cellH - 0.06,
+          fill: { color: theme.white }, line: { color: theme.light, width: HAIRLINE },
+        });
+        slide.addText(it.key, {
+          x: x + 0.08, y: y + 0.03, w: cellW - 0.16, h: cellH - 0.06,
+          fontSize: 11, color: theme.text, align: 'center', valign: 'middle',
+        });
+      });
+    },
+  };
+
+  // ---------- 三角ピラミッド ----------
+  // 上に行くほど狭くなる三角形を水平に分割し、階層（ハイタッチ／ロータッチ等）を示す。
+  const triangleTiers = {
+    id: 'triangle-tiers',
+    name: '三角ピラミッド',
+    category: '構造・ロジック',
+    description: '三角形を水平に分割して階層を示す。上ほど少数・高付加価値、下ほど多数という関係の表現に使う。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['階層', 'ピラミッド', 'タッチ', '層', 'セグメント']);
+      const n = bullets.length;
+      if (kw && n >= 3 && n <= 4) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (!items.length) return emptyBody();
+      const n = items.length;
+      return `<div class="pv-tt">${items
+        .map((it, i) => {
+          const wTop = ((i / n) * 100).toFixed(1);
+          const wBottom = (((i + 1) / n) * 100).toFixed(1);
+          return `<div class="pv-tt-tier" style="background:${scaleCssVar(i, n, true)};clip-path:polygon(${(50 - wTop / 2).toFixed(
+            1
+          )}% 0,${(50 + wTop / 2).toFixed(1)}% 0,${(50 + wBottom / 2).toFixed(1)}% 100%,${(50 - wBottom / 2).toFixed(1)}% 100%);">
+            <span>${esc(it.key)}</span></div>`;
+        })
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (!items.length) return;
+      const n = items.length;
+      const size = Math.min(box.h, box.w * 0.55);
+      const baseW = Math.min(box.w * 0.62, size * 1.5);
+      const cx = box.x + box.w / 2;
+      const tierH = size / n;
+      items.forEach((it, i) => {
+        const y = box.y + (box.h - size) / 2 + i * tierH;
+        const wBottom = baseW * ((i + 1) / n);
+        // 最上段だけ三角、以降は台形を積む
+        slide.addShape(i === 0 ? 'triangle' : 'trapezoid', {
+          x: cx - wBottom / 2, y, w: wBottom, h: tierH,
+          fill: { color: scaleColor(theme, i, n, true) }, line: { color: theme.white, width: 1 },
+        });
+        const dark = i >= n - 1;
+        slide.addText(it.key, {
+          x: cx - wBottom / 2, y, w: wBottom, h: tierH,
+          fontSize: 10.5, bold: true, color: dark ? theme.text : theme.white,
+          align: 'center', valign: 'middle',
+        });
+        if (it.value && it.value !== it.key) {
+          slide.addText(it.value, {
+            x: cx + baseW / 2 + 0.18, y, w: box.x + box.w - (cx + baseW / 2 + 0.18), h: tierH,
+            fontSize: 9.5, color: theme.text, valign: 'middle',
+          });
+        }
+      });
+    },
+  };
+
+  // ---------- 三者関係図 ----------
+  // 3つの立場を三角形に配置し、中央にその関係が生む価値を置く（「三方良し」型）。
+  const triangleRelation = {
+    id: 'triangle-relation',
+    name: '三者関係図',
+    category: '構造・ロジック',
+    description: '3つの立場を三角形に配置し、中央にその関係が生む価値を置く。「中心：価値」＋3項目の形式。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['三方良し', '三者', '関係', 'Win-Win', 'ステークホルダー']);
+      const items = A.extractItems(section.bullets || []);
+      const nodes = items.filter((it) => !/中心|中央|価値/.test(it.key));
+      if (kw && nodes.length === 3) return 10;
+      if (nodes.length === 3 && kw) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets);
+      const center = items.find((it) => /中心|中央|価値/.test(it.key));
+      const nodes = items.filter((it) => it !== center).slice(0, 3);
+      if (nodes.length < 3) return emptyBody();
+      return `<div class="pv-tr">
+        <div class="pv-tr-line"><svg viewBox="0 0 100 100" preserveAspectRatio="none">
+          <polygon points="50,16 88,84 12,84" fill="none" stroke="var(--accent)" stroke-width="2.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+        </svg></div>
+        ${center ? `<div class="pv-tr-center">${esc(center.value)}</div>` : ''}
+        <div class="pv-tr-node is-top">${esc(nodes[0].key)}</div>
+        <div class="pv-tr-node is-left">${esc(nodes[1].key)}</div>
+        <div class="pv-tr-node is-right">${esc(nodes[2].key)}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets);
+      const center = items.find((it) => /中心|中央|価値/.test(it.key));
+      const nodes = items.filter((it) => it !== center).slice(0, 3);
+      if (nodes.length < 3) return;
+      const boxW = Math.min(1.9, box.w * 0.26);
+      const boxH = 0.44;
+      const cx = box.x + box.w / 2;
+      const top = box.y + 0.12;
+      const bottom = box.y + box.h - boxH - 0.12;
+      const spread = Math.min(box.w * 0.32, 2.5);
+      const pts = [
+        { x: cx - boxW / 2, y: top },
+        { x: cx - spread - boxW / 2, y: bottom },
+        { x: cx + spread - boxW / 2, y: bottom },
+      ];
+      // 3辺（頂点の中心どうしを結ぶ）
+      const centers = pts.map((p) => ({ x: p.x + boxW / 2, y: p.y + boxH / 2 }));
+      [[0, 1], [1, 2], [0, 2]].forEach(([a, b]) => {
+        slide.addShape('line', {
+          x: Math.min(centers[a].x, centers[b].x),
+          y: Math.min(centers[a].y, centers[b].y),
+          w: Math.abs(centers[b].x - centers[a].x),
+          h: Math.abs(centers[b].y - centers[a].y),
+          line: { color: theme.accent, width: 2.5 },
+          flipV: (centers[b].x - centers[a].x) * (centers[b].y - centers[a].y) < 0,
+        });
+      });
+      pts.forEach((p, i) => {
+        slide.addShape('roundRect', {
+          x: p.x, y: p.y, w: boxW, h: boxH, rectRadius: ROUND,
+          fill: { color: theme.white }, line: { color: theme.primaryLight, width: 1 },
+        });
+        slide.addText(nodes[i].key, {
+          x: p.x, y: p.y, w: boxW, h: boxH,
+          fontSize: 11, bold: true, color: theme.primary, align: 'center', valign: 'middle',
+        });
+      });
+      if (center) {
+        slide.addText(`“${center.value}”`, {
+          x: cx - 1.5, y: box.y + box.h * 0.52, w: 3.0, h: 0.4,
+          fontSize: 14, bold: true, color: theme.primary, align: 'center', valign: 'middle',
+        });
+      }
+    },
+  };
+
+  // ---------- 優先度マトリクス ----------
+  // 4象限を淡く塗り分け、各象限に優先度ラベルと内容ボックスを置く。
+  // 塗りを淡くして文字を濃くすることで、ベタ塗りより落ち着いた印象にする。
+  const QUADRANT_PRIORITY = ['高', '中', '中', '低'];
+  const quadrantPriority = {
+    id: 'quadrant-priority',
+    name: '優先度マトリクス',
+    category: 'マトリクス／ポジショニング',
+    description: '4象限を淡く塗り分け、象限ごとの優先度と打ち手を示す。軸で優先順位を説明したいときに使う。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['優先度', '優先順位', '象限', '重要度']);
+      if (kw && bullets.length === 4) return 10;
+      if (kw && bullets.length >= 2) return 6;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (items.length < 2) return emptyBody();
+      return `<div class="pv-qp">
+        ${items
+          .map(
+            (it, i) => `<div class="pv-qp-cell pv-qp-${i}">
+          <span class="pv-qp-pri">優先度：<b>${QUADRANT_PRIORITY[i]}</b></span>
+          <span class="pv-qp-box">${esc(it.key)}</span>
+        </div>`
+          )
+          .join('')}
+        <div class="pv-qp-axis-x"></div><div class="pv-qp-axis-y"></div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (items.length < 2) return;
+      const cw = box.w / 2;
+      const ch = box.h / 2;
+      const fills = [theme.light, theme.lighter, theme.pale, theme.paleGray];
+      const pos = [
+        [box.x, box.y],
+        [box.x + cw, box.y],
+        [box.x, box.y + ch],
+        [box.x + cw, box.y + ch],
+      ];
+      items.forEach((it, i) => {
+        const [x, y] = pos[i];
+        slide.addShape('rect', { x, y, w: cw, h: ch, fill: { color: fills[i] }, line: { type: 'none' } });
+        const rightSide = i % 2 === 1;
+        slide.addText(
+          [
+            { text: '優先度：', options: { fontSize: 9, color: theme.subtext } },
+            { text: QUADRANT_PRIORITY[i], options: { fontSize: 12, bold: true, color: theme.primary } },
+          ],
+          {
+            x: x + 0.12, y: i < 2 ? y + 0.06 : y + ch - 0.34, w: cw - 0.24, h: 0.28,
+            align: rightSide ? 'right' : 'left', valign: 'middle',
+          }
+        );
+        const bw = Math.min(2.4, cw * 0.62);
+        slide.addShape('roundRect', {
+          x: x + (cw - bw) / 2, y: y + ch / 2 - 0.24, w: bw, h: 0.48, rectRadius: ROUND,
+          fill: { color: theme.white }, line: { color: theme.border, width: HAIRLINE },
+        });
+        slide.addText(it.key, {
+          x: x + (cw - bw) / 2, y: y + ch / 2 - 0.24, w: bw, h: 0.48,
+          fontSize: 10.5, color: theme.text, align: 'center', valign: 'middle',
+        });
+      });
+      // 中央を通る軸（矢印つき）
+      slide.addShape('rightArrow', {
+        x: box.x, y: box.y + ch - 0.035, w: box.w, h: 0.07,
+        fill: { color: theme.subtext }, line: { type: 'none' },
+      });
+      slide.addShape('upArrow', {
+        x: box.x + cw - 0.035, y: box.y, w: 0.07, h: box.h,
+        fill: { color: theme.subtext }, line: { type: 'none' },
+      });
+    },
+  };
+
+  // ---------- 年表 ----------
+  // 横軸に丸を打ち、年と出来事を交互に振り分けて並べる。
+  // 入力形式： - 1987年：創業
+  const yearTimeline = {
+    id: 'year-timeline',
+    name: '年表',
+    category: '時系列',
+    description: '横軸に丸を打って年と出来事を並べる。沿革や制度改正の経緯など、点が多い年表向け。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const years = (text.match(/\d{4}\s*年/g) || []).length;
+      const kw = A.hasAny(text, ['沿革', '年表', '経緯', '変遷', 'これまでの']);
+      const n = bullets.length;
+      if (n >= 5 && years >= Math.ceil(n * 0.7)) return kw ? 10 : 9;
+      if (kw && years >= 3) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 12);
+      if (!items.length) return emptyBody();
+      return `<div class="pv-yt">
+        <div class="pv-yt-axis"></div>
+        <div class="pv-yt-items">${items
+          .map(
+            (it, i) => `<div class="pv-yt-item${i % 2 ? ' is-below' : ''}">
+            <span class="pv-yt-label">${esc(it.value !== it.key ? it.value : '')}</span>
+            <span class="pv-yt-dot"></span>
+            <span class="pv-yt-year">${esc(it.key)}</span>
+          </div>`
+          )
+          .join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 12);
+      if (!items.length) return;
+      const n = items.length;
+      const axisY = box.y + box.h * 0.52;
+      slide.addShape('line', {
+        x: box.x, y: axisY, w: box.w - 0.28, h: 0,
+        line: { color: theme.accent, width: 1.5 },
+      });
+      slide.addShape('triangle', {
+        x: box.x + box.w - 0.28, y: axisY - 0.09, w: 0.18, h: 0.18,
+        rotate: 90, fill: { color: theme.accent }, line: { type: 'none' },
+      });
+      const stepW = (box.w - 0.5) / n;
+      const dot = 0.17;
+      items.forEach((it, i) => {
+        const cx = box.x + 0.16 + stepW * i + stepW / 2;
+        slide.addShape('oval', {
+          x: cx - dot / 2, y: axisY - dot / 2, w: dot, h: dot,
+          fill: { color: theme.white }, line: { color: theme.accent, width: 1.25 },
+        });
+        slide.addText(it.key, {
+          x: cx - stepW / 2, y: axisY + 0.12, w: stepW, h: 0.26,
+          fontSize: 8.5, color: theme.text, align: 'center', valign: 'top',
+        });
+        if (it.value && it.value !== it.key) {
+          // 出来事は上側に、隣と重ならないよう1つおきに高さを変える
+          const lift = i % 2 ? 0.86 : 0.48;
+          slide.addText(it.value, {
+            x: cx - stepW * 0.9, y: axisY - lift, w: stepW * 1.8, h: 0.36,
+            fontSize: 8.5, color: theme.subtext, align: 'center', valign: 'bottom',
+          });
+          slide.addShape('line', {
+            x: cx, y: axisY - lift + 0.36, w: 0, h: lift - 0.36 - dot / 2,
+            line: { color: theme.border, width: HAIRLINE_THIN },
+          });
+        }
+      });
+    },
+  };
+
   DocAssist.patterns = [
     titleMessage,
     agenda,
@@ -2096,18 +2747,26 @@ window.DocAssist = window.DocAssist || {};
     compareVertical,
     swot,
     matrix2x2,
+    quadrantPriority,
     positioningMap,
     processFlow,
     flowVertical,
+    chevronFlow,
+    diamondFlow,
+    stepArrows,
     cycle,
+    cycleQuadrant,
     funnel,
     waterfall,
     pyramid,
     pyramidTiered,
+    triangleTiers,
+    triangleRelation,
     logicTree,
     beforeAfter,
     timeline,
     timelineVertical,
+    yearTimeline,
     comparisonTable,
     decisionRequest,
     actionPlanTable,
@@ -2128,7 +2787,7 @@ window.DocAssist = window.DocAssist || {};
   //   role   … 資料の中でどの役割を担うスライドか
   // パターン定義そのものには持たせず、ここで一括して付与する。軸を増やしたいときも
   // この表だけを直せばよく、24種を超えるパターン定義に手を入れずに済む。
-  const SCENES = ['提案書', '進捗MTG', '報告書', 'キックオフ', '経営・定例報告', '構成図', '汎用ロジック図解', 'データ提示'];
+  const SCENES = ['提案書', '進捗MTG', '報告書', 'キックオフ', '経営・定例報告', '構成図', '汎用ロジック図解', 'データ提示', '研修・説明会', '会社・採用'];
   const ROLES = ['目次', '本文', '比較', '計画', 'KPI', '表', '図解'];
 
   const PATTERN_META = {
@@ -2145,7 +2804,15 @@ window.DocAssist = window.DocAssist || {};
     'positioning-map': { scenes: ['提案書', 'データ提示'], role: '図解' },
     'process-flow': { scenes: ['提案書', 'キックオフ', '構成図'], role: '図解' },
     'flow-vertical': { scenes: ['提案書', 'キックオフ', '構成図'], role: '図解' },
+    'chevron-flow': { scenes: ['提案書', 'キックオフ', '構成図'], role: '図解' },
+    'diamond-flow': { scenes: ['提案書', '汎用ロジック図解'], role: '図解' },
+    'step-arrows': { scenes: ['提案書', 'キックオフ', '研修・説明会'], role: '図解' },
     cycle: { scenes: ['提案書', '汎用ロジック図解'], role: '図解' },
+    'cycle-quadrant': { scenes: ['提案書', '汎用ロジック図解'], role: '図解' },
+    'triangle-tiers': { scenes: ['提案書', '経営・定例報告', '汎用ロジック図解'], role: '図解' },
+    'triangle-relation': { scenes: ['提案書', '経営・定例報告', '汎用ロジック図解'], role: '図解' },
+    'quadrant-priority': { scenes: ['提案書', '経営・定例報告', '汎用ロジック図解'], role: '図解' },
+    'year-timeline': { scenes: ['報告書', '経営・定例報告', '会社・採用'], role: '計画' },
     funnel: { scenes: ['データ提示', '経営・定例報告'], role: '図解' },
     waterfall: { scenes: ['データ提示', '経営・定例報告'], role: 'KPI' },
     pyramid: { scenes: ['提案書', '報告書', '汎用ロジック図解'], role: '図解' },
@@ -2184,6 +2851,14 @@ window.DocAssist = window.DocAssist || {};
     'process-flow': ['ステップ1：現状分析', 'ステップ2：要件定義', 'ステップ3：設計・開発', 'ステップ4：全社展開'],
     'flow-vertical': ['ステップ1：現状分析', 'ステップ2：要件定義', 'ステップ3：設計・開発', 'ステップ4：試験運用', 'ステップ5：全社展開'],
     cycle: ['Plan：計画を立てる', 'Do：実行する', 'Check：効果を測定する', 'Action：改善する'],
+    'cycle-quadrant': ['Plan：計画を立てる', 'Do：実行する', 'Check：効果を測定する', 'Action：改善する'],
+    'chevron-flow': ['第1フェーズ：現行分析｜課題整理', '第2フェーズ：要件定義｜設計', '第3フェーズ：開発｜移行'],
+    'diamond-flow': ['Segmentation：市場を切り分ける', 'Targeting：狙う市場を選ぶ', 'Positioning：立ち位置を定める'],
+    'step-arrows': ['STEP1：現状把握｜関係者ヒアリング｜業務量の実測', 'STEP2：課題設定｜論点の構造化｜優先順位づけ', 'STEP3：施策立案｜打ち手の比較｜実行計画の策定'],
+    'triangle-tiers': ['ハイタッチ：個別訪問による深耕', 'ロータッチ：セミナー・研修による支援', 'テックタッチ：オンラインでの自己解決'],
+    'triangle-relation': ['中心：三方良し', '企業：持続的な成長', '従業員：働きがいの向上', '顧客：課題解決の実現'],
+    'quadrant-priority': ['即時着手する施策：効果が大きく実行も容易', '計画的に進める施策：効果は大きいが時間を要する', '余力があれば行う施策：容易だが効果は限定的', '当面見送る施策：効果が小さく負荷も大きい'],
+    'year-timeline': ['1987年：創業', '1996年：株式上場', '2001年：海外進出', '2010年：事業再編', '2015年：新規事業を開始', '2020年：デジタル基盤を刷新'],
     funnel: ['認知：10000件', '検討：4000件', '商談：1200件', '受注：300件'],
     waterfall: ['期首：100', '新規獲得：+40', '解約：-15', '期末：125'],
     pyramid: ['結論：市場拡大を優先すべきである', '根拠1：市場が年10%成長している', '根拠2：自社シェアに伸びしろがある', '根拠3：競合の本格参入前である'],
