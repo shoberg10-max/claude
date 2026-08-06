@@ -3787,23 +3787,778 @@ window.DocAssist = window.DocAssist || {};
     },
   };
 
+  // ---------- 評価マトリクス（◎○△×） ----------
+  // 対象×評価軸のマスに記号を置いて優劣を一覧する、日本の提案書で定番の表。
+  // 入力形式：
+  //   - 列：コスト｜機能｜サポート｜拡張性
+  //   - A社：◎｜○｜△｜×
+  //   - B社：★推奨 ○｜◎｜◎｜○
+  const MARK_RE = /^[◎○◯〇△▲✕×✖xX\-−]$/;
+  function markTone(mark, theme) {
+    const m = String(mark || '').trim();
+    if (/^[◎]/.test(m)) return theme.primary;
+    if (/^[○◯〇]/.test(m)) return theme.primaryLight;
+    if (/^[△▲]/.test(m)) return theme.gray;
+    if (/^[✕×✖xX]/.test(m)) return theme.critical;
+    return theme.text;
+  }
+  function markCls(mark) {
+    const m = String(mark || '').trim();
+    if (/^[◎]/.test(m)) return 'is-best';
+    if (/^[○◯〇]/.test(m)) return 'is-good';
+    if (/^[△▲]/.test(m)) return 'is-fair';
+    if (/^[✕×✖xX]/.test(m)) return 'is-poor';
+    return '';
+  }
+
+  const dotMatrix = {
+    id: 'dot-matrix',
+    name: '評価マトリクス（◎○△×）',
+    category: '比較',
+    description: '対象×評価軸のマスに◎○△×を置いて優劣を一覧する。1行目に「列：軸1｜軸2」、以降を「対象：◎｜○｜△」で書く。',
+    score(section) {
+      const t = parseCrossTable(section.bullets || []);
+      const marks = t.rows.reduce((n, r) => n + r.cells.filter((c) => MARK_RE.test(String(c).trim())).length, 0);
+      const cells = t.rows.reduce((n, r) => n + r.cells.length, 0);
+      if (t.cols.length >= 2 && cells && marks >= cells * 0.6) return 10;
+      return 0;
+    },
+    renderBody(bullets) {
+      const t = parseCrossTable(bullets);
+      if (!t.rows.length) return emptyBody();
+      return `<table class="pv-table pv-xtable pv-dotm"><thead><tr><th></th>${t.cols
+        .map((c) => `<th>${esc(c)}</th>`)
+        .join('')}</tr></thead><tbody>
+        ${t.rows
+          .map(
+            (r) => `<tr${r.highlight ? ' class="pv-table-highlight"' : ''}>
+          <th class="pv-xtable-side">${r.highlight ? '★ ' : ''}${esc(r.label)}</th>
+          ${t.cols
+            .map((_, ci) => {
+              const m = r.cells[ci] || '';
+              return `<td><span class="pv-mark ${markCls(m)}">${esc(m)}</span></td>`;
+            })
+            .join('')}
+        </tr>`
+          )
+          .join('')}
+      </tbody></table>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const t = parseCrossTable(bullets);
+      if (!t.rows.length) return;
+      const sideW = box.w * 0.24;
+      const colW = (box.w - sideW) / t.cols.length;
+      addStyledTable(slide, theme, {
+        x: box.x, y: box.y, w: box.w,
+        colW: [sideW].concat(t.cols.map(() => colW)),
+        fontSize: 11,
+        header: [''].concat(t.cols),
+        firstColAccent: true,
+        rows: t.rows.map((r) =>
+          [{ text: `${r.highlight ? '★ ' : ''}${r.label}`, options: r.highlight ? { color: theme.highlight } : {} }].concat(
+            t.cols.map((_, ci) => {
+              const m = r.cells[ci] || '';
+              return {
+                text: m,
+                options: Object.assign(
+                  { align: 'center', bold: true, fontSize: 13, color: markTone(m, theme) },
+                  r.highlight ? { fill: { color: theme.lighter } } : {}
+                ),
+              };
+            })
+          )
+        ),
+      });
+    },
+  };
+
+  // ---------- スイムレーン ----------
+  // 役割（レーン）×工程のマスに作業を置き、誰が何をいつ行うかを一枚で示す。
+  // 入力形式：
+  //   - 列：申請｜承認｜処理｜完了
+  //   - 営業部：申請書を作成｜｜｜受領を確認
+  //   - 上長：｜内容を承認｜｜
+  function parseSwimLane(bullets) {
+    const items = A.extractItems(bullets);
+    let cols = [];
+    const lanes = [];
+    items.forEach((it) => {
+      if (!lanes.length && /^(列|工程|フェーズ|ステップ|段階)$/.test(it.key)) {
+        cols = splitFields(it.value);
+        return;
+      }
+      // 空欄を保持したいので splitFields は使わず、そのまま分割する
+      const cells = String(it.value == null ? '' : it.value).split(/[｜|]/).map((s) => s.trim());
+      lanes.push({ label: it.key, cells, highlight: it.highlight });
+    });
+    const width = lanes.reduce((m, l) => Math.max(m, l.cells.length), 0);
+    if (!cols.length) cols = Array.from({ length: width }, (_, i) => `工程${i + 1}`);
+    while (cols.length < width) cols.push('');
+    return { cols: cols.slice(0, 5), lanes: lanes.slice(0, 5) };
+  }
+
+  const swimLane = {
+    id: 'swim-lane',
+    name: 'スイムレーン（役割別プロセス）',
+    category: 'フロー・プロセス',
+    description: '役割（レーン）×工程のマスに作業を置き、誰が何をいつ行うかを示す。1行目に「列：工程1｜工程2」、以降を「役割：作業｜作業」で書く（空欄可）。',
+    score(section) {
+      const s = parseSwimLane(section.bullets || []);
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['スイムレーン', '役割', '担当', '業務フロー', '誰が']);
+      const filled = s.lanes.reduce((n, l) => n + l.cells.filter(Boolean).length, 0);
+      if (s.cols.length >= 2 && s.lanes.length >= 2 && kw) return 10;
+      if (s.cols.length >= 3 && s.lanes.length >= 2 && filled >= 4) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      const s = parseSwimLane(bullets);
+      if (!s.lanes.length) return emptyBody();
+      return `<div class="pv-sl">
+        <div class="pv-sl-head"><div class="pv-sl-lane-label"></div>${s.cols
+          .map((c) => `<div class="pv-sl-col">${esc(c)}</div>`)
+          .join('')}</div>
+        ${s.lanes
+          .map(
+            (l) => `<div class="pv-sl-row">
+          <div class="pv-sl-lane-label${l.highlight ? ' is-highlight' : ''}">${esc(l.label)}</div>
+          ${s.cols
+            .map((_, ci) => {
+              const v = l.cells[ci] || '';
+              return `<div class="pv-sl-cell">${v ? `<span>${esc(v)}</span>` : ''}</div>`;
+            })
+            .join('')}
+        </div>`
+          )
+          .join('')}
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const s = parseSwimLane(bullets);
+      if (!s.lanes.length) return;
+      const laneW = box.w * 0.16;
+      const headH = 0.32;
+      const colW = (box.w - laneW) / s.cols.length;
+      const rowH = (box.h - headH) / s.lanes.length;
+      s.cols.forEach((c, i) => {
+        const x = box.x + laneW + i * colW;
+        slide.addShape('rect', { x, y: box.y, w: colW - 0.03, h: headH, fill: { color: theme.primary }, line: { type: 'none' } });
+        slide.addText(c, {
+          x, y: box.y, w: colW - 0.03, h: headH,
+          fontSize: 9.5, bold: true, color: theme.white, align: 'center', valign: 'middle',
+        });
+      });
+      s.lanes.forEach((l, ri) => {
+        const y = box.y + headH + ri * rowH;
+        slide.addShape('rect', {
+          x: box.x, y: y + 0.02, w: laneW - 0.05, h: rowH - 0.04,
+          fill: { color: l.highlight ? theme.light : theme.lighter }, line: { type: 'none' },
+        });
+        slide.addText(l.label, {
+          x: box.x + 0.05, y: y + 0.02, w: laneW - 0.15, h: rowH - 0.04,
+          fontSize: 9.5, bold: true, color: theme.primary, valign: 'middle',
+        });
+        s.cols.forEach((_, ci) => {
+          const v = l.cells[ci] || '';
+          const x = box.x + laneW + ci * colW;
+          if (!v) return;
+          slide.addShape('rect', {
+            x, y: y + 0.05, w: colW - 0.03, h: rowH - 0.1,
+            fill: { color: theme.white }, line: { color: theme.primaryLight, width: 1 },
+          });
+          slide.addText(v, {
+            x: x + 0.08, y: y + 0.05, w: colW - 0.19, h: rowH - 0.1,
+            fontSize: 9, color: theme.text, align: 'center', valign: 'middle',
+          });
+        });
+        slide.addShape('line', {
+          x: box.x, y: y + rowH, w: box.w, h: 0,
+          line: { color: theme.border, width: HAIRLINE_THIN },
+        });
+      });
+    },
+  };
+
+  // ---------- ビジネスモデルキャンバス ----------
+  // 9つの構成要素を定位置に配置する定番フレーム。項目名から自動でマスに割り当てる。
+  const BMC_SLOTS = [
+    { key: 'partners', label: 'パートナー', re: /パートナー|提携|Partner/i, col: 0, row: 0, rowSpan: 2 },
+    { key: 'activities', label: '主要活動', re: /主要活動|活動|Activit/i, col: 1, row: 0, rowSpan: 1 },
+    { key: 'resources', label: 'リソース', re: /リソース|資源|Resource/i, col: 1, row: 1, rowSpan: 1 },
+    { key: 'value', label: '価値提案', re: /価値|提供価値|Value/i, col: 2, row: 0, rowSpan: 2 },
+    { key: 'relations', label: '顧客との関係', re: /関係|Relation/i, col: 3, row: 0, rowSpan: 1 },
+    { key: 'channels', label: 'チャネル', re: /チャネル|販路|Channel/i, col: 3, row: 1, rowSpan: 1 },
+    { key: 'segments', label: '顧客セグメント', re: /顧客|セグメント|Segment/i, col: 4, row: 0, rowSpan: 2 },
+    { key: 'cost', label: 'コスト構造', re: /コスト|費用|Cost/i, col: 0, row: 2, rowSpan: 1, wide: 'left' },
+    { key: 'revenue', label: '収益の流れ', re: /収益|売上|Revenue/i, col: 0, row: 2, rowSpan: 1, wide: 'right' },
+  ];
+
+  function parseBmc(bullets) {
+    const items = A.extractItems(bullets);
+    const used = new Set();
+    const map = {};
+    BMC_SLOTS.forEach((s) => {
+      const hit = items.find((it) => !used.has(it) && s.re.test(it.key));
+      if (hit) {
+        used.add(hit);
+        map[s.key] = hit;
+      }
+    });
+    return map;
+  }
+
+  const businessModelCanvas = {
+    id: 'business-model-canvas',
+    name: 'ビジネスモデルキャンバス',
+    category: 'マトリクス／ポジショニング',
+    description: '9つの構成要素を定位置に配置する定番フレーム。「価値提案：〜」「顧客セグメント：〜」のように項目名を書くと自動でマスに入る。',
+    score(section) {
+      const map = parseBmc(section.bullets || []);
+      const filled = Object.keys(map).length;
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ビジネスモデル', 'キャンバス', 'BMC']);
+      if (filled >= 5 && kw) return 10;
+      if (filled >= 6) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      const map = parseBmc(bullets);
+      if (!Object.keys(map).length) return emptyBody();
+      const cell = (s) => {
+        const it = map[s.key];
+        return `<div class="pv-bmc-cell" style="grid-column:${s.col + 1};grid-row:${s.row + 1} / span ${s.rowSpan};">
+          <div class="pv-bmc-label">${esc(s.label)}</div>
+          <div class="pv-bmc-text">${it ? esc(it.value) : ''}</div>
+        </div>`;
+      };
+      const top = BMC_SLOTS.filter((s) => s.row < 2).map(cell).join('');
+      const bottom = BMC_SLOTS.filter((s) => s.row === 2)
+        .map((s) => {
+          const it = map[s.key];
+          return `<div class="pv-bmc-cell">
+            <div class="pv-bmc-label">${esc(s.label)}</div>
+            <div class="pv-bmc-text">${it ? esc(it.value) : ''}</div>
+          </div>`;
+        })
+        .join('');
+      return `<div class="pv-bmc"><div class="pv-bmc-top">${top}</div><div class="pv-bmc-bottom">${bottom}</div></div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const map = parseBmc(bullets);
+      if (!Object.keys(map).length) return;
+      const gap = 0.04;
+      const bottomH = box.h * 0.24;
+      const topH = box.h - bottomH - gap;
+      const colW = box.w / 5;
+      const rowH = topH / 2;
+      const draw = (x, y, w, h, label, item) => {
+        slide.addShape('rect', { x, y, w: w - gap, h: h - gap, fill: { color: theme.white }, line: { color: theme.border, width: HAIRLINE } });
+        slide.addShape('rect', { x, y, w: w - gap, h: 0.24, fill: { color: theme.light }, line: { type: 'none' } });
+        slide.addText(label, {
+          x: x + 0.06, y, w: w - gap - 0.12, h: 0.24,
+          fontSize: 8.5, bold: true, color: theme.primary, valign: 'middle',
+        });
+        if (item) {
+          slide.addText(item.value, {
+            x: x + 0.07, y: y + 0.28, w: w - gap - 0.14, h: h - gap - 0.32,
+            fontSize: 8.5, color: theme.text, valign: 'top',
+          });
+        }
+      };
+      BMC_SLOTS.filter((s) => s.row < 2).forEach((s) => {
+        draw(box.x + s.col * colW, box.y + s.row * rowH, colW, rowH * s.rowSpan, s.label, map[s.key]);
+      });
+      const by = box.y + topH + gap;
+      const halfW = box.w / 2;
+      BMC_SLOTS.filter((s) => s.row === 2).forEach((s, i) => {
+        draw(box.x + i * halfW, by, halfW, bottomH, s.label, map[s.key]);
+      });
+    },
+  };
+
+  // ---------- カスタマージャーニー ----------
+  // 各段階の接点と満足度を折れ線で示し、落ち込んでいる段階を可視化する。
+  // 入力形式： - 認知：Web広告で知る｜4    （段階：接点｜満足度1〜5）
+  function parseJourney(bullets) {
+    return A.extractItems(bullets)
+      .slice(0, 6)
+      .map((it) => {
+        const f = splitFields(it.value);
+        const score = firstNumber(f[1]) ;
+        return { stage: it.key, touch: f[0] || it.value, score: score == null ? 3 : Math.max(1, Math.min(5, score)), highlight: it.highlight };
+      });
+  }
+
+  const customerJourney = {
+    id: 'customer-journey',
+    name: 'カスタマージャーニー',
+    category: '時系列',
+    description: '各段階の接点と満足度を折れ線で示し、体験が落ち込む段階を可視化する。「段階：接点｜満足度（1〜5）」の形式。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ジャーニー', '顧客体験', '接点', 'タッチポイント', 'CX']);
+      const j = parseJourney(section.bullets || []);
+      if (kw && j.length >= 4) return 10;
+      if (kw && j.length >= 3) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const j = parseJourney(bullets);
+      if (j.length < 2) return emptyBody();
+      const n = j.length;
+      const pt = (i, s) => `${((i + 0.5) / n) * 100},${(100 - ((s - 1) / 4) * 90 - 5).toFixed(1)}`;
+      return `<div class="pv-cj">
+        <div class="pv-cj-stages">${j
+          .map((s) => `<div class="pv-cj-stage${s.highlight ? ' is-highlight' : ''}">${esc(s.stage)}</div>`)
+          .join('')}</div>
+        <div class="pv-cj-chart">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <polyline points="${j.map((s, i) => pt(i, s.score)).join(' ')}" fill="none" stroke="var(--primary)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+          </svg>
+          ${j
+            .map(
+              (s, i) =>
+                `<span class="pv-cj-dot${s.score <= 2 ? ' is-low' : ''}" style="left:${((i + 0.5) / n) * 100}%;bottom:${(((s.score - 1) / 4) * 90 + 5).toFixed(1)}%;"></span>`
+            )
+            .join('')}
+        </div>
+        <div class="pv-cj-touches">${j.map((s) => `<div>${esc(s.touch)}</div>`).join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const j = parseJourney(bullets);
+      if (j.length < 2) return;
+      const n = j.length;
+      const colW = box.w / n;
+      const stageH = 0.34;
+      const touchH = 0.62;
+      const chartY = box.y + stageH + 0.08;
+      const chartH = box.h - stageH - touchH - 0.16;
+      j.forEach((s, i) => {
+        const x = box.x + i * colW;
+        slide.addShape('rect', {
+          x: x + 0.02, y: box.y, w: colW - 0.04, h: stageH,
+          fill: { color: s.highlight ? theme.highlight : theme.light }, line: { type: 'none' },
+        });
+        slide.addText(s.stage, {
+          x: x + 0.02, y: box.y, w: colW - 0.04, h: stageH,
+          fontSize: 9.5, bold: true, color: s.highlight ? theme.white : theme.primary,
+          align: 'center', valign: 'middle',
+        });
+      });
+      // 満足度の折れ線（隣り合う点を線分でつなぐ）
+      const py = (s) => chartY + chartH - ((s - 1) / 4) * chartH;
+      for (let i = 0; i < n - 1; i++) {
+        const x1 = box.x + i * colW + colW / 2;
+        const x2 = box.x + (i + 1) * colW + colW / 2;
+        const y1 = py(j[i].score);
+        const y2 = py(j[i + 1].score);
+        slide.addShape('line', {
+          x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1),
+          line: { color: theme.primaryLight, width: 1.75 },
+          flipV: y2 < y1,
+        });
+      }
+      j.forEach((s, i) => {
+        const cx = box.x + i * colW + colW / 2;
+        const cy = py(s.score);
+        const low = s.score <= 2;
+        slide.addShape('oval', {
+          x: cx - 0.09, y: cy - 0.09, w: 0.18, h: 0.18,
+          fill: { color: low ? theme.critical : theme.primary }, line: { color: theme.white, width: 1 },
+        });
+        slide.addText(s.touch, {
+          x: box.x + i * colW + 0.04, y: box.y + box.h - touchH, w: colW - 0.08, h: touchH,
+          fontSize: 8.5, color: theme.text, align: 'center', valign: 'top',
+        });
+      });
+    },
+  };
+
+  // ---------- バリューチェーン ----------
+  // 支援活動を上に積み、主活動を矢羽根で並べる定番フレーム。
+  // 入力形式：
+  //   - 支援活動：全社インフラ｜人事管理｜技術開発
+  //   - 主活動：購買物流｜製造｜出荷物流｜販売｜サービス
+  function parseValueChain(bullets) {
+    const items = A.extractItems(bullets);
+    const support = items.find((it) => /支援|サポート|Support/i.test(it.key));
+    const primary = items.find((it) => /主活動|主要活動|Primary/i.test(it.key));
+    return {
+      support: splitFields(support ? support.value : '').slice(0, 4),
+      primary: splitFields(primary ? primary.value : (items[items.length - 1] || {}).value).slice(0, 6),
+    };
+  }
+
+  const valueChain = {
+    id: 'value-chain',
+    name: 'バリューチェーン',
+    category: '構造・ロジック',
+    description: '支援活動を上に積み、主活動を矢羽根で並べる定番フレーム。「支援活動：〜｜〜」「主活動：〜｜〜」の形式。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['バリューチェーン', '価値連鎖', '主活動', '支援活動']);
+      const v = parseValueChain(section.bullets || []);
+      if (kw && v.primary.length >= 3) return 10;
+      return 0;
+    },
+    renderBody(bullets) {
+      const v = parseValueChain(bullets);
+      if (!v.primary.length) return emptyBody();
+      return `<div class="pv-vc">
+        ${
+          v.support.length
+            ? `<div class="pv-vc-support">${v.support
+                .map((s) => `<div class="pv-vc-support-row">${esc(s)}</div>`)
+                .join('')}</div>`
+            : ''
+        }
+        <div class="pv-vc-primary">${v.primary
+          .map((p, i) => `<div class="pv-vc-seg" style="background:${scaleCssVar(i, v.primary.length)};">${esc(p)}</div>`)
+          .join('')}<div class="pv-vc-margin">利益</div></div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const v = parseValueChain(bullets);
+      if (!v.primary.length) return;
+      const gap = 0.05;
+      const supportH = v.support.length ? Math.min(box.h * 0.5, v.support.length * 0.42) : 0;
+      const rowH = v.support.length ? supportH / v.support.length : 0;
+      v.support.forEach((s, i) => {
+        const y = box.y + i * rowH;
+        slide.addShape('rect', {
+          x: box.x, y, w: box.w * 0.88, h: rowH - gap,
+          fill: { color: theme.lighter }, line: { color: theme.border, width: HAIRLINE },
+        });
+        slide.addText(s, {
+          x: box.x + 0.12, y, w: box.w * 0.88 - 0.24, h: rowH - gap,
+          fontSize: 9.5, color: theme.text, valign: 'middle',
+        });
+      });
+      const py = box.y + supportH + (v.support.length ? 0.1 : 0);
+      const ph = box.y + box.h - py;
+      const n = v.primary.length;
+      const marginW = box.w * 0.12;
+      const overlap = 0.1;
+      const segW = (box.w - marginW + overlap * (n - 1)) / n;
+      v.primary.forEach((p, i) => {
+        const x = box.x + i * (segW - overlap);
+        slide.addShape(i === 0 ? 'homePlate' : 'chevron', {
+          x, y: py, w: segW, h: ph,
+          fill: { color: scaleColor(theme, i, n) }, line: { color: theme.white, width: 1 },
+        });
+        slide.addText(p, {
+          x: x + 0.18, y: py, w: segW - 0.36, h: ph,
+          fontSize: 9.5, bold: true, color: i >= n - 3 ? theme.white : theme.text,
+          align: 'center', valign: 'middle',
+        });
+      });
+      slide.addShape('chevron', {
+        x: box.x + box.w - marginW, y: py, w: marginW, h: ph,
+        fill: { color: theme.primary }, line: { type: 'none' },
+      });
+      slide.addText('利益', {
+        x: box.x + box.w - marginW, y: py, w: marginW, h: ph,
+        fontSize: 9.5, bold: true, color: theme.white, align: 'center', valign: 'middle',
+      });
+    },
+  };
+
+  // ---------- ハニカム ----------
+  // 中心テーマの周りに六角形で構成要素を配置する。
+  const honeycomb = {
+    id: 'honeycomb',
+    name: 'ハニカム（六角形配置）',
+    category: '構造・ロジック',
+    description: '中心テーマの周りに六角形で構成要素を配置する。「中心：テーマ」＋3〜6項目の形式。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ハニカム', '構成要素', '要素', '六角']);
+      const items = A.extractItems(section.bullets || []);
+      const center = items.find((it) => /中心|中央|テーマ/.test(it.key));
+      if (kw && center && items.length >= 4) return 9;
+      if (kw && items.length >= 4) return 6;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets);
+      const center = items.find((it) => /中心|中央|テーマ/.test(it.key));
+      const nodes = items.filter((it) => it !== center).slice(0, 6);
+      if (nodes.length < 3) return emptyBody();
+      const n = nodes.length;
+      return `<div class="pv-hc">
+        <div class="pv-hc-ring">
+          ${nodes
+            .map((nd, i) => {
+              const ang = ((-90 + (360 / n) * i) * Math.PI) / 180;
+              const x = 50 + 33 * Math.cos(ang);
+              const y = 50 + 33 * Math.sin(ang);
+              return `<div class="pv-hc-cell" style="left:${x}%;top:${y}%;"><span>${String(i + 1).padStart(2, '0')}</span></div>`;
+            })
+            .join('')}
+          <div class="pv-hc-cell is-center"><span>${center ? esc(center.value) : ''}</span></div>
+        </div>
+        <div class="pv-hc-notes">${nodes
+          .map((nd, i) => `<div><b>${String(i + 1).padStart(2, '0')}　${esc(nd.key)}</b>${esc(nd.value !== nd.key ? nd.value : '')}</div>`)
+          .join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets);
+      const center = items.find((it) => /中心|中央|テーマ/.test(it.key));
+      const nodes = items.filter((it) => it !== center).slice(0, 6);
+      if (nodes.length < 3) return;
+      const n = nodes.length;
+      const diagW = box.w * 0.42;
+      const R = Math.min(diagW, box.h) * 0.33;
+      const cx = box.x + diagW / 2;
+      const cy = box.y + box.h / 2;
+      const hex = R * 0.92;
+      slide.addShape('hexagon', {
+        x: cx - hex / 2, y: cy - hex / 2, w: hex, h: hex,
+        fill: { color: theme.light }, line: { color: theme.white, width: 1.5 },
+      });
+      if (center) {
+        slide.addText(center.value, {
+          x: cx - hex / 2 + 0.06, y: cy - hex / 2, w: hex - 0.12, h: hex,
+          fontSize: 9, bold: true, color: theme.primary, align: 'center', valign: 'middle',
+        });
+      }
+      nodes.forEach((nd, i) => {
+        const ang = ((-90 + (360 / n) * i) * Math.PI) / 180;
+        const x = cx + R * Math.cos(ang) - hex / 2;
+        const y = cy + R * Math.sin(ang) - hex / 2;
+        slide.addShape('hexagon', {
+          x, y, w: hex, h: hex,
+          fill: { color: theme.lighter }, line: { color: theme.white, width: 1.5 },
+        });
+        slide.addText(String(i + 1).padStart(2, '0'), {
+          x, y, w: hex, h: hex,
+          fontSize: 11, bold: true, color: theme.primary, align: 'center', valign: 'middle',
+        });
+      });
+      const nx = box.x + diagW + 0.26;
+      const nw = box.x + box.w - nx;
+      const nh = box.h / n;
+      nodes.forEach((nd, i) => {
+        const y = box.y + i * nh;
+        slide.addText(
+          [
+            { text: `${String(i + 1).padStart(2, '0')}　${nd.key}`, options: { bold: true, fontSize: 10, color: theme.primary, breakLine: nd.value !== nd.key } },
+            { text: nd.value !== nd.key ? nd.value : '', options: { fontSize: 9, color: theme.text } },
+          ],
+          { x: nx, y, w: nw, h: nh, valign: 'middle' }
+        );
+      });
+    },
+  };
+
+  // ---------- メリット・デメリット ----------
+  // 賛否を左右に分けて示す。「メリット：〜｜〜」「デメリット：〜｜〜」の形式。
+  function parseProsCons(bullets) {
+    const items = A.extractItems(bullets);
+    const pros = items.find((it) => /メリット|利点|良い点|長所|Pros/i.test(it.key));
+    const cons = items.find((it) => /デメリット|欠点|課題|短所|懸念|Cons/i.test(it.key));
+    return {
+      pros: splitFields(pros ? pros.value : '').slice(0, 5),
+      cons: splitFields(cons ? cons.value : '').slice(0, 5),
+      prosLabel: pros ? pros.key : 'メリット',
+      consLabel: cons ? cons.key : 'デメリット',
+    };
+  }
+
+  const prosCons = {
+    id: 'pros-cons',
+    name: 'メリット・デメリット',
+    category: '比較',
+    description: '賛否を左右に分けて示す。「メリット：〜｜〜」「デメリット：〜｜〜」の形式。',
+    score(section) {
+      const p = parseProsCons(section.bullets || []);
+      if (p.pros.length && p.cons.length) return 10;
+      return 0;
+    },
+    renderBody(bullets) {
+      const p = parseProsCons(bullets);
+      if (!p.pros.length && !p.cons.length) return emptyBody();
+      const col = (label, list, cls, mark) => `
+        <div class="pv-pcn-col ${cls}">
+          <div class="pv-pcn-head"><span class="pv-pcn-mark">${mark}</span>${esc(label)}</div>
+          <div class="pv-pcn-list">${list.map((v) => `<div>${esc(v)}</div>`).join('')}</div>
+        </div>`;
+      return `<div class="pv-pcn">${col(p.prosLabel, p.pros, 'is-pros', '✓')}${col(p.consLabel, p.cons, 'is-cons', '✕')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const p = parseProsCons(bullets);
+      if (!p.pros.length && !p.cons.length) return;
+      const gap = 0.28;
+      const colW = (box.w - gap) / 2;
+      const headH = 0.44;
+      [
+        { label: p.prosLabel, list: p.pros, tone: theme.primary, mark: '✓' },
+        { label: p.consLabel, list: p.cons, tone: theme.gray, mark: '✕' },
+      ].forEach((c, i) => {
+        const x = box.x + i * (colW + gap);
+        slide.addShape('oval', {
+          x, y: box.y, w: headH, h: headH,
+          fill: { color: theme.white }, line: { color: c.tone, width: 1.5 },
+        });
+        slide.addText(c.mark, {
+          x, y: box.y, w: headH, h: headH,
+          fontSize: 14, bold: true, color: c.tone, align: 'center', valign: 'middle',
+        });
+        slide.addText(c.label, {
+          x: x + headH + 0.12, y: box.y, w: colW - headH - 0.12, h: headH,
+          fontSize: 13, bold: true, color: c.tone, valign: 'middle',
+        });
+        slide.addShape('line', {
+          x, y: box.y + headH + 0.08, w: colW, h: 0,
+          line: { color: c.tone, width: 1.25 },
+        });
+        if (c.list.length) {
+          slide.addText(bulletTextRuns(c.list, theme, { fontSize: 11, spaceAfter: 9 }), {
+            x: x + 0.06, y: box.y + headH + 0.2, w: colW - 0.12, h: box.h - headH - 0.28,
+            valign: 'top',
+          });
+        }
+      });
+    },
+  };
+
+  // ---------- 引用 ----------
+  // 顧客の声や調査コメントを大きく引用する。1行目が引用文、2行目が出典。
+  const quoteSlide = {
+    id: 'quote',
+    name: '引用',
+    category: '汎用',
+    description: '顧客の声や調査コメントを大きく引用する。1行目が引用文、2行目が発言者・出典。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['引用', '顧客の声', 'コメント', 'インタビュー', 'ヒアリング']);
+      const n = (section.bullets || []).length;
+      if (kw && n >= 1 && n <= 2) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const list = (bullets || []).map((b) => A.stripEmphasis(b)).filter(Boolean);
+      if (!list.length) return emptyBody();
+      return `<div class="pv-quote">
+        <div class="pv-quote-mark">“</div>
+        <div class="pv-quote-text">${esc(list[0])}</div>
+        ${list[1] ? `<div class="pv-quote-by">— ${esc(list[1])}</div>` : ''}
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const list = (bullets || []).map((b) => A.stripEmphasis(b)).filter(Boolean);
+      if (!list.length) return;
+      slide.addText('“', {
+        x: box.x, y: box.y, w: 0.7, h: 0.7,
+        fontSize: 44, bold: true, color: theme.light, valign: 'middle',
+      });
+      slide.addText(list[0], {
+        x: box.x + 0.66, y: box.y + 0.06, w: box.w - 0.8, h: box.h * 0.6,
+        fontSize: 17, italic: true, color: theme.primary, valign: 'top', lineSpacingMultiple: 1.25,
+      });
+      if (list[1]) {
+        slide.addText(`— ${list[1]}`, {
+          x: box.x + 0.66, y: box.y + box.h * 0.68, w: box.w - 0.8, h: 0.36,
+          fontSize: 11, color: theme.subtext, valign: 'top',
+        });
+      }
+    },
+  };
+
+  // ---------- 3×3マトリクス ----------
+  // 2軸を高・中・低の3段階で切り、9マスに分類する。
+  const MATRIX3_AXIS = ['高', '中', '低'];
+  const matrix3x3 = {
+    id: 'matrix-3x3',
+    name: '3×3マトリクス',
+    category: 'マトリクス／ポジショニング',
+    description: '2軸を高・中・低の3段階で切って9マスに分類する。項目は左上から右下の順に9個まで。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['9マス', '九', '3×3', 'マトリクス', '象限']);
+      const n = (section.bullets || []).length;
+      if (kw && n >= 6 && n <= 9) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 9);
+      if (items.length < 4) return emptyBody();
+      return `<div class="pv-m3">${Array.from({ length: 9 }, (_, i) => {
+        const it = items[i];
+        const row = Math.floor(i / 3);
+        return `<div class="pv-m3-cell pv-m3-r${row}">${
+          it ? `<b>${esc(it.key)}</b>${it.value !== it.key ? `<span>${esc(it.value)}</span>` : ''}` : ''
+        }</div>`;
+      }).join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 9);
+      if (items.length < 4) return;
+      const axisW = 0.28;
+      const gridX = box.x + axisW;
+      const gridW = box.w - axisW;
+      const gridH = box.h - axisW;
+      const cw = gridW / 3;
+      const ch = gridH / 3;
+      // 行が上ほど濃くなるように塗り分ける（上＝高）
+      const rowFills = [theme.light, theme.lighter, theme.pale];
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          const i = r * 3 + c;
+          const x = gridX + c * cw;
+          const y = box.y + r * ch;
+          slide.addShape('rect', {
+            x, y, w: cw - 0.03, h: ch - 0.03,
+            fill: { color: rowFills[r] }, line: { type: 'none' },
+          });
+          const it = items[i];
+          if (!it) continue;
+          slide.addText(
+            [
+              { text: it.key, options: { bold: true, fontSize: 10, color: theme.primary, breakLine: it.value !== it.key } },
+              { text: it.value !== it.key ? it.value : '', options: { fontSize: 9, color: theme.text } },
+            ],
+            { x: x + 0.1, y: y + 0.06, w: cw - 0.23, h: ch - 0.15, valign: 'top' }
+          );
+        }
+        slide.addText(MATRIX3_AXIS[r], {
+          x: box.x, y: box.y + r * ch, w: axisW - 0.06, h: ch,
+          fontSize: 9, color: theme.subtext, align: 'center', valign: 'middle',
+        });
+      }
+      MATRIX3_AXIS.slice().reverse().forEach((label, c) => {
+        slide.addText(label, {
+          x: gridX + c * cw, y: box.y + gridH, w: cw, h: axisW,
+          fontSize: 9, color: theme.subtext, align: 'center', valign: 'middle',
+        });
+      });
+    },
+  };
+
   DocAssist.patterns = [
     titleMessage,
     agenda,
     sectionDivider,
     pointCallout,
     agendaCards,
+    quoteSlide,
     boxCompare,
     compareVertical,
     swot,
     matrix2x2,
     quadrantPriority,
+    matrix3x3,
+    businessModelCanvas,
     positioningMap,
     processFlow,
     flowVertical,
     chevronFlow,
     diamondFlow,
     stepArrows,
+    swimLane,
     cycle,
     cycleQuadrant,
     funnel,
@@ -3816,6 +4571,8 @@ window.DocAssist = window.DocAssist || {};
     conclusionFlow,
     vennDiagram,
     concentricCircles,
+    honeycomb,
+    valueChain,
     orgChart,
     decisionTree,
     logicTree,
@@ -3823,9 +4580,12 @@ window.DocAssist = window.DocAssist || {};
     timeline,
     timelineVertical,
     yearTimeline,
+    customerJourney,
     scheduleTable,
     comparisonTable,
     crossTable,
+    dotMatrix,
+    prosCons,
     iconHeaderBox,
     decisionRequest,
     actionPlanTable,
@@ -3855,6 +4615,15 @@ window.DocAssist = window.DocAssist || {};
     agenda: { scenes: ['提案書', '報告書', 'キックオフ', '進捗MTG'], role: '目次' },
     'section-divider': { scenes: ['提案書', '報告書', '研修・説明会', '経営・定例報告'], role: '目次' },
     'point-callout': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
+    quote: { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
+    'dot-matrix': { scenes: ['提案書', '報告書', 'データ提示'], role: '表' },
+    'pros-cons': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '比較' },
+    'matrix-3x3': { scenes: ['提案書', '汎用ロジック図解', '経営・定例報告'], role: '図解' },
+    'business-model-canvas': { scenes: ['提案書', '経営・定例報告', '汎用ロジック図解'], role: '図解' },
+    'swim-lane': { scenes: ['構成図', 'キックオフ', '報告書'], role: '図解' },
+    honeycomb: { scenes: ['提案書', '汎用ロジック図解'], role: '図解' },
+    'value-chain': { scenes: ['提案書', '経営・定例報告', '汎用ロジック図解'], role: '図解' },
+    'customer-journey': { scenes: ['提案書', 'データ提示', '経営・定例報告'], role: '計画' },
     'agenda-cards': { scenes: ['提案書', '報告書', 'キックオフ', '研修・説明会'], role: '目次' },
     'venn-diagram': { scenes: ['提案書', '汎用ロジック図解', '経営・定例報告'], role: '図解' },
     'concentric-circles': { scenes: ['提案書', '経営・定例報告', '汎用ロジック図解'], role: '図解' },
@@ -3920,6 +4689,15 @@ window.DocAssist = window.DocAssist || {};
     'icon-header-box': ['経営：意思決定の迅速化｜投資対効果の可視化', '現場：入力作業の削減｜情報共有の円滑化', 'システム：運用保守の負荷軽減｜セキュリティの担保'],
     'conclusion-flow': ['前提：保守期限が2027年に到来する', '検討：コスト｜拡張性｜移行負荷', '結論：SaaS基盤への移行を推奨する'],
     'agenda-cards': ['背景と目的：なぜ今この論点を扱うのか', '現状の課題：定量・定性の両面から整理', 'ご提案：3案の比較と推奨', '導入効果：定量効果の見込み', '実行計画：体制とスケジュール', '今後の進め方：次回までの宿題'],
+    quote: ['現場で本当に必要なのは、機能の多さではなく毎日確実に使えることだ', '導入企業A社　営業部長（2026年1月ヒアリング）'],
+    'dot-matrix': ['列：コスト｜機能｜サポート｜拡張性', 'A社：◎｜△｜○｜×', 'B社：★推奨 ○｜◎｜◎｜○', 'C社：×｜◎｜○｜◎'],
+    'pros-cons': ['メリット：初期費用を抑えられる｜短期間で導入できる｜既存の運用を変えずに済む', 'デメリット：将来の機能追加に制約がある｜他システムとの連携が限定的'],
+    'matrix-3x3': ['最優先：即時に着手する', '優先：今期中に着手する', '検討：来期の候補とする', '注視：状況を見て判断する', '保留：条件が整えば着手', '見送り：当面は対応しない', '要検討：費用対効果を精査', '低優先：余力があれば', '対象外：実施しない'],
+    'business-model-canvas': ['パートナー：システムベンダー、業務委託先', '主要活動：システム開発、運用保守', 'リソース：技術者、顧客データ', '価値提案：業務時間を半減する仕組み', '顧客との関係：専任担当による伴走支援', 'チャネル：直販とパートナー経由', '顧客セグメント：中堅製造業の情報システム部門', 'コスト構造：人件費、インフラ費用', '収益の流れ：月額利用料、導入支援費'],
+    'swim-lane': ['列：申請｜承認｜処理｜完了', '営業部：申請書を作成｜｜｜受領を確認', '営業部長：｜内容を承認｜｜', '業務部：｜｜システムに登録｜通知を送付'],
+    honeycomb: ['中心：顧客体験の向上', '認知：接点を増やす', '検討：情報を届ける', '購入：手続きを簡素化', '利用：定着を支援する', '継続：関係を深める'],
+    'value-chain': ['支援活動：全社インフラ｜人事・労務管理｜技術開発｜調達', '主活動：購買物流｜製造｜出荷物流｜販売・マーケティング｜サービス'],
+    'customer-journey': ['認知：Web広告・展示会で知る｜4', '情報収集：資料請求・比較サイト｜3', '検討：営業への問い合わせ｜2', '導入：契約・初期設定｜3', '定着：問い合わせ対応｜4'],
     'venn-diagram': ['営業部門の知見：顧客の業務実態を把握している', '技術部門の知見：実現可能性を判断できる', '重なり：実行可能で顧客に刺さる提案力'],
     'concentric-circles': ['理念：社会課題の解決に貢献する', '戦略：デジタル基盤への集中投資', '施策：CRM導入と業務標準化'],
     'org-chart': ['プロジェクトオーナー：情報システム部長', '業務要件チーム：営業部｜カスタマーサポート部', 'システム構築チーム：情報システム部｜開発ベンダー', '推進事務局：経営企画部'],
