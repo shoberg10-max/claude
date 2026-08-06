@@ -67,6 +67,61 @@ window.DocAssist = window.DocAssist || {};
     });
   }
 
+  // 表の共通スタイル。参考パーツ集の表は「縦罫線を引かず、横だけを細い点線で区切る」
+  // 作法で、罫線でマス目を作らずに視線を横方向へ流す。表側（1列目）は淡いブルーで
+  // 塗り、見出し行はネイビーのベタ塗りにする。
+  // 表を描くパターンはすべてこの関数を通し、スタイルを1箇所で決められるようにする。
+  //   opts: { x, y, w, colW, header: [文字列], rows: [[セル]], firstColAccent, zebra, fontSize }
+  //   セルは文字列か { text, options } のどちらでもよい（options はそのまま尊重する）。
+  const TABLE_BORDER = [
+    { type: 'none' },
+    { type: 'none' },
+    { type: 'dash', color: 'C9CDD6', pt: 0.75 },
+    { type: 'none' },
+  ];
+
+  function addStyledTable(slide, theme, opts) {
+    const o = opts || {};
+    const rows = [];
+    if (o.header && o.header.length) {
+      rows.push(
+        o.header.map((h) => ({
+          text: typeof h === 'string' ? h : h.text,
+          options: Object.assign(
+            { bold: true, color: theme.white, fill: { color: theme.primary }, align: 'center', border: [{ type: 'none' }, { type: 'none' }, { type: 'none' }, { type: 'none' }] },
+            (h && h.options) || {}
+          ),
+        }))
+      );
+    }
+    (o.rows || []).forEach((row, ri) => {
+      rows.push(
+        row.map((cell, ci) => {
+          const isObj = cell && typeof cell === 'object';
+          const text = isObj ? cell.text : cell;
+          const given = (isObj && cell.options) || {};
+          const base = { border: TABLE_BORDER, valign: 'middle' };
+          if (o.firstColAccent && ci === 0) {
+            base.fill = { color: theme.light };
+            base.color = theme.primary;
+            base.bold = true;
+          } else if (o.zebra && ri % 2) {
+            base.fill = { color: 'F4F5F7' };
+          }
+          return { text, options: Object.assign(base, given) };
+        })
+      );
+    });
+    slide.addTable(rows, {
+      x: o.x, y: o.y, w: o.w,
+      colW: o.colW,
+      fontSize: o.fontSize || 11,
+      color: theme.text,
+      valign: 'middle',
+      autoPage: false,
+    });
+  }
+
   // 同系色を段階的に変化させる（帯や円弧を「進むほど濃く」見せるための階調）。
   const BLUE_SCALE = ['light', 'softBlue', 'accent', 'mid', 'primaryLight', 'primary'];
   function scaleColor(theme, i, n, reverse) {
@@ -558,36 +613,19 @@ window.DocAssist = window.DocAssist || {};
     buildBody(slide, bullets, theme, box) {
       const items = A.extractItems(bullets);
       if (!items.length) return;
-      const rows = [
-        [
-          { text: '項目', options: { bold: true, color: theme.white, fill: { color: theme.primary } } },
-          { text: '内容', options: { bold: true, color: theme.white, fill: { color: theme.primary } } },
-        ],
-        ...items.map((it, i) => {
-          const fillColor = it.highlight ? theme.light : i % 2 ? theme.light : theme.white;
-          return [
-            {
-              text: `${it.highlight ? '★ ' : ''}${it.key}`,
-              options: {
-                fill: { color: fillColor },
-                bold: !!it.highlight,
-                color: it.highlight ? theme.highlight : theme.text,
-              },
-            },
-            { text: it.value, options: { fill: { color: fillColor }, bold: !!it.highlight } },
-          ];
-        }),
-      ];
-      slide.addTable(rows, {
-        x: box.x,
-        y: box.y,
-        w: box.w,
+      addStyledTable(slide, theme, {
+        x: box.x, y: box.y, w: box.w,
         colW: [box.w * 0.3, box.w * 0.7],
         fontSize: 12,
-        color: theme.text,
-        border: { type: 'solid', color: theme.white, pt: 1.5 },
-        valign: 'middle',
-        autoPage: false,
+        header: ['項目', '内容'],
+        firstColAccent: true,
+        rows: items.map((it) => [
+          {
+            text: `${it.highlight ? '★ ' : ''}${it.key}`,
+            options: it.highlight ? { color: theme.highlight } : {},
+          },
+          { text: it.value, options: it.highlight ? { bold: true, fill: { color: theme.lighter } } : {} },
+        ]),
       });
     },
   };
@@ -639,34 +677,19 @@ window.DocAssist = window.DocAssist || {};
     buildBody(slide, bullets, theme, box) {
       const items = parseActionItems(bullets).slice(0, 8);
       if (!items.length) return;
-      const headOpts = { bold: true, color: theme.white, fill: { color: theme.primary } };
-      const rows = [
-        [
-          { text: 'No', options: headOpts },
-          { text: 'タスク', options: headOpts },
-          { text: '担当', options: headOpts },
-          { text: '期限', options: headOpts },
-        ],
-        ...items.map((it, i) => {
-          const fill = { color: i % 2 ? theme.light : theme.white };
-          return [
-            { text: String(i + 1), options: { fill, align: 'center' } },
-            { text: it.task, options: { fill } },
-            { text: it.owner, options: { fill, align: 'center' } },
-            { text: it.due, options: { fill, align: 'center' } },
-          ];
-        }),
-      ];
-      slide.addTable(rows, {
-        x: box.x,
-        y: box.y,
-        w: box.w,
+      addStyledTable(slide, theme, {
+        x: box.x, y: box.y, w: box.w,
         colW: [box.w * 0.08, box.w * 0.5, box.w * 0.2, box.w * 0.22],
         fontSize: 11.5,
-        color: theme.text,
-        border: { type: 'solid', color: theme.white, pt: 1.5 },
-        valign: 'middle',
-        autoPage: false,
+        header: ['No', 'タスク', '担当', '期限'],
+        firstColAccent: true,
+        zebra: true,
+        rows: items.map((it, i) => [
+          { text: String(i + 1), options: { align: 'center' } },
+          { text: it.task },
+          { text: it.owner, options: { align: 'center' } },
+          { text: it.due, options: { align: 'center' } },
+        ]),
       });
     },
   };
@@ -1882,32 +1905,23 @@ window.DocAssist = window.DocAssist || {};
     buildBody(slide, bullets, theme, box) {
       const items = A.extractItems(bullets).slice(0, 8);
       if (!items.length) return;
-      const head = { bold: true, color: theme.white, fill: { color: theme.primary } };
-      const rows = [
-        [
-          { text: 'タスク', options: head },
-          { text: '担当', options: head },
-          { text: '状況', options: head },
-          { text: '期限', options: head },
-        ],
-        ...items.map((it, i) => {
-          const f = splitFields(it.value);
-          const status = f[1] || '';
-          const fill = { color: i % 2 ? theme.lighter : theme.white };
-          return [
-            { text: it.key, options: { fill } },
-            { text: f[0] || '', options: { fill, align: 'center' } },
-            { text: status, options: { fill: { color: statusTone(status, theme) }, color: theme.white, bold: true, align: 'center' } },
-            { text: f[2] || '', options: { fill, align: 'center' } },
-          ];
-        }),
-      ];
-      slide.addTable(rows, {
+      addStyledTable(slide, theme, {
         x: box.x, y: box.y, w: box.w,
         colW: [box.w * 0.46, box.w * 0.16, box.w * 0.18, box.w * 0.2],
-        fontSize: 11, color: theme.text,
-        border: { type: 'solid', color: theme.white, pt: 1.5 },
-        valign: 'middle', autoPage: false,
+        fontSize: 11,
+        header: ['タスク', '担当', '状況', '期限'],
+        firstColAccent: true,
+        zebra: true,
+        rows: items.map((it) => {
+          const f = splitFields(it.value);
+          const status = f[1] || '';
+          return [
+            { text: it.key },
+            { text: f[0] || '', options: { align: 'center' } },
+            { text: status, options: { fill: { color: statusTone(status, theme) }, color: theme.white, bold: true, align: 'center' } },
+            { text: f[2] || '', options: { align: 'center' } },
+          ];
+        }),
       });
     },
   };
@@ -1946,32 +1960,23 @@ window.DocAssist = window.DocAssist || {};
     buildBody(slide, bullets, theme, box) {
       const items = A.extractItems(bullets).slice(0, 7);
       if (!items.length) return;
-      const head = { bold: true, color: theme.white, fill: { color: theme.primary } };
-      const rows = [
-        [
-          { text: '課題・リスク', options: head },
-          { text: '内容', options: head },
-          { text: '影響度', options: head },
-          { text: '対応方針', options: head },
-        ],
-        ...items.map((it, i) => {
-          const f = splitFields(it.value);
-          const sev = f[1] || '';
-          const fill = { color: i % 2 ? theme.lighter : theme.white };
-          return [
-            { text: it.key, options: { fill, bold: true } },
-            { text: f[0] || '', options: { fill } },
-            { text: sev, options: { fill: { color: severityTone(sev, theme) }, color: theme.white, bold: true, align: 'center' } },
-            { text: f[2] || '', options: { fill } },
-          ];
-        }),
-      ];
-      slide.addTable(rows, {
+      addStyledTable(slide, theme, {
         x: box.x, y: box.y, w: box.w,
         colW: [box.w * 0.24, box.w * 0.38, box.w * 0.12, box.w * 0.26],
-        fontSize: 10.5, color: theme.text,
-        border: { type: 'solid', color: theme.white, pt: 1.5 },
-        valign: 'middle', autoPage: false,
+        fontSize: 10.5,
+        header: ['課題・リスク', '内容', '影響度', '対応方針'],
+        firstColAccent: true,
+        zebra: true,
+        rows: items.map((it) => {
+          const f = splitFields(it.value);
+          const sev = f[1] || '';
+          return [
+            { text: it.key },
+            { text: f[0] || '' },
+            { text: sev, options: { fill: { color: severityTone(sev, theme) }, color: theme.white, bold: true, align: 'center' } },
+            { text: f[2] || '' },
+          ];
+        }),
       });
     },
   };
@@ -2740,9 +2745,396 @@ window.DocAssist = window.DocAssist || {};
     },
   };
 
+  // ---------- クロス表（表頭×表側） ----------
+  // 1行目で列見出しを定義し、以降の行を「表側の見出し＋各列の値」として並べる。
+  // 入力形式：
+  //   - 列：初期費用｜運用コスト｜拡張性
+  //   - A社：30万円｜月1万円｜限定的
+  //   - B社：★推奨 50万円｜月3万円｜拡張可能
+  function parseCrossTable(bullets) {
+    const items = A.extractItems(bullets);
+    let cols = [];
+    const rows = [];
+    items.forEach((it) => {
+      if (!cols.length && /^(列|項目|軸|観点|評価軸|比較軸)$/.test(it.key)) {
+        cols = splitFields(it.value);
+        return;
+      }
+      rows.push({ label: it.key, cells: splitFields(it.value), highlight: it.highlight });
+    });
+    const width = rows.reduce((m, r) => Math.max(m, r.cells.length), 0);
+    if (!cols.length) cols = Array.from({ length: width }, (_, i) => `項目${i + 1}`);
+    while (cols.length < width) cols.push('');
+    return { cols: cols.slice(0, 5), rows: rows.slice(0, 7) };
+  }
+
+  const crossTable = {
+    id: 'cross-table',
+    name: 'クロス表（表頭×表側）',
+    category: '比較',
+    description: '複数の対象を複数の評価軸で交差させて比較する表。1行目に「列：軸1｜軸2｜軸3」を書き、以降を「対象：値｜値｜値」で書く。',
+    score(section) {
+      const t = parseCrossTable(section.bullets || []);
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['比較', '評価', '観点', '軸']);
+      const multi = t.rows.filter((r) => r.cells.length >= 2).length;
+      if (t.cols.length >= 2 && multi >= 2 && kw) return 10;
+      if (t.cols.length >= 2 && multi >= 2) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const t = parseCrossTable(bullets);
+      if (!t.rows.length) return emptyBody();
+      return `<table class="pv-table pv-xtable"><thead><tr><th></th>${t.cols
+        .map((c) => `<th>${esc(c)}</th>`)
+        .join('')}</tr></thead><tbody>
+        ${t.rows
+          .map(
+            (r) => `<tr${r.highlight ? ' class="pv-table-highlight"' : ''}>
+          <th class="pv-xtable-side">${r.highlight ? '★ ' : ''}${esc(r.label)}</th>
+          ${t.cols.map((_, ci) => `<td>${esc(r.cells[ci] || '')}</td>`).join('')}
+        </tr>`
+          )
+          .join('')}
+      </tbody></table>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const t = parseCrossTable(bullets);
+      if (!t.rows.length) return;
+      const sideW = box.w * 0.2;
+      const colW = (box.w - sideW) / t.cols.length;
+      addStyledTable(slide, theme, {
+        x: box.x, y: box.y, w: box.w,
+        colW: [sideW].concat(t.cols.map(() => colW)),
+        fontSize: 11,
+        header: [''].concat(t.cols),
+        firstColAccent: true,
+        rows: t.rows.map((r) =>
+          [{ text: `${r.highlight ? '★ ' : ''}${r.label}`, options: r.highlight ? { color: theme.highlight } : {} }].concat(
+            t.cols.map((_, ci) => ({
+              text: r.cells[ci] || '',
+              options: Object.assign({ align: 'center' }, r.highlight ? { bold: true, fill: { color: theme.lighter } } : {}),
+            }))
+          )
+        ),
+      });
+    },
+  };
+
+  // ---------- 中扉（セクション区切り） ----------
+  // 章の切り替わりを示すスライド。全セクションを並べ、★を付けた1つを現在地として強調する。
+  // 入力形式： - 01：現状の課題 ／ - 02：★ ご提案 …
+  const sectionDivider = {
+    id: 'section-divider',
+    name: '中扉（セクション区切り）',
+    category: '汎用',
+    description: '章の切り替わりを示す扉ページ。全セクションを並べ、「★」を付けた1つを現在地として大きく示す。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['中扉', 'セクション', '章', '本章', 'ここから']);
+      const items = A.extractItems(section.bullets || []);
+      const marked = items.filter((it) => it.highlight).length;
+      if (kw && marked === 1) return 10;
+      if (marked === 1 && items.length >= 2) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (!items.length) return emptyBody();
+      const cur = items.find((it) => it.highlight) || items[0];
+      return `<div class="pv-sd">
+        <div class="pv-sd-main">
+          <div class="pv-sd-num">${esc(cur.key)}</div>
+          <div class="pv-sd-rule"></div>
+          <div class="pv-sd-title">${esc(cur.value)}</div>
+        </div>
+        <div class="pv-sd-list">${items
+          .map(
+            (it) => `<div class="pv-sd-item${it === cur ? ' is-current' : ''}"><span>${esc(it.key)}</span>${esc(it.value)}</div>`
+          )
+          .join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (!items.length) return;
+      const cur = items.find((it) => it.highlight) || items[0];
+      const leftW = box.w * 0.56;
+      slide.addText(cur.key, {
+        x: box.x, y: box.y + box.h * 0.16, w: leftW, h: 0.9,
+        fontSize: 40, bold: true, color: theme.light, valign: 'middle',
+      });
+      slide.addShape('rect', {
+        x: box.x, y: box.y + box.h * 0.16 + 0.98, w: Math.min(leftW, 3.2), h: 0.045,
+        fill: { color: theme.primary }, line: { type: 'none' },
+      });
+      slide.addText(cur.value, {
+        x: box.x, y: box.y + box.h * 0.16 + 1.12, w: leftW, h: 0.7,
+        fontSize: 22, bold: true, color: theme.primary, valign: 'top',
+      });
+      // 右側に全セクションを並べ、現在地以外は淡く表示する
+      const listX = box.x + leftW + 0.3;
+      const listW = box.x + box.w - listX;
+      const n = items.length;
+      const rowH = Math.min(0.48, box.h / n);
+      const startY = box.y + (box.h - rowH * n) / 2;
+      items.forEach((it, i) => {
+        const y = startY + i * rowH;
+        const isCur = it === cur;
+        if (isCur) {
+          slide.addShape('rect', { x: listX - 0.12, y, w: 0.045, h: rowH, fill: { color: theme.primary }, line: { type: 'none' } });
+        }
+        slide.addText(
+          [
+            { text: it.key + '   ', options: { bold: true, color: isCur ? theme.primary : theme.accent } },
+            { text: it.value, options: { color: isCur ? theme.text : theme.subtext } },
+          ],
+          { x: listX, y, w: listW, h: rowH, fontSize: isCur ? 12 : 11, bold: isCur, valign: 'middle' }
+        );
+      });
+    },
+  };
+
+  // ---------- アイコン付き見出しボックス ----------
+  // 観点ごとに「アイコン＋淡い見出しバー＋枠線の本文ボックス」を並べる。
+  // 入力形式： - 経営：意思決定の迅速化｜投資対効果の可視化
+  const iconHeaderBox = {
+    id: 'icon-header-box',
+    name: 'アイコン付き見出しボックス',
+    category: '比較',
+    description: '観点ごとにアイコン付きの見出しバーと枠線ボックスを並べる。立場・部門別の論点整理に使う。',
+    score(section) {
+      const items = A.extractItems(section.bullets || []);
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['観点', '立場', '部門', '目線', 'ごと']);
+      const n = items.length;
+      if (kw && n >= 2 && n <= 3) return 9;
+      if (n >= 2 && n <= 3 && items.filter((it) => splitFields(it.value).length >= 2).length >= 2) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 3);
+      if (!items.length) return emptyBody();
+      return `<div class="pv-ihb">${items
+        .map(
+          (it) => `<div class="pv-ihb-col">
+          <div class="pv-ihb-head">
+            <span class="pv-ihb-icon">${iconSvg(guessIcon(it.key))}</span>
+            <span class="pv-ihb-bar">${esc(it.key)}</span>
+          </div>
+          <div class="pv-ihb-body">${splitFields(it.value)
+            .map((l) => `<div class="pv-ihb-line">${esc(l)}</div>`)
+            .join('')}</div>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 3);
+      if (!items.length) return;
+      const n = items.length;
+      const gap = 0.24;
+      const colW = (box.w - gap * (n - 1)) / n;
+      const icon = 0.52;
+      const headH = 0.4;
+      const headY = box.y + icon / 2 - headH / 2;
+      items.forEach((it, i) => {
+        const x = box.x + i * (colW + gap);
+        // 見出しバー（アイコンの分だけ右にずらす）
+        slide.addShape('rect', {
+          x: x + icon * 0.6, y: headY, w: colW - icon * 0.6, h: headH,
+          fill: { color: theme.light }, line: { type: 'none' },
+        });
+        slide.addText(it.key, {
+          x: x + icon * 0.6 + 0.34, y: headY, w: colW - icon * 0.6 - 0.42, h: headH,
+          fontSize: 11.5, bold: true, color: theme.primary, valign: 'middle',
+        });
+        // 本文の枠線ボックス
+        const bodyY = box.y + icon;
+        const bodyH = box.h - icon;
+        slide.addShape('rect', {
+          x: x + icon * 0.3, y: bodyY, w: colW - icon * 0.3, h: bodyH,
+          fill: { color: theme.white }, line: { color: theme.primaryLight, width: 1 },
+        });
+        const lines = splitFields(it.value);
+        if (lines.length) {
+          slide.addText(bulletTextRuns(lines, theme, { fontSize: 10, spaceAfter: 6 }), {
+            x: x + icon * 0.3 + 0.16, y: bodyY + 0.14, w: colW - icon * 0.3 - 0.32, h: bodyH - 0.28,
+            valign: 'top',
+          });
+        }
+        // アイコンの丸（左上に重ねる）
+        slide.addShape('oval', {
+          x, y: box.y, w: icon, h: icon,
+          fill: { color: theme.white }, line: { color: theme.primary, width: 1.25 },
+        });
+        addIcon(slide, guessIcon(it.key), { x: x + icon * 0.24, y: box.y + icon * 0.24, w: icon * 0.52, h: icon * 0.52 }, theme);
+      });
+    },
+  };
+
+  // ---------- Point強調 ----------
+  // 「Point 1」のタグを付けた強調ボックスを積む。押さえてほしい要点を数点だけ示す型。
+  const pointCallout = {
+    id: 'point-callout',
+    name: 'Point強調',
+    category: '汎用',
+    description: '「Point」タグ付きの強調ボックスを積んで、押さえてほしい要点を2〜4点示す。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ポイント', 'Point', '要点', '押さえ']);
+      const n = (section.bullets || []).length;
+      if (kw && n >= 2 && n <= 4) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (!items.length) return emptyBody();
+      return `<div class="pv-pc">${items
+        .map(
+          (it, i) => `<div class="pv-pc-row${it.highlight ? ' is-highlight' : ''}">
+          <span class="pv-pc-tag">Point ${i + 1}</span>
+          <div class="pv-pc-box"><b>${esc(it.key)}</b>${it.value !== it.key ? `<span>${esc(it.value)}</span>` : ''}</div>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (!items.length) return;
+      const n = items.length;
+      const gap = 0.18;
+      const rowH = (box.h - gap * (n - 1)) / n;
+      const tagW = 0.92;
+      const tagH = 0.28;
+      items.forEach((it, i) => {
+        const y = box.y + i * (rowH + gap);
+        const tone = it.highlight ? theme.highlight : theme.primary;
+        // 本文ボックス（タグの分だけ下げて、タグが上辺に載るようにする）
+        slide.addShape('rect', {
+          x: box.x, y: y + tagH * 0.5, w: box.w, h: rowH - tagH * 0.5,
+          fill: { color: theme.lighter }, line: { type: 'none' },
+        });
+        slide.addShape('rect', {
+          x: box.x, y: y + tagH * 0.5, w: 0.05, h: rowH - tagH * 0.5,
+          fill: { color: tone }, line: { type: 'none' },
+        });
+        slide.addShape('rect', { x: box.x + 0.22, y, w: tagW, h: tagH, fill: { color: tone }, line: { type: 'none' } });
+        slide.addText(`Point ${i + 1}`, {
+          x: box.x + 0.22, y, w: tagW, h: tagH,
+          fontSize: 9.5, bold: true, color: theme.white, align: 'center', valign: 'middle',
+        });
+        const runs = [{ text: it.key, options: { bold: true, fontSize: 12, color: theme.primary } }];
+        if (it.value !== it.key) runs.push({ text: '　' + it.value, options: { fontSize: 11, color: theme.text } });
+        slide.addText(runs, {
+          x: box.x + 0.26, y: y + tagH + 0.04, w: box.w - 0.52, h: rowH - tagH - 0.1,
+          valign: 'middle',
+        });
+      });
+    },
+  };
+
+  // ---------- 前提→検討→結論 ----------
+  // 左に前提、中央に検討した観点、右に結論を置き、矢印で結論へ導く。
+  // 入力形式： - 前提：… / - 検討：… （複数可） / - 結論：…
+  function parseConclusionFlow(bullets) {
+    const items = A.extractItems(bullets);
+    const premise = items.find((it) => /前提|背景|現状/.test(it.key));
+    const conclusion = items.find((it) => /結論|示唆|so ?what|提案/i.test(it.key));
+    let middle = items.filter((it) => it !== premise && it !== conclusion);
+    if (!middle.length) middle = items.slice(1, -1);
+    // 「検討：コスト｜拡張性｜移行負荷」のように1件へまとめて書かれた場合は、
+    // 観点ごとに別々のボックスへ展開する（横並びで見比べられるようにするため）
+    if (middle.length === 1) {
+      const fields = splitFields(middle[0].value);
+      if (fields.length >= 2) middle = fields.map((f) => ({ key: f, value: '' }));
+    }
+    return {
+      premise: premise || (items.length >= 3 ? items[0] : null),
+      middle: middle.slice(0, 4),
+      conclusion: conclusion || (items.length >= 2 ? items[items.length - 1] : null),
+    };
+  }
+
+  const conclusionFlow = {
+    id: 'conclusion-flow',
+    name: '前提→検討→結論',
+    category: '構造・ロジック',
+    description: '左に前提、中央に検討した観点、右に結論を置き、矢印で結論へ導く。「前提：」「検討：」「結論：」の形式。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.countAny(text, ['前提', '結論', '示唆', 'したがって', 'So What']);
+      const d = parseConclusionFlow(section.bullets || []);
+      if (kw >= 2 && d.premise && d.conclusion && d.middle.length) return 10;
+      if (kw >= 1 && d.premise && d.conclusion) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const d = parseConclusionFlow(bullets);
+      if (!d.premise || !d.conclusion) return emptyBody();
+      return `<div class="pv-cfl">
+        <div class="pv-cfl-premise"><b>${esc(d.premise.key)}</b><span>${esc(d.premise.value)}</span></div>
+        <div class="pv-cfl-middle">${d.middle
+          .map((m) => `<div class="pv-cfl-item"><b>${esc(m.key)}</b>${m.value ? `<span>${esc(m.value)}</span>` : ''}</div>`)
+          .join('')}</div>
+        <div class="pv-cfl-arrow"></div>
+        <div class="pv-cfl-conclusion"><b>${esc(d.conclusion.key)}</b><span>${esc(d.conclusion.value)}</span></div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const d = parseConclusionFlow(bullets);
+      if (!d.premise || !d.conclusion) return;
+      const arrowW = 0.42;
+      const premiseW = box.w * 0.19;
+      const conclusionW = box.w * 0.24;
+      const midW = box.w - premiseW - conclusionW - arrowW - 0.32;
+      // 前提（ネイビーのベタ塗り）
+      slide.addShape('rect', { x: box.x, y: box.y, w: premiseW, h: box.h, fill: { color: theme.primary }, line: { type: 'none' } });
+      slide.addText(
+        [
+          { text: d.premise.key + '\n', options: { bold: true, fontSize: 11.5 } },
+          { text: d.premise.value, options: { fontSize: 10 } },
+        ],
+        { x: box.x + 0.14, y: box.y, w: premiseW - 0.28, h: box.h, color: theme.white, align: 'center', valign: 'middle' }
+      );
+      // 検討（白地＋枠線）
+      const midX = box.x + premiseW + 0.16;
+      const mn = d.middle.length || 1;
+      const mGap = 0.12;
+      const mW = (midW - mGap * (mn - 1)) / mn;
+      d.middle.forEach((m, i) => {
+        const x = midX + i * (mW + mGap);
+        slide.addShape('rect', { x, y: box.y, w: mW, h: box.h, fill: { color: theme.white }, line: { color: theme.border, width: HAIRLINE } });
+        const runs = [{ text: m.key, options: { bold: true, fontSize: 10.5, color: theme.primary, breakLine: !!m.value } }];
+        if (m.value) runs.push({ text: m.value, options: { fontSize: 9.5, color: theme.text } });
+        slide.addText(runs, {
+          x: x + 0.12, y: box.y + 0.12, w: mW - 0.24, h: box.h - 0.24,
+          align: m.value ? 'left' : 'center', valign: m.value ? 'top' : 'middle',
+        });
+      });
+      // 矢印（グレーの太い矢羽根）
+      slide.addShape('rightArrow', {
+        x: midX + midW + 0.06, y: box.y + box.h / 2 - 0.22, w: arrowW, h: 0.44,
+        fill: { color: theme.gray }, line: { type: 'none' },
+      });
+      // 結論（淡いブルー）
+      const cx = midX + midW + arrowW + 0.16;
+      slide.addShape('rect', { x: cx, y: box.y, w: conclusionW, h: box.h, fill: { color: theme.light }, line: { type: 'none' } });
+      slide.addText(
+        [
+          { text: d.conclusion.key + '\n', options: { bold: true, fontSize: 11.5, color: theme.primary } },
+          { text: d.conclusion.value, options: { fontSize: 10.5, color: theme.text } },
+        ],
+        { x: cx + 0.14, y: box.y, w: conclusionW - 0.28, h: box.h, align: 'center', valign: 'middle' }
+      );
+    },
+  };
+
   DocAssist.patterns = [
     titleMessage,
     agenda,
+    sectionDivider,
+    pointCallout,
     boxCompare,
     compareVertical,
     swot,
@@ -2762,12 +3154,15 @@ window.DocAssist = window.DocAssist || {};
     pyramidTiered,
     triangleTiers,
     triangleRelation,
+    conclusionFlow,
     logicTree,
     beforeAfter,
     timeline,
     timelineVertical,
     yearTimeline,
     comparisonTable,
+    crossTable,
+    iconHeaderBox,
     decisionRequest,
     actionPlanTable,
     taskStatusTable,
@@ -2793,6 +3188,11 @@ window.DocAssist = window.DocAssist || {};
   const PATTERN_META = {
     'title-message': { scenes: ['提案書', '報告書', '進捗MTG', 'キックオフ', '経営・定例報告'], role: '本文' },
     agenda: { scenes: ['提案書', '報告書', 'キックオフ', '進捗MTG'], role: '目次' },
+    'section-divider': { scenes: ['提案書', '報告書', '研修・説明会', '経営・定例報告'], role: '目次' },
+    'point-callout': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
+    'cross-table': { scenes: ['提案書', '報告書', 'データ提示'], role: '表' },
+    'icon-header-box': { scenes: ['提案書', '報告書', '汎用ロジック図解'], role: '比較' },
+    'conclusion-flow': { scenes: ['提案書', '報告書', '汎用ロジック図解'], role: '図解' },
     'box-compare': { scenes: ['提案書', '報告書'], role: '比較' },
     'compare-vertical': { scenes: ['提案書', '報告書'], role: '比較' },
     'comparison-table': { scenes: ['提案書', '報告書'], role: '表' },
@@ -2841,6 +3241,11 @@ window.DocAssist = window.DocAssist || {};
     agenda: ['本日の論点', '現状と課題', 'ご提案', '今後の進め方'],
     'box-compare': ['A案：低コストだが拡張性に課題', 'B案：★推奨 バランスが最も良い', 'C案：高機能だが過剰投資'],
     'compare-vertical': ['初期費用：A社30万円、B社50万円', '運用コスト：A社1万円、B社3万円', '拡張性：★推奨 B社はオプションで拡張可能', 'サポート：B社は電話・チャット対応'],
+    'section-divider': ['01：現状と課題', '02：★ ご提案', '03：実行計画'],
+    'point-callout': ['意思決定の迅速化：稟議の所要日数を半減できる', '運用負荷の軽減：手作業の帳票出力が不要になる', '拡張性の確保：将来の機能追加に対応できる'],
+    'cross-table': ['列：初期費用｜運用コスト｜拡張性', 'A社：30万円｜月1万円｜限定的', 'B社：★推奨 50万円｜月3万円｜拡張可能', 'C社：120万円｜月8万円｜充実'],
+    'icon-header-box': ['経営：意思決定の迅速化｜投資対効果の可視化', '現場：入力作業の削減｜情報共有の円滑化', 'システム：運用保守の負荷軽減｜セキュリティの担保'],
+    'conclusion-flow': ['前提：保守期限が2027年に到来する', '検討：コスト｜拡張性｜移行負荷', '結論：SaaS基盤への移行を推奨する'],
     'comparison-table': ['初期費用：50万円', '運用コスト：月額3万円', '導入期間：2ヶ月', '拡張性：オプションで拡張可能', 'サポート：電話・チャット対応'],
     'decision-request': ['依頼事項：導入ベンダーをB社に確定することをご承認いただきたい', '期限：2026年3月10日', 'A案：A社CRM｜低コストだが拡張性に課題', 'B案：★推奨 B社CRM｜バランスが最も良い'],
     'before-after': ['現状：手作業で平均15分を要している', '導入後：自動化により平均2分に短縮される'],
@@ -2909,6 +3314,11 @@ window.DocAssist = window.DocAssist || {};
     severityTone,
     statusCls,
     severityCls,
+    addStyledTable,
+    addNumberCircle,
+    scaleColor,
+    ROUND,
+    HAIRLINE,
     ICON_KEYS: Object.keys(ICONS),
   };
 })();

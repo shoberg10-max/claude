@@ -342,38 +342,31 @@ window.DocAssist = window.DocAssist || {};
     return `<table class="pv-table"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`;
   }
 
+  // 組み込みパターンと同じ表スタイル（縦罫線なし・横は点線・表側は淡いブルー）を使う。
   function tablePptx(spec, items, slide, theme, box) {
     const L = spec.layout;
     const cols = L.columns;
-    const headOpts = { bold: true, color: theme.white, fill: { color: theme.primary } };
-    const rows = [cols.map((c) => ({ text: c.label, options: headOpts }))];
-    items.forEach((it, i) => {
-      const zebra = L.zebra && i % 2 ? theme.lighter : theme.white;
-      const baseFill = it.highlight ? theme.light : zebra;
-      rows.push(
+    H.addStyledTable(slide, theme, {
+      x: box.x, y: box.y, w: box.w,
+      colW: cols.map((c) => box.w * c.width),
+      fontSize: 11,
+      header: cols.map((c) => c.label),
+      firstColAccent: true,
+      zebra: !!L.zebra,
+      rows: items.map((it, i) =>
         cols.map((c, ci) => {
           const raw = resolveFrom(c.from, it, i);
           const tone = badgeTone(c.badge, raw, theme);
-          if (tone) {
-            return { text: raw, options: { fill: { color: tone }, color: theme.white, bold: true, align: 'center' } };
-          }
+          if (tone) return { text: raw, options: { fill: { color: tone }, color: theme.white, bold: true, align: 'center' } };
           return {
             text: `${it.highlight && ci === 0 ? '★ ' : ''}${raw}`,
-            options: {
-              fill: { color: baseFill },
-              bold: !!(c.bold || it.highlight),
-              color: it.highlight && ci === 0 ? theme.highlight : theme.text,
-            },
+            options: Object.assign(
+              c.bold ? { bold: true } : {},
+              it.highlight ? { bold: true, color: ci === 0 ? theme.highlight : theme.text } : {}
+            ),
           };
         })
-      );
-    });
-    slide.addTable(rows, {
-      x: box.x, y: box.y, w: box.w,
-      colW: cols.map((c) => box.w * c.width),
-      fontSize: 11, color: theme.text,
-      border: { type: 'solid', color: theme.white, pt: 1.5 },
-      valign: 'middle', autoPage: false,
+      ),
     });
   }
 
