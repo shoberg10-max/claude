@@ -3130,11 +3130,669 @@ window.DocAssist = window.DocAssist || {};
     },
   };
 
+  // ---------- レーダーチャート ----------
+  // 複数の評価軸でのバランスを多角形で示す。1系列でも、比較対象を並べた2系列でも描ける。
+  // 入力形式：
+  //   - 系列：自社｜競合A          ← 任意。系列名を付けたいときだけ書く
+  //   - 提案力：4｜3
+  //   - 技術力：5｜4
+  function parseRadar(bullets) {
+    const items = A.extractItems(bullets);
+    let names = [];
+    const axes = [];
+    items.forEach((it) => {
+      if (!axes.length && /^(系列|凡例|対象|比較)$/.test(it.key)) {
+        names = splitFields(it.value);
+        return;
+      }
+      const nums = splitFields(it.value)
+        .map((v) => firstNumber(v))
+        .filter((v) => v !== null);
+      if (nums.length) axes.push({ label: it.key, values: nums });
+    });
+    const seriesCount = axes.reduce((m, a) => Math.max(m, a.values.length), 0);
+    return { names, axes: axes.slice(0, 8), seriesCount: Math.min(seriesCount, 3) };
+  }
+
+  const radarChart = {
+    id: 'radar-chart',
+    name: 'レーダーチャート',
+    category: '数値・グラフ',
+    description: '複数の評価軸でのバランスを多角形で示す（PowerPointのネイティブグラフ）。「軸：値」または「軸：自社の値｜競合の値」の形式。',
+    score(section) {
+      const r = parseRadar(section.bullets || []);
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['レーダー', 'バランス', '評価', 'スコア', '強み']);
+      if (r.axes.length >= 4 && kw) return 10;
+      if (r.axes.length >= 5) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      const r = parseRadar(bullets);
+      if (r.axes.length < 3) return emptyBody();
+      const n = r.axes.length;
+      const maxV = Math.max(...r.axes.map((a) => Math.max(...a.values)), 1);
+      const R = 42;
+      const pt = (i, v) => {
+        const ang = ((-90 + (360 / n) * i) * Math.PI) / 180;
+        const rr = (v / maxV) * R;
+        return `${(50 + rr * Math.cos(ang)).toFixed(1)},${(50 + rr * Math.sin(ang)).toFixed(1)}`;
+      };
+      const grid = [0.25, 0.5, 0.75, 1]
+        .map((f) => `<polygon points="${r.axes.map((_, i) => pt(i, maxV * f)).join(' ')}" fill="none" stroke="#dfe3ea" stroke-width="0.4"/>`)
+        .join('');
+      const spokes = r.axes
+        .map((_, i) => `<line x1="50" y1="50" x2="${pt(i, maxV).split(',')[0]}" y2="${pt(i, maxV).split(',')[1]}" stroke="#dfe3ea" stroke-width="0.4"/>`)
+        .join('');
+      const seriesColors = ['var(--primary)', 'var(--accent)', 'var(--gray)'];
+      const polys = Array.from({ length: r.seriesCount }, (_, si) => {
+        const pts = r.axes.map((a, i) => pt(i, a.values[si] != null ? a.values[si] : 0)).join(' ');
+        return `<polygon points="${pts}" fill="${seriesColors[si]}" fill-opacity="0.18" stroke="${seriesColors[si]}" stroke-width="1.2"/>`;
+      }).join('');
+      const labels = r.axes
+        .map((a, i) => {
+          const [x, y] = pt(i, maxV * 1.16).split(',');
+          return `<text x="${x}" y="${y}" font-size="3.4" fill="#595959" text-anchor="middle" dominant-baseline="middle">${esc(a.label)}</text>`;
+        })
+        .join('');
+      return `<div class="pv-radar">
+        <svg viewBox="0 0 100 100">${grid}${spokes}${polys}${labels}</svg>
+        ${
+          r.names.length
+            ? `<div class="pv-radar-legend">${r.names
+                .slice(0, r.seriesCount)
+                .map((nm, i) => `<span><i style="background:${seriesColors[i]}"></i>${esc(nm)}</span>`)
+                .join('')}</div>`
+            : ''
+        }
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const r = parseRadar(bullets);
+      if (r.axes.length < 3) return;
+      const labels = r.axes.map((a) => a.label);
+      const colors = [theme.primary, theme.accent, theme.gray];
+      const data = Array.from({ length: r.seriesCount }, (_, si) => ({
+        name: r.names[si] || `系列${si + 1}`,
+        labels,
+        values: r.axes.map((a) => (a.values[si] != null ? a.values[si] : 0)),
+      }));
+      slide.addChart('radar', data, {
+        x: box.x, y: box.y, w: box.w, h: box.h,
+        radarStyle: 'marker',
+        chartColors: colors.slice(0, r.seriesCount),
+        showLegend: r.names.length > 0,
+        legendPos: 'b',
+        legendColor: theme.text,
+        legendFontSize: 10,
+        catAxisLabelColor: theme.text,
+        catAxisLabelFontSize: 9,
+        valAxisLabelColor: theme.subtext,
+        valAxisLabelFontSize: 8,
+        lineSize: 2,
+      });
+    },
+  };
+
+  // ---------- ベン図 ----------
+  // 2〜3つの領域の重なりで、共通部分や掛け合わせの価値を示す。
+  // 入力形式： - 営業の知見：… / - 技術の知見：… / - 重なり：両者を掛け合わせた提案力
+  function parseVenn(bullets) {
+    const items = A.extractItems(bullets);
+    const overlap = items.find((it) => /重な|共通|交差|掛け合わ|両者|中心/.test(it.key));
+    const circles = items.filter((it) => it !== overlap).slice(0, 3);
+    return { circles, overlap };
+  }
+
+  const vennDiagram = {
+    id: 'venn-diagram',
+    name: 'ベン図',
+    category: '構造・ロジック',
+    description: '2〜3つの領域の重なりで共通部分や掛け合わせの価値を示す。「重なり：〜」を書くと交差部分の説明になる。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ベン図', '重なり', '共通', '掛け合わせ', '交差']);
+      const v = parseVenn(section.bullets || []);
+      if (kw && v.circles.length >= 2 && v.overlap) return 10;
+      if (kw && v.circles.length >= 2) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      const v = parseVenn(bullets);
+      if (v.circles.length < 2) return emptyBody();
+      const three = v.circles.length >= 3;
+      const pos = three
+        ? [{ cx: 38, cy: 34 }, { cx: 62, cy: 34 }, { cx: 50, cy: 58 }]
+        : [{ cx: 37, cy: 46 }, { cx: 63, cy: 46 }];
+      return `<div class="pv-venn">
+        <svg viewBox="0 0 100 92">
+          ${pos
+            .map((p) => `<circle cx="${p.cx}" cy="${p.cy}" r="24" fill="var(--primary-light)" fill-opacity="0.18" stroke="var(--primary-light)" stroke-width="0.7"/>`)
+            .join('')}
+          ${
+            v.overlap
+              ? `<text x="50" y="${three ? 44 : 46}" font-size="3.6" font-weight="bold" fill="var(--primary)" text-anchor="middle" dominant-baseline="middle">${esc(
+                  v.overlap.key
+                )}</text>`
+              : ''
+          }
+          ${pos
+            .map(
+              (p, i) =>
+                `<text x="${p.cx + (three && i === 2 ? 0 : i === 0 ? -9 : 9)}" y="${
+                  three && i === 2 ? p.cy + 11 : p.cy - 10
+                }" font-size="3.6" font-weight="bold" fill="var(--primary)" text-anchor="middle">${esc(v.circles[i].key)}</text>`
+            )
+            .join('')}
+        </svg>
+        <div class="pv-venn-notes">${v.circles
+          .map((c) => `<div><b>${esc(c.key)}</b>${esc(c.value !== c.key ? c.value : '')}</div>`)
+          .join('')}${v.overlap ? `<div class="is-overlap"><b>${esc(v.overlap.key)}</b>${esc(v.overlap.value)}</div>` : ''}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const v = parseVenn(bullets);
+      if (v.circles.length < 2) return;
+      const three = v.circles.length >= 3;
+      const diagW = box.w * 0.46;
+      const size = Math.min(diagW, box.h) * (three ? 0.62 : 0.7);
+      const cx = box.x + diagW / 2;
+      const cy = box.y + box.h / 2;
+      const off = size * 0.34;
+      const centers = three
+        ? [{ x: cx - off, y: cy - off * 0.6 }, { x: cx + off, y: cy - off * 0.6 }, { x: cx, y: cy + off * 0.72 }]
+        : [{ x: cx - off, y: cy }, { x: cx + off, y: cy }];
+      centers.forEach((c) => {
+        slide.addShape('ellipse', {
+          x: c.x - size / 2, y: c.y - size / 2, w: size, h: size,
+          fill: { color: theme.primaryLight, transparency: 82 },
+          line: { color: theme.primaryLight, width: 1 },
+        });
+      });
+      centers.forEach((c, i) => {
+        const dx = three && i === 2 ? 0 : i === 0 ? -size * 0.3 : size * 0.3;
+        const dy = three && i === 2 ? size * 0.34 : -size * 0.36;
+        slide.addText(v.circles[i].key, {
+          x: c.x + dx - 0.9, y: c.y + dy - 0.16, w: 1.8, h: 0.32,
+          fontSize: 10.5, bold: true, color: theme.primary, align: 'center', valign: 'middle',
+        });
+      });
+      if (v.overlap) {
+        slide.addText(v.overlap.key, {
+          x: cx - 0.85, y: cy - (three ? 0.02 : 0.16), w: 1.7, h: 0.32,
+          fontSize: 10, bold: true, color: theme.primary, align: 'center', valign: 'middle',
+        });
+      }
+      // 右側に各領域の説明を並べる
+      const notes = v.circles.concat(v.overlap ? [v.overlap] : []);
+      const nx = box.x + diagW + 0.3;
+      const nw = box.x + box.w - nx;
+      const nh = box.h / notes.length;
+      notes.forEach((it, i) => {
+        const y = box.y + i * nh;
+        const isOverlap = it === v.overlap;
+        slide.addShape('rect', {
+          x: nx, y: y + nh * 0.12, w: 0.045, h: nh * 0.76,
+          fill: { color: isOverlap ? theme.primary : theme.accent }, line: { type: 'none' },
+        });
+        slide.addText(
+          [
+            { text: it.key + '\n', options: { bold: true, fontSize: 10.5, color: theme.primary } },
+            { text: it.value !== it.key ? it.value : '', options: { fontSize: 9.5, color: theme.text } },
+          ],
+          { x: nx + 0.16, y, w: nw - 0.16, h: nh, valign: 'middle' }
+        );
+      });
+    },
+  };
+
+  // ---------- 組織図 ----------
+  // 1行目を頂点、以降を配下の部門として並べ、各部門の下にさらに配下を積む。
+  // 入力形式：
+  //   - 代表取締役社長：山田太郎
+  //   - 営業本部：第一営業部｜第二営業部
+  //   - 技術本部：開発部｜品質保証部
+  function parseOrgChart(bullets) {
+    const items = A.extractItems(bullets);
+    if (!items.length) return { root: null, branches: [] };
+    return {
+      root: items[0],
+      branches: items.slice(1, 6).map((it) => ({ label: it.key, children: splitFields(it.value).slice(0, 4) })),
+    };
+  }
+
+  const orgChart = {
+    id: 'org-chart',
+    name: '組織図',
+    category: '構造・ロジック',
+    description: '頂点と配下の部門を階層で示す。1行目が頂点、以降が「部門：配下｜配下」の形式。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['組織', '体制', '本部', '部門', '推進体制', 'チーム編成']);
+      const o = parseOrgChart(section.bullets || []);
+      if (kw && o.branches.length >= 2) return 10;
+      if (o.branches.length >= 3 && o.branches.filter((b) => b.children.length).length >= 2) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const o = parseOrgChart(bullets);
+      if (!o.root || !o.branches.length) return emptyBody();
+      return `<div class="pv-org">
+        <div class="pv-org-root">${esc(o.root.key)}${o.root.value !== o.root.key ? `<span>${esc(o.root.value)}</span>` : ''}</div>
+        <div class="pv-org-stem"></div>
+        <div class="pv-org-branches">${o.branches
+          .map(
+            (b) => `<div class="pv-org-branch">
+          <div class="pv-org-node">${esc(b.label)}</div>
+          ${b.children.map((c) => `<div class="pv-org-child">${esc(c)}</div>`).join('')}
+        </div>`
+          )
+          .join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const o = parseOrgChart(bullets);
+      if (!o.root || !o.branches.length) return;
+      const n = o.branches.length;
+      const rootW = Math.min(2.6, box.w * 0.3);
+      const rootH = 0.44;
+      const cx = box.x + box.w / 2;
+      slide.addShape('rect', { x: cx - rootW / 2, y: box.y, w: rootW, h: rootH, fill: { color: theme.primary }, line: { type: 'none' } });
+      slide.addText(o.root.value !== o.root.key ? `${o.root.key}　${o.root.value}` : o.root.key, {
+        x: cx - rootW / 2, y: box.y, w: rootW, h: rootH,
+        fontSize: 11, bold: true, color: theme.white, align: 'center', valign: 'middle',
+      });
+      // 縦のつなぎ線と横のバス線
+      const stemY = box.y + rootH;
+      const busY = stemY + 0.24;
+      slide.addShape('line', { x: cx, y: stemY, w: 0, h: 0.24, line: { color: theme.accent, width: 1 } });
+      const gap = 0.14;
+      const colW = (box.w - gap * (n - 1)) / n;
+      const firstCx = box.x + colW / 2;
+      const lastCx = box.x + (n - 1) * (colW + gap) + colW / 2;
+      slide.addShape('line', { x: firstCx, y: busY, w: lastCx - firstCx, h: 0, line: { color: theme.accent, width: 1 } });
+      const nodeY = busY + 0.2;
+      const nodeH = 0.4;
+      o.branches.forEach((b, i) => {
+        const x = box.x + i * (colW + gap);
+        const bcx = x + colW / 2;
+        slide.addShape('line', { x: bcx, y: busY, w: 0, h: 0.2, line: { color: theme.accent, width: 1 } });
+        slide.addShape('rect', { x, y: nodeY, w: colW, h: nodeH, fill: { color: theme.light }, line: { type: 'none' } });
+        slide.addText(b.label, {
+          x: x + 0.06, y: nodeY, w: colW - 0.12, h: nodeH,
+          fontSize: 10.5, bold: true, color: theme.primary, align: 'center', valign: 'middle',
+        });
+        const childH = 0.34;
+        b.children.forEach((c, ci) => {
+          const y = nodeY + nodeH + 0.1 + ci * (childH + 0.07);
+          if (y + childH > box.y + box.h) return;
+          slide.addShape('rect', {
+            x: x + 0.1, y, w: colW - 0.2, h: childH,
+            fill: { color: theme.white }, line: { color: theme.border, width: HAIRLINE },
+          });
+          slide.addText(c, {
+            x: x + 0.14, y, w: colW - 0.28, h: childH,
+            fontSize: 9.5, color: theme.text, align: 'center', valign: 'middle',
+          });
+        });
+      });
+    },
+  };
+
+  // ---------- 同心円（中核要素） ----------
+  // 中核から外側へ広がる層を同心円で示す。1行目が最も内側。
+  const concentricCircles = {
+    id: 'concentric-circles',
+    name: '同心円（中核要素）',
+    category: '構造・ロジック',
+    description: '中核から外側へ広がる層を同心円で示す。1行目が最も内側の中核。3〜4層向け。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['中核', '核', '同心円', '層', '広がり', 'コア']);
+      const n = (section.bullets || []).length;
+      if (kw && n >= 3 && n <= 4) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (items.length < 2) return emptyBody();
+      const n = items.length;
+      return `<div class="pv-cc">
+        <div class="pv-cc-circles">${items
+          .map((it, i) => {
+            // 内側ほど小さく、かつ内側ほど手前（z-index を大きく）にする
+            const size = 100 - (n - 1 - i) * (60 / n);
+            const onDark = i <= n - 2;
+            return `<div class="pv-cc-ring" style="width:${size}%;height:${size}%;background:${scaleCssVar(
+              i,
+              n,
+              true
+            )};z-index:${n - i};color:${onDark ? '#fff' : 'var(--primary)'};"><span>${esc(it.key)}</span></div>`;
+          })
+          .join('')}</div>
+        <div class="pv-cc-notes">${items
+          .map((it) => `<div><b>${esc(it.key)}</b>${esc(it.value !== it.key ? it.value : '')}</div>`)
+          .join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 4);
+      if (items.length < 2) return;
+      const n = items.length;
+      const diagW = box.w * 0.44;
+      const maxD = Math.min(diagW, box.h) * 0.94;
+      const cx = box.x + diagW / 2;
+      const cy = box.y + box.h / 2;
+      // 外側（＝最後の項目）から描いて内側を上に重ねる
+      for (let i = n - 1; i >= 0; i--) {
+        const d = maxD * (1 - (n - 1 - i) * (0.62 / n));
+        slide.addShape('ellipse', {
+          x: cx - d / 2, y: cy - d / 2, w: d, h: d,
+          fill: { color: scaleColor(theme, i, n, true) }, line: { color: theme.white, width: 1.5 },
+        });
+      }
+      // ラベルは各層の上端付近に置く（内側の円に隠れないように）
+      for (let i = n - 1; i >= 0; i--) {
+        const d = maxD * (1 - (n - 1 - i) * (0.62 / n));
+        const inner = i > 0 ? maxD * (1 - (n - i) * (0.62 / n)) : 0;
+        const bandTop = cy - d / 2;
+        const labelY = i === 0 ? cy - 0.16 : bandTop + (d / 2 - inner / 2) / 2 - 0.14;
+        slide.addText(items[i].key, {
+          x: cx - d / 2, y: labelY, w: d, h: 0.3,
+          fontSize: i === 0 ? 11 : 9.5, bold: true,
+          color: i <= n - 2 ? theme.white : theme.primary,
+          align: 'center', valign: 'middle',
+        });
+      }
+      const nx = box.x + diagW + 0.3;
+      const nw = box.x + box.w - nx;
+      const nh = box.h / n;
+      items.forEach((it, i) => {
+        const y = box.y + i * nh;
+        slide.addShape('rect', {
+          x: nx, y: y + nh * 0.14, w: 0.045, h: nh * 0.72,
+          fill: { color: scaleColor(theme, i, n, true) }, line: { type: 'none' },
+        });
+        slide.addText(
+          [
+            { text: it.key + '\n', options: { bold: true, fontSize: 10.5, color: theme.primary } },
+            { text: it.value !== it.key ? it.value : '', options: { fontSize: 9.5, color: theme.text } },
+          ],
+          { x: nx + 0.16, y, w: nw - 0.16, h: nh, valign: 'middle' }
+        );
+      });
+    },
+  };
+
+  // ---------- 決定木 ----------
+  // 1行目の問いから枝分かれして結論に至る流れを示す。
+  // 入力形式： - 判断：内製で対応できるか / - はい：自社開発で進める｜3ヶ月 / - いいえ：外部委託｜6ヶ月
+  function parseDecisionTree(bullets) {
+    const items = A.extractItems(bullets);
+    if (items.length < 2) return { root: null, branches: [] };
+    return {
+      root: items[0],
+      branches: items.slice(1, 5).map((it) => {
+        const f = splitFields(it.value);
+        return { label: it.key, result: f[0] || it.value, note: f[1] || '', highlight: it.highlight };
+      }),
+    };
+  }
+
+  const decisionTree = {
+    id: 'decision-tree',
+    name: '決定木',
+    category: '構造・ロジック',
+    description: '問いから枝分かれして結論に至る流れを示す。1行目が問い、以降が「分岐：結論｜補足」の形式。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['決定木', '分岐', '判断', '場合分け', 'はい', 'いいえ', 'Yes', 'No']);
+      const d = parseDecisionTree(section.bullets || []);
+      if (kw && d.branches.length >= 2) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const d = parseDecisionTree(bullets);
+      if (!d.root || !d.branches.length) return emptyBody();
+      return `<div class="pv-dt">
+        <div class="pv-dt-root">${esc(d.root.value !== d.root.key ? d.root.value : d.root.key)}</div>
+        <div class="pv-dt-branches">${d.branches
+          .map(
+            (b) => `<div class="pv-dt-branch">
+          <span class="pv-dt-label">${esc(b.label)}</span>
+          <div class="pv-dt-result${b.highlight ? ' is-highlight' : ''}"><b>${esc(b.result)}</b>${
+              b.note ? `<span>${esc(b.note)}</span>` : ''
+            }</div>
+        </div>`
+          )
+          .join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const d = parseDecisionTree(bullets);
+      if (!d.root || !d.branches.length) return;
+      const n = d.branches.length;
+      const rootW = box.w * 0.24;
+      const rootH = Math.min(0.9, box.h * 0.4);
+      const rootY = box.y + box.h / 2 - rootH / 2;
+      slide.addShape('rect', { x: box.x, y: rootY, w: rootW, h: rootH, fill: { color: theme.primary }, line: { type: 'none' } });
+      slide.addText(d.root.value !== d.root.key ? d.root.value : d.root.key, {
+        x: box.x + 0.12, y: rootY, w: rootW - 0.24, h: rootH,
+        fontSize: 11, bold: true, color: theme.white, align: 'center', valign: 'middle',
+      });
+      const gap = 0.14;
+      const bh = (box.h - gap * (n - 1)) / n;
+      const bx = box.x + rootW + 0.75;
+      const bw = box.x + box.w - bx;
+      const midX = box.x + rootW + 0.34;
+      slide.addShape('line', { x: midX, y: box.y + bh / 2, w: 0, h: box.h - bh, line: { color: theme.accent, width: 1 } });
+      slide.addShape('line', { x: box.x + rootW, y: box.y + box.h / 2, w: midX - (box.x + rootW), h: 0, line: { color: theme.accent, width: 1 } });
+      d.branches.forEach((b, i) => {
+        const y = box.y + i * (bh + gap);
+        const cy = y + bh / 2;
+        slide.addShape('line', { x: midX, y: cy, w: bx - midX, h: 0, line: { color: theme.accent, width: 1 } });
+        slide.addText(b.label, {
+          x: midX + 0.06, y: cy - 0.28, w: bx - midX - 0.12, h: 0.24,
+          fontSize: 8.5, bold: true, color: theme.subtext, align: 'center', valign: 'bottom',
+        });
+        slide.addShape('rect', {
+          x: bx, y, w: bw, h: bh,
+          fill: { color: b.highlight ? theme.light : theme.white },
+          line: { color: b.highlight ? theme.highlight : theme.border, width: b.highlight ? 1.5 : HAIRLINE },
+        });
+        const runs = [{ text: b.result, options: { bold: true, fontSize: 10.5, color: theme.primary, breakLine: !!b.note } }];
+        if (b.note) runs.push({ text: b.note, options: { fontSize: 9.5, color: theme.subtext } });
+        slide.addText(runs, { x: bx + 0.14, y, w: bw - 0.28, h: bh, valign: 'middle' });
+      });
+    },
+  };
+
+  // ---------- タイムテーブル ----------
+  // 時刻と内容を並べる時間割。研修・ワークショップ・当日進行の共有向け。
+  // 入力形式： - 9:00-10:00：オープニング｜事務局
+  const scheduleTable = {
+    id: 'schedule-table',
+    name: 'タイムテーブル',
+    category: '時系列',
+    description: '時刻と内容を並べる当日進行表。「9:00-10:00：内容｜担当」の形式。研修・ワークショップの進行共有に使う。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const times = (text.match(/\d{1,2}[:：]\d{2}/g) || []).length;
+      const kw = A.hasAny(text, ['タイムテーブル', '進行', '当日', '時間割', 'アジェンダ']);
+      const n = bullets.length;
+      if (n >= 4 && times >= Math.ceil(n * 0.7)) return kw ? 10 : 9;
+      if (kw && times >= 3) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 10);
+      if (!items.length) return emptyBody();
+      const hasOwner = items.some((it) => splitFields(it.value).length >= 2);
+      return `<table class="pv-table"><thead><tr><th style="width:22%;">時刻</th><th>内容</th>${
+        hasOwner ? '<th style="width:20%;">担当</th>' : ''
+      }</tr></thead><tbody>
+        ${items
+          .map((it) => {
+            const f = splitFields(it.value);
+            return `<tr${it.highlight ? ' class="pv-table-highlight"' : ''}><td>${esc(it.key)}</td><td>${esc(f[0] || '')}</td>${
+              hasOwner ? `<td>${esc(f[1] || '')}</td>` : ''
+            }</tr>`;
+          })
+          .join('')}
+      </tbody></table>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 10);
+      if (!items.length) return;
+      const hasOwner = items.some((it) => splitFields(it.value).length >= 2);
+      const colW = hasOwner ? [box.w * 0.22, box.w * 0.58, box.w * 0.2] : [box.w * 0.22, box.w * 0.78];
+      addStyledTable(slide, theme, {
+        x: box.x, y: box.y, w: box.w,
+        colW,
+        fontSize: 10.5,
+        header: hasOwner ? ['時刻', '内容', '担当'] : ['時刻', '内容'],
+        firstColAccent: true,
+        rows: items.map((it) => {
+          const f = splitFields(it.value);
+          const row = [
+            { text: it.key, options: { align: 'center' } },
+            { text: f[0] || '', options: it.highlight ? { bold: true, color: theme.primary } : {} },
+          ];
+          if (hasOwner) row.push({ text: f[1] || '', options: { align: 'center' } });
+          return row;
+        }),
+      });
+    },
+  };
+
+  // ---------- 横型ファネル ----------
+  // 左から右へ絞り込まれる流れを台形で示す。段階ごとの数値を下に添える。
+  const funnelHorizontal = {
+    id: 'funnel-horizontal',
+    name: '横型ファネル',
+    category: '変化・対比',
+    description: '左から右へ段階的に絞り込まれる流れを横向きの台形で示す。縦型より段階数が多い場合に読みやすい。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['ファネル', '歩留まり', 'コンバージョン', '絞り込み']);
+      const items = A.extractItems(bullets);
+      const dec = bullets.length >= 4 && isDecreasingSeq(items);
+      if (kw && dec && bullets.length >= 5) return 10;
+      if (dec && bullets.length >= 5) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 7);
+      if (items.length < 2) return emptyBody();
+      const n = items.length;
+      return `<div class="pv-fh">
+        <div class="pv-fh-body">${items
+          .map((it, i) => {
+            const h = (100 - i * (58 / (n - 1 || 1))).toFixed(1);
+            return `<div class="pv-fh-seg" style="background:${scaleCssVar(i, n)};height:${h}%;"><b>${esc(it.value)}</b></div>`;
+          })
+          .join('')}</div>
+        <div class="pv-fh-labels">${items.map((it) => `<div>${esc(it.key)}</div>`).join('')}</div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 7);
+      if (items.length < 2) return;
+      const n = items.length;
+      const labelH = 0.36;
+      const chartH = box.h - labelH - 0.1;
+      const segW = box.w / n;
+      items.forEach((it, i) => {
+        const x = box.x + i * segW;
+        // 段ごとに高さを減らして絞り込みを表す。図形の回転で台形を寝かせると
+        // 外接枠ごと回ってしまい横長のコマに収まらないため、矩形の高さで表現する。
+        const h = chartH * (1 - i * (0.58 / (n - 1 || 1)));
+        slide.addShape('rect', {
+          x, y: box.y + (chartH - h) / 2, w: segW + 0.01, h,
+          fill: { color: scaleColor(theme, i, n) }, line: { color: theme.white, width: 1 },
+        });
+        slide.addText(it.value, {
+          x, y: box.y + chartH / 2 - 0.18, w: segW, h: 0.36,
+          fontSize: 10, bold: true, color: i >= n - 3 ? theme.white : theme.text,
+          align: 'center', valign: 'middle',
+        });
+        slide.addText(it.key, {
+          x, y: box.y + chartH + 0.06, w: segW, h: labelH,
+          fontSize: 9, color: theme.subtext, align: 'center', valign: 'top',
+        });
+      });
+    },
+  };
+
+  // ---------- 番号付きアジェンダ（カード型） ----------
+  // 番号・見出し・補足の3段をカードにしてグリッドで並べる。項目数が多い目次向け。
+  const agendaCards = {
+    id: 'agenda-cards',
+    name: '番号付きアジェンダ（カード型）',
+    category: '汎用',
+    description: '番号・見出し・補足の3段をカードにしてグリッドで並べる。項目数の多い目次やアジェンダ向け。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['アジェンダ', '目次', 'もくじ', 'Agenda', '本日']);
+      const items = A.extractItems(section.bullets || []);
+      const n = items.length;
+      if (kw && n >= 4 && n <= 6) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (!items.length) return emptyBody();
+      return `<div class="pv-ac">${items
+        .map(
+          (it, i) => `<div class="pv-ac-card${it.highlight ? ' is-highlight' : ''}">
+        <div class="pv-ac-num">${String(i + 1).padStart(2, '0')}.</div>
+        <div class="pv-ac-title">${esc(it.key)}</div>
+        ${it.value !== it.key ? `<div class="pv-ac-desc">${esc(it.value)}</div>` : ''}
+      </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 6);
+      if (!items.length) return;
+      const n = items.length;
+      const cols = n <= 3 ? n : 3;
+      const rowsN = Math.ceil(n / cols);
+      const gapX = 0.3;
+      const gapY = 0.24;
+      const cw = (box.w - gapX * (cols - 1)) / cols;
+      const ch = (box.h - gapY * (rowsN - 1)) / rowsN;
+      items.forEach((it, i) => {
+        const x = box.x + (i % cols) * (cw + gapX);
+        const y = box.y + Math.floor(i / cols) * (ch + gapY);
+        const tone = it.highlight ? theme.highlight : theme.primary;
+        slide.addText(`${String(i + 1).padStart(2, '0')}.`, {
+          x, y, w: cw, h: 0.42,
+          fontSize: 19, bold: true, color: tone, valign: 'middle',
+        });
+        slide.addShape('line', { x, y: y + 0.46, w: cw * 0.32, h: 0, line: { color: tone, width: 1.5 } });
+        slide.addText(it.key, {
+          x, y: y + 0.54, w: cw, h: 0.34,
+          fontSize: 12, bold: true, color: theme.text, valign: 'top',
+        });
+        if (it.value !== it.key) {
+          slide.addText(it.value, {
+            x, y: y + 0.9, w: cw, h: ch - 0.94,
+            fontSize: 9.5, color: theme.subtext, valign: 'top',
+          });
+        }
+      });
+    },
+  };
+
   DocAssist.patterns = [
     titleMessage,
     agenda,
     sectionDivider,
     pointCallout,
+    agendaCards,
     boxCompare,
     compareVertical,
     swot,
@@ -3149,17 +3807,23 @@ window.DocAssist = window.DocAssist || {};
     cycle,
     cycleQuadrant,
     funnel,
+    funnelHorizontal,
     waterfall,
     pyramid,
     pyramidTiered,
     triangleTiers,
     triangleRelation,
     conclusionFlow,
+    vennDiagram,
+    concentricCircles,
+    orgChart,
+    decisionTree,
     logicTree,
     beforeAfter,
     timeline,
     timelineVertical,
     yearTimeline,
+    scheduleTable,
     comparisonTable,
     crossTable,
     iconHeaderBox,
@@ -3175,6 +3839,7 @@ window.DocAssist = window.DocAssist || {};
     barChart,
     lineChart,
     pieChart,
+    radarChart,
   ];
 
   // テンプレート選択ギャラリー（app.jsのモーダル）の絞り込み軸。
@@ -3190,6 +3855,14 @@ window.DocAssist = window.DocAssist || {};
     agenda: { scenes: ['提案書', '報告書', 'キックオフ', '進捗MTG'], role: '目次' },
     'section-divider': { scenes: ['提案書', '報告書', '研修・説明会', '経営・定例報告'], role: '目次' },
     'point-callout': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
+    'agenda-cards': { scenes: ['提案書', '報告書', 'キックオフ', '研修・説明会'], role: '目次' },
+    'venn-diagram': { scenes: ['提案書', '汎用ロジック図解', '経営・定例報告'], role: '図解' },
+    'concentric-circles': { scenes: ['提案書', '経営・定例報告', '汎用ロジック図解'], role: '図解' },
+    'org-chart': { scenes: ['キックオフ', '報告書', '会社・採用'], role: '図解' },
+    'decision-tree': { scenes: ['提案書', '汎用ロジック図解', '報告書'], role: '図解' },
+    'schedule-table': { scenes: ['研修・説明会', 'キックオフ', '進捗MTG'], role: '計画' },
+    'funnel-horizontal': { scenes: ['データ提示', '経営・定例報告'], role: '図解' },
+    'radar-chart': { scenes: ['データ提示', '経営・定例報告', '提案書'], role: 'KPI' },
     'cross-table': { scenes: ['提案書', '報告書', 'データ提示'], role: '表' },
     'icon-header-box': { scenes: ['提案書', '報告書', '汎用ロジック図解'], role: '比較' },
     'conclusion-flow': { scenes: ['提案書', '報告書', '汎用ロジック図解'], role: '図解' },
@@ -3246,6 +3919,14 @@ window.DocAssist = window.DocAssist || {};
     'cross-table': ['列：初期費用｜運用コスト｜拡張性', 'A社：30万円｜月1万円｜限定的', 'B社：★推奨 50万円｜月3万円｜拡張可能', 'C社：120万円｜月8万円｜充実'],
     'icon-header-box': ['経営：意思決定の迅速化｜投資対効果の可視化', '現場：入力作業の削減｜情報共有の円滑化', 'システム：運用保守の負荷軽減｜セキュリティの担保'],
     'conclusion-flow': ['前提：保守期限が2027年に到来する', '検討：コスト｜拡張性｜移行負荷', '結論：SaaS基盤への移行を推奨する'],
+    'agenda-cards': ['背景と目的：なぜ今この論点を扱うのか', '現状の課題：定量・定性の両面から整理', 'ご提案：3案の比較と推奨', '導入効果：定量効果の見込み', '実行計画：体制とスケジュール', '今後の進め方：次回までの宿題'],
+    'venn-diagram': ['営業部門の知見：顧客の業務実態を把握している', '技術部門の知見：実現可能性を判断できる', '重なり：実行可能で顧客に刺さる提案力'],
+    'concentric-circles': ['理念：社会課題の解決に貢献する', '戦略：デジタル基盤への集中投資', '施策：CRM導入と業務標準化'],
+    'org-chart': ['プロジェクトオーナー：情報システム部長', '業務要件チーム：営業部｜カスタマーサポート部', 'システム構築チーム：情報システム部｜開発ベンダー', '推進事務局：経営企画部'],
+    'decision-tree': ['判断：既存システムを活かせるか', 'はい：改修で対応する｜期間3ヶ月・費用50万円', 'いいえ：★推奨 新規に導入する｜期間6ヶ月・費用200万円'],
+    'schedule-table': ['9:30-10:00：オープニング・本日のゴール共有｜事務局', '10:00-11:30：現状課題の共有｜業務部門', '11:30-12:30：休憩', '12:30-14:30：解決案のディスカッション｜全員', '14:30-15:00：次回までのアクション確認｜事務局'],
+    'funnel-horizontal': ['認知：10000件', '興味：6000件', '比較検討：3000件', '商談：1200件', '受注：300件'],
+    'radar-chart': ['系列：自社｜競合A', '提案力：4｜3', '技術力：5｜4', '価格競争力：3｜5', 'サポート体制：4｜3', '実績：3｜5'],
     'comparison-table': ['初期費用：50万円', '運用コスト：月額3万円', '導入期間：2ヶ月', '拡張性：オプションで拡張可能', 'サポート：電話・チャット対応'],
     'decision-request': ['依頼事項：導入ベンダーをB社に確定することをご承認いただきたい', '期限：2026年3月10日', 'A案：A社CRM｜低コストだが拡張性に課題', 'B案：★推奨 B社CRM｜バランスが最も良い'],
     'before-after': ['現状：手作業で平均15分を要している', '導入後：自動化により平均2分に短縮される'],
