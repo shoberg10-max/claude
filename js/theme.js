@@ -38,4 +38,13 @@ DocAssist.theme = {
   text: '000000',         // 本文（黒）
   subtext: '595959',      // 出所表記・ページ番号等の小さいグレー文字
   white: 'FFFFFF',
+  fontFace: 'Yu Gothic UI', // 全テキストに使うフォント（js/pptxExport.jsのwithDefaultFontが参照）
+  bulletChar: '■',          // 本文の箇条書きマーカー（js/patterns.jsのsquareBullet()とCSSの--bullet-charが参照）
 };
+
+// テンプレート読み込み機能（js/pptxImport.js）が配色・フォント・箇条書き記号を
+// 上書きしたあと、「既定に戻す」で元のNRI配色に復元するためのスナップショット。
+// DocAssist.theme のプロパティは各所で参照渡しされている（buildPptx等が呼び出しの
+// たびに DocAssist.theme を読み直す設計）ため、テーマの切り替えはオブジェクトの
+// 差し替えではなく、このスナップショットを使ったプロパティの上書き・復元で行う。
+DocAssist.defaultTheme = Object.assign({}, DocAssist.theme);

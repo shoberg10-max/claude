@@ -1023,5 +1023,120 @@
       .join('');
   }
 
+  // ---------------- デザインテンプレートの取り込み ----------------
+  // 既存のPowerPointファイルをテンプレートとして読み込み、js/pptxImport.js が抽出した
+  // 配色・フォント・箇条書き記号を DocAssist.theme に反映する。HTMLプレビューの色は
+  // すべてCSS変数（var(--primary)等）経由で描かれているため、適用後に個々のカードを
+  // 再描画しなくても見た目は自動的に切り替わる（renderThemeBar()だけ更新すればよい）。
+  function renderThemeBar() {
+    const bar = document.getElementById('themeBar');
+    if (!bar) return;
+    const saved = DocAssist.pptxImport.getSaved();
+    bar.innerHTML = saved
+      ? `<span class="theme-bar-swatch" style="background:#${escapeAttr(saved.primary)};"></span>
+         <span class="theme-bar-label">テンプレート適用中：${escapeHtml(saved.sourceFileName)}</span>
+         <button type="button" class="btn ghost theme-bar-btn" id="themeChangeBtn">変更</button>
+         <button type="button" class="btn ghost theme-bar-btn" id="themeResetBtn">既定に戻す</button>`
+      : `<span class="theme-bar-label">配色：官公庁報告書スタイル（既定）</span>
+         <button type="button" class="btn ghost theme-bar-btn" id="themeChangeBtn">🎨 テンプレートから取り込む</button>`;
+    document.getElementById('themeChangeBtn').addEventListener('click', openTemplateThemeModal);
+    const resetBtn = document.getElementById('themeResetBtn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        DocAssist.pptxImport.resetTheme();
+        renderThemeBar();
+      });
+    }
+  }
+
+  function openTemplateThemeModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-box tt-modal">
+        <h3>🎨 テンプレートから配色を取り込む</h3>
+        <p class="hint">お手元のPowerPointファイル（.pptx）を選ぶと、スライドマスターのテーマ色・本文フォント・箇条書き記号を読み取ります。抽出した内容を確認してから適用できます。</p>
+        <p class="hint">※ このアプリの4層構成（ヘッダー／メッセージ／ボディ／フッター）自体は変わりません。取り込むのは色・フォント・箇条書き記号のみです。テーマの副次的なアクセント色（赤・オレンジ等を含みうる）はそのまま使わず、ブランドカラー1色から青系統と同じ考え方で階調を作り直します。</p>
+        <input type="file" id="ttFile" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation">
+        <div id="ttResult"></div>
+        <div class="btn-row">
+          <span class="status-msg" id="ttStatus"></span>
+          <div style="display:flex;gap:10px;">
+            <button type="button" class="btn ghost" id="ttClose">閉じる</button>
+            <button type="button" class="btn" id="ttApply" disabled>適用する</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    function close() {
+      if (overlay.parentNode) document.body.removeChild(overlay);
+    }
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector('#ttClose').addEventListener('click', close);
+
+    let parsed = null;
+    const resultEl = overlay.querySelector('#ttResult');
+    const statusEl = overlay.querySelector('#ttStatus');
+    const applyBtn = overlay.querySelector('#ttApply');
+
+    overlay.querySelector('#ttFile').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      parsed = null;
+      applyBtn.disabled = true;
+      resultEl.innerHTML = '';
+      statusEl.textContent = '読み込み中…';
+      statusEl.classList.remove('error');
+      try {
+        parsed = await DocAssist.pptxImport.parseFile(file);
+        const scale = [0, 0.25, 0.42, 0.58, 0.7, 0.82].map((pct) => DocAssist.pptxImport.tint(parsed.primary, pct));
+        resultEl.innerHTML = `
+          <div class="tt-preview">
+            <div class="tt-row">
+              <span class="tt-row-label">抽出した配色</span>
+              <div class="tt-swatches">${scale.map((hex) => `<span class="tt-swatch" style="background:#${hex};" title="#${hex}"></span>`).join('')}</div>
+            </div>
+            <div class="tt-row">
+              <span class="tt-row-label">本文フォント</span>
+              <span class="tt-value" style="font-family:'${escapeAttr(parsed.fontFace || 'Yu Gothic UI')}';">${escapeHtml(
+          parsed.fontFace || 'Yu Gothic UI（フォント情報を検出できなかったため既定のまま）'
+        )}</span>
+            </div>
+            <div class="tt-row">
+              <span class="tt-row-label">箇条書き記号</span>
+              <span class="tt-value tt-bullet">${escapeHtml(parsed.bulletChar || '■')}</span>
+              ${!parsed.bulletChar ? '<span class="tt-note">（記号を検出できなかった、または装飾フォント依存のため既定の■を使用）</span>' : ''}
+            </div>
+            ${
+              parsed.rawAccents.length
+                ? `<div class="tt-row">
+                     <span class="tt-row-label">参考：テーマの全アクセント色</span>
+                     <div class="tt-swatches">${parsed.rawAccents.map((hex) => `<span class="tt-swatch" style="background:#${hex};" title="#${hex}"></span>`).join('')}</div>
+                     <span class="tt-note">（本文には最初の1色のみ使用し、残りは適用しません）</span>
+                   </div>`
+                : ''
+            }
+          </div>`;
+        statusEl.textContent = '内容を確認して「適用する」を押してください。';
+        applyBtn.disabled = false;
+      } catch (err) {
+        statusEl.textContent = '読み込みに失敗しました：' + err.message;
+        statusEl.classList.add('error');
+      }
+    });
+
+    applyBtn.addEventListener('click', () => {
+      if (!parsed) return;
+      DocAssist.pptxImport.applyTheme(parsed);
+      close();
+      renderThemeBar();
+    });
+  }
+
+  renderThemeBar();
   render();
 })();

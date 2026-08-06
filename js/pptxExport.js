@@ -13,7 +13,13 @@ window.DocAssist = window.DocAssist || {};
 (function () {
   const SLIDE_W = 13.33;
   const SLIDE_H = 7.5;
-  const FONT_FACE = 'Yu Gothic UI';
+
+  // フォントは DocAssist.theme.fontFace を単一ソースとする（既定は Yu Gothic UI）。
+  // テンプレート読み込み機能（js/pptxImport.js）がここを書き換えることで、
+  // 取り込んだテンプレートの本文フォントを書き出しに反映できる。
+  function currentFontFace() {
+    return (DocAssist.theme && DocAssist.theme.fontFace) || 'Yu Gothic UI';
+  }
 
   // slide.addText / addTable に渡す options に既定の fontFace を差し込む。
   // 個々のパターン実装（40箇所以上）に手を入れず、フォントを一箇所で統一するための薄いラッパー。
@@ -22,7 +28,7 @@ window.DocAssist = window.DocAssist || {};
     const origAddText = slide.addText.bind(slide);
     const origAddTable = slide.addTable.bind(slide);
     function withFont(opts) {
-      return opts && opts.fontFace ? opts : Object.assign({ fontFace: FONT_FACE }, opts || {});
+      return opts && opts.fontFace ? opts : Object.assign({ fontFace: currentFontFace() }, opts || {});
     }
     slide.addText = (text, options) => origAddText(text, withFont(options));
     slide.addTable = (rows, options) => origAddTable(rows, withFont(options));

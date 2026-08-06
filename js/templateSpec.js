@@ -277,7 +277,7 @@ window.DocAssist = window.DocAssist || {};
         fontSize: 11, color: textOnColor(L.body.fill, theme), valign: isRow ? 'top' : 'middle',
       };
       if (L.body.bullet) {
-        slide.addText([{ text: bodyText, options: { bullet: H.SQUARE_BULLET } }], bodyOpts);
+        slide.addText([{ text: bodyText, options: { bullet: H.SQUARE_BULLET() } }], bodyOpts);
       } else {
         slide.addText(bodyText, bodyOpts);
       }

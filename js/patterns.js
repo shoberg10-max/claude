@@ -42,7 +42,15 @@ window.DocAssist = window.DocAssist || {};
   }
 
   // ■ を箇条書きマーカーに使う（NRI報告書の本文で多用される記号）。
-  const SQUARE_BULLET = { code: '25A0', indent: 14 };
+  // DocAssist.theme.bulletChar を単一ソースとする（テンプレート読み込み機能が
+  // 取り込んだ記号に差し替えられるよう、固定値ではなく毎回テーマから読み直す）。
+  function charToBulletCode(ch) {
+    const cp = String(ch || '■').codePointAt(0);
+    return cp.toString(16).toUpperCase().padStart(4, '0');
+  }
+  function SQUARE_BULLET() {
+    return { code: charToBulletCode(DocAssist.theme && DocAssist.theme.bulletChar), indent: 14 };
+  }
 
   // 洗練された見た目のための共通スタイル定数。
   // 参考にしたパーツテンプレート集の特徴：角はごくわずかに丸め、罫線は髪の毛のように細く、
@@ -145,7 +153,7 @@ window.DocAssist = window.DocAssist || {};
   function bulletTextRuns(bullets, theme, opts) {
     const fontSize = (opts && opts.fontSize) || 14;
     const spaceAfter = (opts && opts.spaceAfter) || 12;
-    const bulletChar = (opts && opts.bulletChar) || SQUARE_BULLET;
+    const bulletChar = (opts && opts.bulletChar) || SQUARE_BULLET();
     const runs = [];
     (bullets || []).forEach((b) => {
       const tokens = A.parseEmphasisTokens(b);
@@ -161,6 +169,57 @@ window.DocAssist = window.DocAssist || {};
       });
     });
     return runs;
+  }
+
+  // 番号付き箇条書き用。PowerPointのネイティブ自動採番（a:buAutoNum）を使うため、
+  // 書き出し後にPowerPoint上で行を並べ替えても番号が自動でつき直る。
+  function numberedTextRuns(bullets, theme, opts) {
+    const fontSize = (opts && opts.fontSize) || 14;
+    const spaceAfter = (opts && opts.spaceAfter) || 12;
+    const runs = [];
+    (bullets || []).forEach((b) => {
+      const tokens = A.parseEmphasisTokens(b);
+      tokens.forEach((t, ti) => {
+        const isLast = ti === tokens.length - 1;
+        const runOpts = {
+          fontSize,
+          color: t.bold ? theme.primary : theme.text,
+        };
+        if (ti === 0) runOpts.bullet = { type: 'number', style: 'arabicPeriod' };
+        if (t.bold) runOpts.bold = true;
+        if (isLast) {
+          runOpts.breakLine = true;
+          runOpts.paraSpaceAfter = spaceAfter;
+        }
+        runs.push({ text: t.text, options: runOpts });
+      });
+    });
+    return runs;
+  }
+
+  // 「見出し：」（コロンの後に何も続かない行）を新しいブロックの区切りとして扱い、
+  // 箇条書きを「小見出し＋その配下の項目」の配列に分解する。
+  // 小見出し行が無ければ、全体を見出し無しの1ブロックとして返す
+  // （＝小見出し記法を使っていない普通の箇条書きでもスコア判定・描画とも壊れない）。
+  const HEADING_ONLY_RE = /^(.{1,24})[：:]\s*$/;
+  function parseHeadingGroups(bullets) {
+    const groups = [];
+    let current = null;
+    (bullets || []).forEach((b) => {
+      const stripped = A.stripEmphasis(b).trim();
+      const m = stripped.match(HEADING_ONLY_RE);
+      if (m) {
+        current = { heading: m[1].trim(), items: [] };
+        groups.push(current);
+      } else {
+        if (!current) {
+          current = { heading: '', items: [] };
+          groups.push(current);
+        }
+        current.items.push(b);
+      }
+    });
+    return groups.filter((g) => g.heading || g.items.length);
   }
 
   // ---------- アイコン ----------
@@ -271,6 +330,223 @@ window.DocAssist = window.DocAssist || {};
     },
   };
 
+  // ---------- 番号付き箇条書き ----------
+  // 手順ではなく「条項・論点を順序立てて列挙する」ための、報告書本文でよく使う番号リスト。
+  // PowerPointのネイティブ自動採番を使うため、書き出し後に行を並べ替えても番号がずれない。
+  const bulletNumbered = {
+    id: 'bullet-numbered',
+    name: '番号付き箇条書き',
+    category: '汎用',
+    description: '箇条書きに1.2.3…の番号を振る。手順ではなく、論点や条項を順序立てて列挙したいときに使う。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const numbered = A.numberedBulletCount(bullets);
+      if (bullets.length >= 2 && numbered >= Math.ceil(bullets.length * 0.6)) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      if (!bullets.length) return emptyBody();
+      return `<ol class="pv-bullets pv-bullets-numbered">${bullets.map((b) => `<li>${emphasisHtml(b)}</li>`).join('')}</ol>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      if (!bullets.length) return;
+      slide.addText(numberedTextRuns(bullets, theme), { x: box.x, y: box.y, w: box.w, h: box.h, valign: 'top' });
+    },
+  };
+
+  // ---------- 小見出し＋箇条書き（複数ブロック） ----------
+  // 1つの論点の中に「背景」「課題」「対策」のような複数の小節がある場合に、
+  // 小見出しごとにブロックを縦に積んで示す。行末が全角/半角コロンだけで終わる行
+  // （例：「背景：」）を小見出しとして扱い、それ以降の行を配下の箇条書きとする。
+  const bulletHeadingGroups = {
+    id: 'bullet-heading-groups',
+    name: '小見出し＋箇条書き（複数ブロック）',
+    category: '汎用',
+    description: '1枚の中を「背景：」のような小見出しで複数ブロックに分け、それぞれに箇条書きを添えて縦に並べる。小見出し行は行末をコロンだけにして書く。',
+    score(section) {
+      const groups = parseHeadingGroups(section.bullets || []);
+      const valid = groups.filter((g) => g.heading && g.items.length);
+      if (valid.length >= 2) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      if (!groups.length) return emptyBody();
+      return `<div class="pv-hg">${groups
+        .map(
+          (g) => `<div class="pv-hg-group">
+          <div class="pv-hg-heading">${esc(g.heading)}</div>
+          <ul class="pv-bullets pv-bullets-square">${g.items.map((it) => `<li>${emphasisHtml(it)}</li>`).join('')}</ul>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      if (!groups.length) return;
+      const n = groups.length;
+      const gap = 0.12;
+      const rowH = (box.h - gap * (n - 1)) / n;
+      groups.forEach((g, i) => {
+        const y = box.y + i * (rowH + gap);
+        slide.addText(g.heading, {
+          x: box.x, y, w: box.w, h: 0.3,
+          fontSize: 12, bold: true, color: theme.primary,
+        });
+        slide.addText(bulletTextRuns(g.items, theme, { fontSize: 11, spaceAfter: 4 }), {
+          x: box.x + 0.1, y: y + 0.3, w: box.w - 0.1, h: rowH - 0.3, valign: 'top',
+        });
+      });
+    },
+  };
+
+  // ---------- 小見出し＋箇条書き（2カラム） ----------
+  // 上と同じ小見出し記法を使うが、ちょうど2ブロックのときに左右へ並べる版。
+  // 縦積み版より1ブロックあたりの縦スペースを確保できるため、各ブロックの
+  // 項目数が多いときに読みやすい。
+  const headingBullets2Col = {
+    id: 'heading-bullets-2col',
+    name: '小見出し＋箇条書き（2カラム）',
+    category: '汎用',
+    description: '「背景：」のような小見出しで2ブロックに分け、左右に並べて箇条書きを添える。ちょうど2つの観点を並べたいときに使う。',
+    score(section) {
+      const groups = parseHeadingGroups(section.bullets || []);
+      const valid = groups.filter((g) => g.heading && g.items.length);
+      if (valid.length === 2) return 8;
+      return 0;
+    },
+    renderBody(bullets) {
+      const groups = parseHeadingGroups(bullets)
+        .filter((g) => g.heading && g.items.length)
+        .slice(0, 2);
+      if (groups.length < 2) return emptyBody();
+      return `<div class="pv-hg2">${groups
+        .map(
+          (g) => `<div class="pv-hg2-col">
+          <div class="pv-hg-heading">${esc(g.heading)}</div>
+          <ul class="pv-bullets pv-bullets-square">${g.items.map((it) => `<li>${emphasisHtml(it)}</li>`).join('')}</ul>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const groups = parseHeadingGroups(bullets)
+        .filter((g) => g.heading && g.items.length)
+        .slice(0, 2);
+      if (groups.length < 2) return;
+      const gap = 0.3;
+      const colW = (box.w - gap) / 2;
+      groups.forEach((g, i) => {
+        const x = box.x + i * (colW + gap);
+        slide.addText(g.heading, {
+          x, y: box.y, w: colW, h: 0.3,
+          fontSize: 12, bold: true, color: theme.primary,
+        });
+        slide.addText(bulletTextRuns(g.items, theme, { fontSize: 11, spaceAfter: 6 }), {
+          x: x + 0.05, y: box.y + 0.34, w: colW - 0.05, h: box.h - 0.34, valign: 'top',
+        });
+      });
+    },
+  };
+
+  // ---------- 2列箇条書き ----------
+  // 見出しの無い、フラットな箇条書きが8件以上あるときに、左右2列に均等分割して
+  // 密度を上げる。項目数が多いだけで意味的なグルーピングは無い場合に使う。
+  const bulletTwoCol = {
+    id: 'bullet-two-col',
+    name: '2列箇条書き',
+    category: '汎用',
+    description: '見出しの無いフラットな箇条書きを、項目数が多いときに左右2列に均等分割して密度を上げる。',
+    score(section) {
+      const bullets = section.bullets || [];
+      const n = bullets.length;
+      const groups = parseHeadingGroups(bullets).filter((g) => g.heading);
+      // 小見出し記法を使っている場合はそちら（bullet-heading-groups等）を優先する
+      if (groups.length) return 0;
+      if (n >= 8 && n <= 16) return 6;
+      return 0;
+    },
+    renderBody(bullets) {
+      if (!bullets.length) return emptyBody();
+      const mid = Math.ceil(bullets.length / 2);
+      const cols = [bullets.slice(0, mid), bullets.slice(mid)];
+      return `<div class="pv-bc2">${cols
+        .map((col) => `<ul class="pv-bullets pv-bullets-square">${col.map((b) => `<li>${emphasisHtml(b)}</li>`).join('')}</ul>`)
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      if (!bullets.length) return;
+      const mid = Math.ceil(bullets.length / 2);
+      const cols = [bullets.slice(0, mid), bullets.slice(mid)];
+      const gap = 0.3;
+      const colW = (box.w - gap) / 2;
+      cols.forEach((col, i) => {
+        if (!col.length) return;
+        const x = box.x + i * (colW + gap);
+        slide.addText(bulletTextRuns(col, theme, { fontSize: 12, spaceAfter: 10 }), {
+          x, y: box.y, w: colW, h: box.h, valign: 'top',
+        });
+      });
+    },
+  };
+
+  // ---------- チェックリスト ----------
+  // 確認事項・合意事項を四角いチェックボックス付きで並べる。行頭に「★」を付けた項目は
+  // 「対応済み／確認済み」として塗りつぶしたチェックボックスで示す（他の比較パターンと
+  // 同じ★記法の再利用。ここでは「推奨」ではなく「完了」の意味で使う）。
+  const checklist = {
+    id: 'checklist',
+    name: 'チェックリスト',
+    category: '汎用',
+    description: '確認事項・合意事項をチェックボックス付きで並べる。行頭に「★」を付けた項目はチェック済みとして示す。',
+    score(section) {
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['チェックリスト', '確認事項', '確認事項一覧', 'ご確認', 'チェック項目']);
+      const n = (section.bullets || []).length;
+      if (kw && n >= 2 && n <= 8) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (!items.length) return emptyBody();
+      return `<div class="pv-cl">${items
+        .map(
+          (it) => `<div class="pv-cl-row${it.highlight ? ' is-checked' : ''}">
+          <span class="pv-cl-box">${it.highlight ? '✓' : ''}</span>
+          <span class="pv-cl-text">${esc(it.value !== it.key ? `${it.key}：${it.value}` : it.key)}</span>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const items = A.extractItems(bullets).slice(0, 8);
+      if (!items.length) return;
+      const n = items.length;
+      const gap = 0.1;
+      const rowH = (box.h - gap * (n - 1)) / n;
+      const boxSize = Math.min(0.3, rowH * 0.6);
+      items.forEach((it, i) => {
+        const y = box.y + i * (rowH + gap) + (rowH - boxSize) / 2;
+        slide.addShape('rect', {
+          x: box.x, y, w: boxSize, h: boxSize,
+          fill: { color: it.highlight ? theme.primary : theme.white },
+          line: { color: theme.primary, width: 1.25 },
+        });
+        if (it.highlight) {
+          slide.addText('✓', {
+            x: box.x, y, w: boxSize, h: boxSize,
+            fontSize: 12, bold: true, color: theme.white, align: 'center', valign: 'middle',
+          });
+        }
+        const label = it.value !== it.key ? `${it.key}：${it.value}` : it.key;
+        slide.addText(label, {
+          x: box.x + boxSize + 0.14, y: box.y + i * (rowH + gap), w: box.w - boxSize - 0.14, h: rowH,
+          fontSize: 12, color: theme.text, valign: 'middle',
+        });
+      });
+    },
+  };
+
   // ---------- ボックス比較 ----------
   const boxCompare = {
     id: 'box-compare',
@@ -316,7 +592,7 @@ window.DocAssist = window.DocAssist || {};
           line: it.highlight ? { color: theme.highlight, width: 1.5 } : { type: 'none' },
         });
         slide.addText(
-          [{ text: it.value, options: { bullet: SQUARE_BULLET } }],
+          [{ text: it.value, options: { bullet: SQUARE_BULLET() } }],
           { x: x + 0.15, y: box.y + 0.62, w: boxW - 0.28, h: box.h - 0.74, fontSize: bodyFontSize, color: theme.text, valign: 'top' }
         );
       });
@@ -2768,6 +3044,14 @@ window.DocAssist = window.DocAssist || {};
     return { cols: cols.slice(0, 5), rows: rows.slice(0, 7) };
   }
 
+  // 行を「ラベル＋値セル」から実際の列数（見出し行の列数）に合わせて過不足なく揃える。
+  // 「列：」宣言の項目数とデータ行のセル数が食い違っていても、表がずれずに描画できる。
+  function rowCells(row, colCount) {
+    const cells = [row.label].concat(row.cells);
+    while (cells.length < colCount) cells.push('');
+    return cells.slice(0, colCount);
+  }
+
   const crossTable = {
     id: 'cross-table',
     name: 'クロス表（表頭×表側）',
@@ -2816,6 +3100,62 @@ window.DocAssist = window.DocAssist || {};
               options: Object.assign({ align: 'center' }, r.highlight ? { bold: true, fill: { color: theme.lighter } } : {}),
             }))
           )
+        ),
+      });
+    },
+  };
+
+  // ---------- 汎用表（自由列） ----------
+  // クロス表と同じ「1行目で列を定義」形式だが、1列目を特別扱いしない素の表。
+  // 生産の現場では「対象×評価軸」より単純な「項目を並べた一覧表」の方が頻度が高いため、
+  // 表側の色分けを前提にしないニュートラルな表として別パターンにしている。
+  const genericTable = {
+    id: 'generic-table',
+    name: '汎用表（自由列）',
+    category: '汎用',
+    description: '列を自由に定義できる、ニュートラルな一覧表。1行目に「列：1列目の見出し｜2列目の見出し｜…」（1列目の見出しも含める）、以降を「行の1列目：2列目以降の値｜値｜…」で書く。',
+    score(section) {
+      const t = parseCrossTable(section.bullets || []);
+      const multi = t.rows.filter((r) => r.cells.length >= 1).length;
+      // クロス表（比較・評価の文脈）と競合しないよう、比較色の強いキーワードが
+      // 無いときのニュートラルな表としてこちらを優先させる。
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['比較', '評価', '観点', '軸']);
+      if (t.cols.length >= 2 && multi >= 3 && !kw) return 9;
+      if (t.cols.length >= 2 && multi >= 3) return 6;
+      return 0;
+    },
+    renderBody(bullets) {
+      const t = parseCrossTable(bullets);
+      if (!t.rows.length) return emptyBody();
+      const headers = t.cols.length ? t.cols : ['項目'];
+      return `<table class="pv-table"><thead><tr>${headers.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+        ${t.rows
+          .map((r) => {
+            const cells = rowCells(r, headers.length);
+            return `<tr${r.highlight ? ' class="pv-table-highlight"' : ''}>${cells
+              .map((v, ci) => `<td>${ci === 0 && r.highlight ? '★ ' : ''}${esc(v || '')}</td>`)
+              .join('')}</tr>`;
+          })
+          .join('')}
+      </tbody></table>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const t = parseCrossTable(bullets);
+      if (!t.rows.length) return;
+      const headers = t.cols.length ? t.cols : ['項目'];
+      const colW = box.w / headers.length;
+      addStyledTable(slide, theme, {
+        x: box.x, y: box.y, w: box.w,
+        colW: headers.map(() => colW),
+        fontSize: 11,
+        header: headers,
+        zebra: true,
+        rows: t.rows.map((r) =>
+          rowCells(r, headers.length).map((v, ci) => ({
+            text: `${ci === 0 && r.highlight ? '★ ' : ''}${v || ''}`,
+            options: r.highlight ? { bold: true, color: ci === 0 ? theme.highlight : theme.text } : {},
+          }))
         ),
       });
     },
@@ -4540,6 +4880,12 @@ window.DocAssist = window.DocAssist || {};
 
   DocAssist.patterns = [
     titleMessage,
+    bulletNumbered,
+    bulletHeadingGroups,
+    headingBullets2Col,
+    bulletTwoCol,
+    checklist,
+    genericTable,
     agenda,
     sectionDivider,
     pointCallout,
@@ -4612,6 +4958,12 @@ window.DocAssist = window.DocAssist || {};
 
   const PATTERN_META = {
     'title-message': { scenes: ['提案書', '報告書', '進捗MTG', 'キックオフ', '経営・定例報告'], role: '本文' },
+    'bullet-numbered': { scenes: ['提案書', '報告書', '経営・定例報告', '研修・説明会'], role: '本文' },
+    'bullet-heading-groups': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
+    'heading-bullets-2col': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
+    'bullet-two-col': { scenes: ['提案書', '報告書', '経営・定例報告', 'データ提示'], role: '本文' },
+    checklist: { scenes: ['進捗MTG', 'キックオフ', '報告書'], role: '表' },
+    'generic-table': { scenes: ['提案書', '報告書', 'データ提示', '経営・定例報告'], role: '表' },
     agenda: { scenes: ['提案書', '報告書', 'キックオフ', '進捗MTG'], role: '目次' },
     'section-divider': { scenes: ['提案書', '報告書', '研修・説明会', '経営・定例報告'], role: '目次' },
     'point-callout': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
@@ -4680,6 +5032,12 @@ window.DocAssist = window.DocAssist || {};
   const DEFAULT_SAMPLE = ['項目A：説明テキストが入ります', '項目B：説明テキストが入ります', '項目C：説明テキストが入ります'];
   const SAMPLES = {
     'title-message': ['**重要な語句**を含む説明が入ります', '補足の説明テキストが入ります', '3点目の説明が入ります'],
+    'bullet-numbered': ['1つ目の論点：現状の業務プロセスに関する課題', '2つ目の論点：システム間のデータ連携における課題', '3つ目の論点：運用体制における課題'],
+    'bullet-heading-groups': ['背景：', '既存システムの保守期限が2027年に到来する', '運用コストが年々増加している', '課題：', '担当者ごとに対応品質にばらつきがある', '対策：', 'クラウド型システムへの移行を検討する'],
+    'heading-bullets-2col': ['現状の課題：', '対応品質にばらつきがある', '情報共有に時間がかかる', '期待される効果：', '対応品質を平準化できる', '情報共有の時間を半減できる'],
+    'bullet-two-col': ['項目1：説明テキストが入ります', '項目2：説明テキストが入ります', '項目3：説明テキストが入ります', '項目4：説明テキストが入ります', '項目5：説明テキストが入ります', '項目6：説明テキストが入ります', '項目7：説明テキストが入ります', '項目8：説明テキストが入ります'],
+    checklist: ['確認事項：★導入範囲について合意済み', '確認事項：予算枠の確保', '確認事項：プロジェクトオーナーの任命', '確認事項：★キックオフ日程の確定'],
+    'generic-table': ['列：拠点｜担当者｜連絡先', '東京本社：山田｜03-xxxx-xxxx', '大阪支社：佐藤｜06-xxxx-xxxx', '名古屋支社：鈴木｜052-xxxx-xxxx'],
     agenda: ['本日の論点', '現状と課題', 'ご提案', '今後の進め方'],
     'box-compare': ['A案：低コストだが拡張性に課題', 'B案：★推奨 バランスが最も良い', 'C案：高機能だが過剰投資'],
     'compare-vertical': ['初期費用：A社30万円、B社50万円', '運用コスト：A社1万円、B社3万円', '拡張性：★推奨 B社はオプションで拡張可能', 'サポート：B社は電話・チャット対応'],
