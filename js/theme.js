@@ -40,6 +40,8 @@ DocAssist.theme = {
   white: 'FFFFFF',
   fontFace: 'Yu Gothic UI', // 全テキストに使うフォント（js/pptxExport.jsのwithDefaultFontが参照）
   bulletChar: '■',          // 本文の箇条書きマーカー（js/patterns.jsのsquareBullet()とCSSの--bullet-charが参照）
+  titleLayout: null,        // 取り込んだスライドマスターのタイトル枠位置（js/pptxImport.js参照）。未取り込み時はnull
+  titleFontSize: null,      // 取り込んだタイトルの既定フォントサイズ（pt）。未取り込み時はnull
 };
 
 // テンプレート読み込み機能（js/pptxImport.js）が配色・フォント・箇条書き記号を

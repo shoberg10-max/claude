@@ -6,11 +6,15 @@
 // XMLとして持っている。この2つを読み、このアプリの4層構成（ヘッダー／メッセージ／
 // ボディ／フッター）はそのままに、色とフォントと箇条書き記号だけを差し替える。
 //
+// タイトルプレースホルダー（見出し部分）の位置・サイズ・フォントサイズだけは例外的に
+// そのまま取り込む（theme.titleLayout / theme.titleFontSize）。ヘッダーの「タイトル」に
+// 相当する要素は1つしかなく、位置の自由度を許しても4層構成の一貫性が崩れないため。
+//
 // 意図的にやらないこと：
-//   - スライドの配置（プレースホルダーの位置・サイズ）をそのまま複製すること。
+//   - タイトル以外のプレースホルダー（本文・画像など）の配置を複製すること。
 //     テンプレートごとにレイアウトはバラバラで、これをやると本アプリの一貫した
 //     4層構成が崩れてしまう。取り込むのは「ブランドを識別する要素」（色・フォント・
-//     箇条書き記号）に絞る。
+//     箇条書き記号・タイトル位置）に絞る。
 //   - accent2〜accent6 をそのまま取り込むこと。テーマの副次アクセント色は赤やオレンジを
 //     含むことが珍しくなく、それを取り込むと「オレンジ・レッドは★推奨等の予約色」という
 //     このアプリの方針が崩れる。取り込むのは主要ブランド色（accent1）だけとし、そこから
@@ -122,6 +126,62 @@ window.DocAssist = window.DocAssist || {};
     return ch.trim().charAt(0);
   }
 
+  // ppt/presentation.xml の <p:sldSz cx="" cy=""/>（EMU）から、取り込み元ファイルの
+  // スライド寸法を読む。プレースホルダーの位置・サイズをこのアプリのスライド寸法へ
+  // 比率で変換するために必要（取り込み元と書き出し先でスライドサイズが異なるため）。
+  async function readPresentationSlideSize(zip) {
+    const path = 'ppt/presentation.xml';
+    if (!zip.files[path]) return null;
+    const doc = parseXml(await zip.files[path].async('string'));
+    const sldSz = doc.getElementsByTagName('p:sldSz')[0];
+    if (!sldSz) return null;
+    const cx = parseInt(sldSz.getAttribute('cx'), 10);
+    const cy = parseInt(sldSz.getAttribute('cy'), 10);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy) || cx <= 0 || cy <= 0) return null;
+    return { cx, cy };
+  }
+
+  // スライドマスターの spTree から、タイトルのプレースホルダー図形（type="title"
+  // または "ctrTitle"）を探し、その位置・サイズ（EMU）を取り出す。
+  function parseTitlePlaceholder(masterDoc) {
+    if (!masterDoc) return null;
+    const shapes = Array.prototype.slice.call(masterDoc.getElementsByTagName('p:sp'));
+    const titleSp = shapes.find((sp) => {
+      const ph = sp.getElementsByTagName('p:ph')[0];
+      if (!ph) return false;
+      const type = ph.getAttribute('type');
+      return type === 'title' || type === 'ctrTitle';
+    });
+    if (!titleSp) return null;
+    const xfrm = titleSp.getElementsByTagName('a:xfrm')[0];
+    if (!xfrm) return null;
+    const off = xfrm.getElementsByTagName('a:off')[0];
+    const ext = xfrm.getElementsByTagName('a:ext')[0];
+    if (!off || !ext) return null;
+    const x = parseInt(off.getAttribute('x'), 10);
+    const y = parseInt(off.getAttribute('y'), 10);
+    const cx = parseInt(ext.getAttribute('cx'), 10);
+    const cy = parseInt(ext.getAttribute('cy'), 10);
+    if (![x, y, cx, cy].every((n) => Number.isFinite(n) && n >= 0)) return null;
+    return { x, y, cx, cy };
+  }
+
+  // <p:txStyles><p:titleStyle><a:lvl1pPr><a:defRPr sz="XXXX"/> からタイトルの
+  // 既定フォントサイズを読む（szは100分の1ポイント単位）。
+  function parseTitleFontSize(masterDoc) {
+    if (!masterDoc) return null;
+    const titleStyle = masterDoc.getElementsByTagName('p:titleStyle')[0];
+    if (!titleStyle) return null;
+    const lvl1 = titleStyle.getElementsByTagName('a:lvl1pPr')[0];
+    if (!lvl1) return null;
+    const defRPr = lvl1.getElementsByTagName('a:defRPr')[0];
+    if (!defRPr) return null;
+    const sz = defRPr.getAttribute('sz');
+    if (!sz) return null;
+    const pt = parseInt(sz, 10) / 100;
+    return Number.isFinite(pt) && pt > 0 ? pt : null;
+  }
+
   // zip内のファイル名から、既定名（theme1.xml等）を優先しつつ最初に見つかったものを返す。
   function findZipFile(zip, dir, prefix) {
     const preferred = `ppt/${dir}/${prefix}1.xml`;
@@ -212,11 +272,32 @@ window.DocAssist = window.DocAssist || {};
 
     const bulletChar = parseBodyBullet(masterXml);
 
+    // タイトルプレースホルダーの位置・サイズ：取り込み元のスライド寸法に対する比率
+    // （xFrac/yFrac/wFrac/hFrac）として保持する。書き出し先（このアプリ）のスライド
+    // 寸法とは異なりうるため、絶対インチではなく比率で持つことで正しく変換できる。
+    let titleLayout = null;
+    const titlePh = parseTitlePlaceholder(masterXml);
+    if (titlePh) {
+      const slideSize = await readPresentationSlideSize(zip);
+      if (slideSize) {
+        const clamp01 = (n) => Math.max(0, Math.min(1, n));
+        titleLayout = {
+          xFrac: clamp01(titlePh.x / slideSize.cx),
+          yFrac: clamp01(titlePh.y / slideSize.cy),
+          wFrac: clamp01(titlePh.cx / slideSize.cx),
+          hFrac: clamp01(titlePh.cy / slideSize.cy),
+        };
+      }
+    }
+    const titleFontSize = parseTitleFontSize(masterXml);
+
     return {
       sourceFileName: file.name,
       primary: primaryHex,
       fontFace: fontFace || null,
       bulletChar: bulletChar || null,
+      titleLayout,
+      titleFontSize: titleFontSize || null,
       // 参考表示用（適用はしない）：抽出できたテーマ色の生データ
       rawAccents: [1, 2, 3, 4, 5, 6].map((n) => clrScheme['accent' + n]).filter(Boolean),
       rawDark: clrScheme.dk1,
@@ -230,6 +311,8 @@ window.DocAssist = window.DocAssist || {};
     Object.assign(DocAssist.theme, patch);
     if (summary.fontFace) DocAssist.theme.fontFace = summary.fontFace;
     if (summary.bulletChar) DocAssist.theme.bulletChar = summary.bulletChar;
+    DocAssist.theme.titleLayout = summary.titleLayout || null;
+    DocAssist.theme.titleFontSize = summary.titleFontSize || null;
     applyCssVars();
     persist(summary);
   }
@@ -252,6 +335,26 @@ window.DocAssist = window.DocAssist || {};
     light: '--light', lighter: '--lighter', mid: '--mid', softBlue: '--soft-blue', pale: '--pale',
     paleGray: '--pale-gray', border: '--border', text: '--text', subtext: '--subtext',
   };
+  // js/pptxExport.js が実際に使っているスライド寸法・左右余白。読み込み順序に
+  // 依存せず動くよう、同じ値をここにもフォールバックとして持つ（A4横向き・0.55inch余白）。
+  function slideGeometry() {
+    return DocAssist.slideGeometry || { width: 11.69, height: 8.27, marginX: 0.55 };
+  }
+
+  // 取り込んだタイトル枠のx位置・幅を、プレビューの余白（--title-inset-left）と
+  // 幅（--title-width）というCSS変数に変換する。値はどちらも「本文コンテンツ幅
+  // （＝canvas幅から左右余白を引いた幅）に対する割合」として計算する必要がある
+  // （CSSのmargin/width の%はコンテナのpadding抜きの幅を基準にするため）。
+  function titleInsetVars(titleLayout) {
+    const geo = slideGeometry();
+    const pad = geo.marginX / geo.width; // canvas幅に対する左右余白の割合
+    const contentFrac = 1 - pad * 2;
+    if (!titleLayout || contentFrac <= 0) return { insetPct: 0, widthPct: 100 };
+    const insetPct = Math.max(0, ((titleLayout.xFrac - pad) / contentFrac) * 100);
+    const widthPct = Math.max(10, Math.min(100, (titleLayout.wFrac / contentFrac) * 100));
+    return { insetPct, widthPct };
+  }
+
   function applyCssVars() {
     const root = document.documentElement;
     const t = DocAssist.theme;
@@ -264,6 +367,13 @@ window.DocAssist = window.DocAssist || {};
     if (t.bulletChar) {
       root.style.setProperty('--bullet-char', `'${t.bulletChar}'`);
     }
+    const { insetPct, widthPct } = titleInsetVars(t.titleLayout);
+    root.style.setProperty('--title-inset-left', insetPct.toFixed(2) + '%');
+    root.style.setProperty('--title-width', widthPct.toFixed(2) + '%');
+    // 既定は20pt想定のプレビュー文字サイズ(14.5px)を基準に、取り込んだタイトルの
+    // フォントサイズ比でスケールする（プレビューは実寸ではなくスタイライズ表示のため）。
+    const titleScale = t.titleFontSize ? t.titleFontSize / 20 : 1;
+    root.style.setProperty('--title-font-scale', titleScale.toFixed(3));
   }
 
   function persist(summary) {
@@ -291,6 +401,8 @@ window.DocAssist = window.DocAssist || {};
       Object.assign(DocAssist.theme, patch);
       if (saved.fontFace) DocAssist.theme.fontFace = saved.fontFace;
       if (saved.bulletChar) DocAssist.theme.bulletChar = saved.bulletChar;
+      DocAssist.theme.titleLayout = saved.titleLayout || null;
+      DocAssist.theme.titleFontSize = saved.titleFontSize || null;
     }
     applyCssVars(); // 保存が無くても、既定テーマの値をCSS変数へ反映しておく
     return saved;

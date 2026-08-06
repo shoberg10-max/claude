@@ -11,8 +11,9 @@
 window.DocAssist = window.DocAssist || {};
 
 (function () {
-  const SLIDE_W = 13.33;
-  const SLIDE_H = 7.5;
+  // A4横向き（297mm×210mm）。
+  const SLIDE_W = 11.69;
+  const SLIDE_H = 8.27;
 
   // フォントは DocAssist.theme.fontFace を単一ソースとする（既定は Yu Gothic UI）。
   // テンプレート読み込み機能（js/pptxImport.js）がここを書き換えることで、
@@ -21,17 +22,47 @@ window.DocAssist = window.DocAssist || {};
     return (DocAssist.theme && DocAssist.theme.fontFace) || 'Yu Gothic UI';
   }
 
-  // slide.addText / addTable に渡す options に既定の fontFace を差し込む。
+  // 本文として読める最小サイズ。表のセルやバッジなど、パターン側の個別実装が
+  // 詰め込み目的で9〜11pt程度を指定している箇所が多いため、書き出しの直前に
+  // 一箇所でまとめて底上げする（グラフの軸ラベル等、addChartを使う箇所は対象外）。
+  const MIN_FONT_SIZE = 12;
+  function clampFontSize(opts) {
+    if (opts && typeof opts.fontSize === 'number' && opts.fontSize < MIN_FONT_SIZE) {
+      opts.fontSize = MIN_FONT_SIZE;
+    }
+    return opts;
+  }
+
+  // slide.addText / addTable に渡す options に既定の fontFace を差し込み、
+  // fontSize が最小値を下回っていれば底上げする。
   // 個々のパターン実装（40箇所以上）に手を入れず、フォントを一箇所で統一するための薄いラッパー。
   // 呼び出し側が明示的に fontFace を指定した場合はそちらを優先する。
   function withDefaultFont(slide) {
     const origAddText = slide.addText.bind(slide);
     const origAddTable = slide.addTable.bind(slide);
     function withFont(opts) {
-      return opts && opts.fontFace ? opts : Object.assign({ fontFace: currentFontFace() }, opts || {});
+      const merged = opts && opts.fontFace ? opts : Object.assign({ fontFace: currentFontFace() }, opts || {});
+      return clampFontSize(merged);
     }
-    slide.addText = (text, options) => origAddText(text, withFont(options));
-    slide.addTable = (rows, options) => origAddTable(rows, withFont(options));
+    slide.addText = (text, options) => {
+      // 配列（テキストラン）で渡す場合、各ランが自前の fontSize を持つことが多く、
+      // トップレベルの options だけを底上げしても効かないため、ラン単位でも底上げする。
+      if (Array.isArray(text)) {
+        text.forEach((run) => {
+          if (run && run.options) clampFontSize(run.options);
+        });
+      }
+      return origAddText(text, withFont(options));
+    };
+    slide.addTable = (rows, options) => {
+      // セル単位で fontSize を上書きしていることがあるため、行・セルも底上げする。
+      (rows || []).forEach((row) => {
+        (row || []).forEach((cell) => {
+          if (cell && typeof cell === 'object' && cell.options) clampFontSize(cell.options);
+        });
+      });
+      return origAddTable(rows, withFont(options));
+    };
     return slide;
   }
 
@@ -51,33 +82,59 @@ window.DocAssist = window.DocAssist || {};
   const FOOTER_H = 0.3;
   const BODY_PADDING = 0.05;
 
+  // 取り込んだスライドマスターのタイトルプレースホルダー位置（js/pptxImport.jsが
+  // theme.titleLayoutにEMU由来の比率で格納）を、実寸（インチ）に変換する。
+  // 未取り込みの場合はnullを返し、呼び出し側は既定のヘッダー位置にフォールバックする。
+  function importedTitleBox(theme) {
+    const tl = theme && theme.titleLayout;
+    if (!tl) return null;
+    return {
+      x: tl.xFrac * SLIDE_W,
+      y: tl.yFrac * SLIDE_H,
+      w: tl.wFrac * SLIDE_W,
+      h: tl.hFrac * SLIDE_H,
+    };
+  }
+
   // ヘッダー：紺の縦棒＋パンくず（heading内に「｜」があれば複数セグメントとして扱う）＋
   // 結論を言い切る大きな太字ネイビーの見出し文（メッセージ）＋直下の細いヘアライン罫線。
   // 見出し文の長さに応じて1行/2行を判定し、罫線の位置を調整する。
+  // テンプレートからタイトルレイアウトを取り込んでいる場合は、その位置・サイズ・
+  // フォントサイズをそのまま使う（パンくずは取り込んだタイトル枠の上段に収める）。
   function addHeader(slide, heading, message, subMessage, theme) {
     const A = DocAssist.analyze;
     const crumbText = (heading || '(見出し未設定)').trim();
-    slide.addShape('rect', { x: BODY_X, y: HEADER_Y + 0.02, w: BAR_W, h: CRUMB_H - 0.04, fill: { color: theme.primary }, line: { type: 'none' } });
+    const titleBox = importedTitleBox(theme);
+
+    const groupX = titleBox ? titleBox.x : BODY_X;
+    const groupW = titleBox ? titleBox.w : BODY_W;
+    const groupY = titleBox ? titleBox.y : HEADER_Y;
+
+    slide.addShape('rect', { x: groupX, y: groupY + 0.02, w: BAR_W, h: CRUMB_H - 0.04, fill: { color: theme.primary }, line: { type: 'none' } });
     slide.addText(crumbText, {
-      x: BODY_X + BAR_W + 0.1, y: HEADER_Y, w: BODY_W - BAR_W - 0.1, h: CRUMB_H,
-      fontSize: 11, bold: true, color: theme.text, valign: 'middle',
+      x: groupX + BAR_W + 0.1, y: groupY, w: groupW - BAR_W - 0.1, h: CRUMB_H,
+      fontSize: 12, bold: true, color: theme.text, valign: 'middle',
     });
 
     const msg = message || '';
     const isLong = A.stripEmphasis(msg).length > 34;
-    const headlineH = isLong ? HEADLINE_H_2LINE : HEADLINE_H_1LINE;
+    const headlineY = groupY + CRUMB_H + 0.04;
+    const headlineH = titleBox
+      ? Math.max(0.32, titleBox.h - CRUMB_H - 0.04)
+      : (isLong ? HEADLINE_H_2LINE : HEADLINE_H_1LINE);
+    const headlineFontSize = (theme && theme.titleFontSize) || 20;
     slide.addText(A.emphasisRuns(msg, theme.primary, { bold: true }), {
-      x: BODY_X, y: HEADLINE_Y, w: BODY_W, h: headlineH,
-      fontSize: 20, color: theme.primary, valign: 'top',
+      x: groupX, y: headlineY, w: groupW, h: headlineH,
+      fontSize: headlineFontSize, color: theme.primary, valign: 'top',
       lineSpacingMultiple: 1.15,
     });
 
-    let y = HEADLINE_Y + headlineH;
+    let y = headlineY + headlineH;
     const hasSub = !!(subMessage && subMessage.trim());
     if (hasSub) {
       slide.addText(A.emphasisRuns(subMessage.trim(), theme.primary), {
-        x: BODY_X, y, w: BODY_W, h: 0.3,
-        fontSize: 11, color: theme.subtext, valign: 'top',
+        x: groupX, y, w: groupW, h: 0.3,
+        fontSize: 12, color: theme.subtext, valign: 'top',
       });
       y += 0.3;
     }
@@ -132,8 +189,8 @@ window.DocAssist = window.DocAssist || {};
     const theme = DocAssist.theme;
     const A = DocAssist.analyze;
     const pptx = new PptxGenJS();
-    pptx.defineLayout({ name: 'DOC_ASSIST_WIDE', width: SLIDE_W, height: SLIDE_H });
-    pptx.layout = 'DOC_ASSIST_WIDE';
+    pptx.defineLayout({ name: 'DOC_ASSIST_A4', width: SLIDE_W, height: SLIDE_H });
+    pptx.layout = 'DOC_ASSIST_A4';
     pptx.author = '資料作成支援アプリ';
     pptx.title = outline.title || '資料構成案';
 
@@ -169,6 +226,13 @@ window.DocAssist = window.DocAssist || {};
     const name = fileName || (outline.title || '資料構成案') + '.pptx';
     return pptx.writeFile({ fileName: name });
   }
+
+  // タイトル取り込み機能（js/pptxImport.js）がプレビューCSSの余白計算に使う、
+  // このファイルが実際に使っているスライド寸法・余白の単一ソース。
+  DocAssist.slideGeometry = {
+    width: SLIDE_W, height: SLIDE_H, marginX: MARGIN_X,
+    headerY: HEADER_Y, footerH: FOOTER_H, bodyGap: BODY_GAP, crumbH: CRUMB_H,
+  };
 
   DocAssist.buildPptx = buildPptx;
   DocAssist.exportPptx = exportPptx;
