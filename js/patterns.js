@@ -805,6 +805,133 @@ window.DocAssist = window.DocAssist || {};
     },
   };
 
+  // ---------- 前回の振り返り×本日の討議内容 ----------
+  // 左に前回までの振り返り（見出し＋ネスト箇条書き）、右に本日の討議内容
+  // （番号付きボックスの一覧）を並べる、MTG冒頭でよく使う2カラム構成。
+  // 箇条書きの中に区切り行（「---」「＝＝＝」など3文字以上の記号だけの行）を
+  // 1つ入れると、それより前が左側、後が右側として扱われる。各側の1行目は
+  // 小見出しとして使う。左側は行頭を「-」で始めると一段深くインデントされる
+  // （ノート風見出し＋箇条書きと同じサブ項目記法）。右側の番号は自動で振られる。
+  const RECAP_DIVIDER_RE = /^[＝=\-－―ー]{3,}$/;
+  const CIRCLED_DIGITS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
+  function parseRecapAgenda(bullets) {
+    const list = bullets || [];
+    const dividerIdx = list.findIndex((b) => RECAP_DIVIDER_RE.test(A.stripEmphasis(b).trim()));
+    if (dividerIdx < 1 || dividerIdx >= list.length - 1) return null;
+    const leftLines = list.slice(0, dividerIdx);
+    const rightLines = list.slice(dividerIdx + 1);
+    if (leftLines.length < 2 || rightLines.length < 2) return null;
+    const leftHeading = leftLines[0];
+    const leftItems = [];
+    leftLines.slice(1).forEach((raw) => {
+      const m = A.stripEmphasis(raw).trim().match(SUB_ITEM_RE);
+      if (m && leftItems.length) {
+        const rawMatch = raw.match(SUB_ITEM_RE);
+        leftItems[leftItems.length - 1].subs.push(rawMatch ? rawMatch[1] : m[1]);
+      } else {
+        leftItems.push({ text: raw, subs: [] });
+      }
+    });
+    const rightHeading = rightLines[0];
+    const rightGroups = parseHeadingGroups(rightLines.slice(1)).filter((g) => g.heading && g.items.length);
+    if (!leftItems.length || !rightGroups.length) return null;
+    return { leftHeading, leftItems, rightHeading, rightGroups };
+  }
+
+  const recapAgendaSplit = {
+    id: 'recap-agenda-split',
+    name: '前回の振り返り×本日の討議内容',
+    category: '汎用',
+    description: '左に前回までの振り返り（見出し＋ネスト箇条書き）、右に本日の討議内容（番号付きボックス）を並べる。箇条書きの中に「---」のような区切り行を1つ入れると、それより前が左側、後が右側になる。各側の1行目は小見出しとして使う。左側は行頭を「-」で始めると一段深くインデントされる。',
+    score(section) {
+      const parsed = parseRecapAgenda(section.bullets || []);
+      if (!parsed) return 0;
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['振り返り', '前回', '討議内容', 'アジェンダ']);
+      return kw ? 10 : 7;
+    },
+    renderBody(bullets) {
+      const parsed = parseRecapAgenda(bullets);
+      if (!parsed) return emptyBody();
+      const { leftHeading, leftItems, rightHeading, rightGroups } = parsed;
+      const groups = rightGroups.slice(0, CIRCLED_DIGITS.length);
+      return `<div class="pv-ra">
+        <div class="pv-ra-col pv-ra-left">
+          <div class="pv-ra-subhead">${esc(leftHeading)}</div>
+          <ul class="pv-ra-outline">${leftItems
+            .map(
+              (it) => `<li>${emphasisHtml(it.text)}${
+                it.subs.length ? `<ul class="pv-ra-sub">${it.subs.map((s) => `<li>${emphasisHtml(s)}</li>`).join('')}</ul>` : ''
+              }</li>`
+            )
+            .join('')}</ul>
+        </div>
+        <div class="pv-ra-col pv-ra-right">
+          <div class="pv-ra-subhead pv-ra-subhead-center">${esc(rightHeading)}</div>
+          ${groups
+            .map(
+              (g, i) => `<div class="pv-ra-box">
+            <div class="pv-ra-box-head">${CIRCLED_DIGITS[i]}${esc(g.heading)}</div>
+            <ul class="pv-bullets pv-bullets-square">${g.items.map((it) => `<li>${emphasisHtml(it)}</li>`).join('')}</ul>
+          </div>`
+            )
+            .join('')}
+        </div>
+      </div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const parsed = parseRecapAgenda(bullets);
+      if (!parsed) return;
+      const { leftHeading, leftItems, rightHeading, rightGroups } = parsed;
+      const gap = 0.3;
+      const colW = (box.w - gap) / 2;
+
+      slide.addText(leftHeading, { x: box.x, y: box.y, w: colW, h: 0.3, fontSize: 13, bold: true, color: theme.text });
+      slide.addShape('line', { x: box.x, y: box.y + 0.32, w: colW, h: 0, line: { color: theme.border, width: HAIRLINE } });
+      const runs = [];
+      leftItems.forEach((it) => {
+        const tokens = A.parseEmphasisTokens(it.text);
+        tokens.forEach((t, ti) => {
+          const isLast = ti === tokens.length - 1;
+          const runOpts = { fontSize: 12, bullet: SQUARE_BULLET(), color: t.bold ? theme.primary : theme.text };
+          if (t.bold) runOpts.bold = true;
+          if (isLast) { runOpts.breakLine = true; runOpts.paraSpaceAfter = 4; }
+          runs.push({ text: t.text, options: runOpts });
+        });
+        it.subs.forEach((s, si) => {
+          const subTokens = A.parseEmphasisTokens(s);
+          subTokens.forEach((t, ti) => {
+            const isLast = ti === subTokens.length - 1;
+            const runOpts = { fontSize: 12, indentLevel: 1, bullet: { code: '2013', indent: 14 }, color: t.bold ? theme.primary : theme.text };
+            if (t.bold) runOpts.bold = true;
+            if (isLast) { runOpts.breakLine = true; runOpts.paraSpaceAfter = si === it.subs.length - 1 ? 6 : 2; }
+            runs.push({ text: t.text, options: runOpts });
+          });
+        });
+      });
+      slide.addText(runs, { x: box.x, y: box.y + 0.42, w: colW, h: box.h - 0.42, valign: 'top' });
+
+      const rx = box.x + colW + gap;
+      slide.addText(rightHeading, { x: rx, y: box.y, w: colW, h: 0.3, fontSize: 13, bold: true, color: theme.text, align: 'center' });
+      const groups = rightGroups.slice(0, CIRCLED_DIGITS.length);
+      const n = groups.length;
+      const boxGap = 0.14;
+      const boxY0 = box.y + 0.42;
+      const boxH = (box.h - 0.42 - boxGap * (n - 1)) / n;
+      groups.forEach((g, i) => {
+        const y = boxY0 + i * (boxH + boxGap);
+        slide.addShape('rect', { x: rx, y, w: colW, h: boxH, fill: { color: theme.lighter }, line: { type: 'none' } });
+        slide.addShape('rect', { x: rx, y, w: colW, h: 0.34, fill: { color: theme.primaryLight }, line: { type: 'none' } });
+        slide.addText(`${CIRCLED_DIGITS[i]}${g.heading}`, {
+          x: rx + 0.12, y, w: colW - 0.24, h: 0.34, fontSize: 12, bold: true, color: theme.white, valign: 'middle',
+        });
+        slide.addText(bulletTextRuns(g.items, theme, { fontSize: 11, spaceAfter: 4 }), {
+          x: rx + 0.14, y: y + 0.4, w: colW - 0.28, h: boxH - 0.46, valign: 'top',
+        });
+      });
+    },
+  };
+
   // ---------- ボックス比較 ----------
   const boxCompare = {
     id: 'box-compare',
@@ -2535,6 +2662,108 @@ window.DocAssist = window.DocAssist || {};
       }),
     };
   }
+
+  // ---------- 課題分類×内容→対応案（4列表） ----------
+  // 課題をカテゴリー別にグループ化し、「課題」「課題内容」から「対応案」への
+  // 流れを矢印で示す4列の表。1行目に「列：カテゴリー｜課題｜課題内容｜対応案」、
+  // 以降を「カテゴリー：課題｜内容1／内容2｜対応1／対応2」で書く（parseCrossTableを
+  // 再利用。「／」区切りで1セル内に複数の箇条書きを入れられる）。同じカテゴリーが
+  // 連続する行は自動的に縦結合される。
+  const categorizedIssueResponseTable = {
+    id: 'categorized-issue-response-table',
+    name: '課題分類×内容→対応案（4列表）',
+    category: 'アクションプラン',
+    description: '課題をカテゴリー別にグループ化し、「課題内容」から「対応案」への流れを矢印で示す4列の表。1行目に「列：カテゴリー｜課題｜課題内容｜対応案」、以降を「カテゴリー：課題｜内容1／内容2｜対応1／対応2」で書く。同じカテゴリーが連続する行は自動的に結合される。',
+    score(section) {
+      const t = parseCrossTable(section.bullets || []);
+      const rows = t.rows.filter((r) => r.cells.length >= 2);
+      const text = A.fullText(section);
+      const kw = A.hasAny(text, ['課題内容', '対応案', '対応方針']);
+      if (t.cols.length >= 3 && rows.length >= 2 && kw) return 10;
+      return 0;
+    },
+    renderBody(bullets) {
+      const t = parseCrossTable(bullets);
+      if (!t.rows.length) return emptyBody();
+      const headers = t.cols.length ? t.cols : ['カテゴリー', '課題', '課題内容', '対応案'];
+      const rows = t.rows.map((r) => rowCells(r, headers.length));
+      const spans = rows.map((cells, i) => {
+        if (i > 0 && rows[i - 1][0] === cells[0]) return 0;
+        let span = 1;
+        for (let j = i + 1; j < rows.length && rows[j][0] === cells[0]; j++) span++;
+        return span;
+      });
+      return `<table class="pv-table pv-cirt"><thead><tr><th>${esc(headers[0])}</th><th>${esc(headers[1])}</th><th>${esc(
+        headers[2]
+      )}</th><th class="pv-cirt-arrow-th"></th><th>${esc(headers[3] || '対応案')}</th></tr></thead><tbody>
+        ${rows
+          .map((cells, i) => {
+            const [cat, issue, content, response] = cells;
+            const contentItems = splitGroupItems(content);
+            const responseItems = splitGroupItems(response);
+            return `<tr>
+            ${spans[i] ? `<td class="pv-cirt-cat" rowspan="${spans[i]}">${esc(cat)}</td>` : ''}
+            <td class="pv-cirt-issue">${esc(issue)}</td>
+            <td><ul class="pv-bullets pv-bullets-square">${contentItems.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></td>
+            ${i === 0 ? `<td class="pv-cirt-arrow-td" rowspan="${rows.length}"></td>` : ''}
+            <td><ul class="pv-bullets pv-bullets-square">${responseItems.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></td>
+          </tr>`;
+          })
+          .join('')}
+      </tbody></table>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const t = parseCrossTable(bullets);
+      if (!t.rows.length) return;
+      const headers = t.cols.length ? t.cols : ['カテゴリー', '課題', '課題内容', '対応案'];
+      const rows = t.rows.map((r) => rowCells(r, headers.length));
+      const spans = rows.map((cells, i) => {
+        if (i > 0 && rows[i - 1][0] === cells[0]) return 0;
+        let span = 1;
+        for (let j = i + 1; j < rows.length && rows[j][0] === cells[0]; j++) span++;
+        return span;
+      });
+      const arrowW = 0.34;
+      const catW = box.w * 0.14;
+      const issueW = box.w * 0.2;
+      const contentW = (box.w - catW - issueW - arrowW) / 2;
+      const bulletJoin = (s) => splitGroupItems(s).map((v) => `${(theme.bulletChar || '■')} ${v}`).join('\n');
+
+      const tableRows = rows.map((cells, i) => {
+        const [cat, issue, content, response] = cells;
+        const row = [];
+        if (spans[i]) {
+          row.push({ text: cat, options: { rowspan: spans[i], fill: { color: theme.primary }, color: theme.white, bold: true, align: 'center', valign: 'middle' } });
+        }
+        row.push({ text: issue, options: { fill: { color: theme.primaryLight }, color: theme.white, bold: true, valign: 'middle' } });
+        row.push({ text: bulletJoin(content), options: { valign: 'top' } });
+        if (i === 0) {
+          row.push({
+            text: '', options: {
+              rowspan: rows.length, fill: { type: 'none' },
+              border: [{ type: 'none' }, { type: 'none' }, { type: 'none' }, { type: 'none' }],
+            },
+          });
+        }
+        row.push({ text: bulletJoin(response), options: { valign: 'top' } });
+        return row;
+      });
+
+      addStyledTable(slide, theme, {
+        x: box.x, y: box.y, w: box.w,
+        colW: [catW, issueW, contentW, arrowW, contentW],
+        fontSize: 11,
+        header: [headers[0] || 'カテゴリー', headers[1] || '課題', headers[2] || '課題内容', '', headers[3] || '対応案'],
+        rows: tableRows,
+      });
+
+      const arrowX = box.x + catW + issueW + contentW;
+      slide.addShape('triangle', {
+        x: arrowX + arrowW / 2 - 0.12, y: box.y + box.h / 2 - 0.16, w: 0.24, h: 0.32,
+        rotate: 90, fill: { color: theme.gray }, line: { type: 'none' },
+      });
+    },
+  };
 
   const decisionRequest = {
     id: 'decision-request',
@@ -5148,6 +5377,7 @@ window.DocAssist = window.DocAssist || {};
     notebookHeadingBullets,
     flagHeadingBoxGroups,
     chevronBoxGroups,
+    recapAgendaSplit,
     agenda,
     sectionDivider,
     pointCallout,
@@ -5199,6 +5429,7 @@ window.DocAssist = window.DocAssist || {};
     actionPlanTable,
     taskStatusTable,
     issueRiskList,
+    categorizedIssueResponseTable,
     blockerRequest,
     asIsToBe,
     ganttChart,
@@ -5230,6 +5461,7 @@ window.DocAssist = window.DocAssist || {};
     'notebook-heading-bullets': { scenes: ['提案書', '報告書'], role: '本文' },
     'flag-heading-box-groups': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
     'chevron-box-groups': { scenes: ['提案書', 'キックオフ', '構成図'], role: '図解' },
+    'recap-agenda-split': { scenes: ['進捗MTG', 'キックオフ', '経営・定例報告'], role: '目次' },
     agenda: { scenes: ['提案書', '報告書', 'キックオフ', '進捗MTG'], role: '目次' },
     'section-divider': { scenes: ['提案書', '報告書', '研修・説明会', '経営・定例報告'], role: '目次' },
     'point-callout': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
@@ -5285,6 +5517,7 @@ window.DocAssist = window.DocAssist || {};
     'action-plan-table': { scenes: ['提案書', 'キックオフ', '進捗MTG'], role: '計画' },
     'task-status-table': { scenes: ['進捗MTG', '報告書'], role: '表' },
     'issue-risk-list': { scenes: ['進捗MTG', '報告書'], role: '表' },
+    'categorized-issue-response-table': { scenes: ['提案書', '報告書', '進捗MTG'], role: '表' },
     'blocker-request': { scenes: ['進捗MTG'], role: '表' },
     'kpi-summary': { scenes: ['経営・定例報告', 'データ提示', '進捗MTG'], role: 'KPI' },
     'bar-chart': { scenes: ['データ提示', '経営・定例報告'], role: 'KPI' },
@@ -5308,6 +5541,23 @@ window.DocAssist = window.DocAssist || {};
     'notebook-heading-bullets': ['背景：', '既存システムの保守期限が2027年に到来する', '運用コストが年々増加している、特にライセンス費用が課題である', '-サーバー保守費用', '-ライセンス更新費用', '-運用委託費用', '目的：', '以上の背景を踏まえ、クラウド型システムへの移行を提案する', '-移行スケジュールの策定', '-移行対象システムの選定'],
     'flag-heading-box-groups': ['背景：', '顧客情報が部門ごとに分散管理されている', '検索・共有に平均15分を要している', '課題認識：', '対応品質にばらつきが生じている', '解約率が前年比で上昇している', '本活動の目的：', 'クラウド型CRMによる一元管理を実現する'],
     'chevron-box-groups': ['背景：', '顧客情報が部門ごとに分散している', '検索・共有に時間を要している', '課題：', '対応品質にばらつきが生じている', '解約率が上昇している', '対策：', 'クラウド型CRMを導入する', '全社の対応履歴を一元管理する'],
+    'recap-agenda-split': [
+      '5/21(火) 第2回検討WGのサマリ',
+      'WGでの検討対象施策の棚卸',
+      '-対象範囲は管理課及び人事課の施策とすることで合意',
+      '-議論が深まった段階で給与課へのアプローチを検討する',
+      'タレマネ選定の進め方',
+      '-試験導入検証の候補選定、評価のロジック案を確認',
+      '-同案をもとに評価資料を作成して整理を進める',
+      '---',
+      '本日の討議内容',
+      'WGでの検討対象施策の棚卸：',
+      '管理課及び人事課施策の棚卸状況と概要の確認を行いたい',
+      '同各施策の全体スケジュールへの反映方法の確認を行いたい',
+      'タレマネシステム選定の進め方の整理：',
+      'デジタル統括室で整理いただいた評価資料内容の確認を行いたい',
+      '試験導入検証の進め方について認識共有を行いたい',
+    ],
     agenda: ['本日の論点', '現状と課題', 'ご提案', '今後の進め方'],
     'box-compare': ['A案：低コストだが拡張性に課題', 'B案：★推奨 バランスが最も良い', 'C案：高機能だが過剰投資'],
     'compare-vertical': ['初期費用：A社30万円、B社50万円', '運用コスト：A社1万円、B社3万円', '拡張性：★推奨 B社はオプションで拡張可能', 'サポート：B社は電話・チャット対応'],
@@ -5363,6 +5613,12 @@ window.DocAssist = window.DocAssist || {};
     'action-plan-table': ['要件定義を完了する｜山田｜2026年9月末', 'データ移行を実施する｜佐藤｜2026年10月末', '全社展開を行う｜鈴木｜2026年12月末'],
     'task-status-table': ['要件定義書の作成：山田｜完了｜9/10', '業務要件の確定：業務部門｜遅延｜9/30', 'データ移行設計：鈴木｜進行中｜10/15', 'テスト計画策定：田中｜未着手｜10/31'],
     'issue-risk-list': ['要件の認識齟齬：部門間で解釈が異なる｜高｜合同レビューを実施', 'データ移行の品質：重複レコードが存在する｜中｜事前にクレンジング', '現場の習熟度：一時的な生産性低下｜低｜研修で対応'],
+    'categorized-issue-response-table': [
+      '列：カテゴリー｜課題｜課題内容｜対応案',
+      'オンライン化手法：【課題1】eメールが選ばれているもののオンライン化の余地がある｜オンライン化手法にeメールが多く選ばれている／オンライン化のメリットが理解されていない可能性がある｜オンライン化のメリットを説明し、既存プラットフォームの利点を伝える',
+      'オンライン化手法：【課題2】新規システムは開発コストが大きくなる可能性がある｜新規システム構築を検討する手続が多い／既存システムを活用することで開発コストを削減できる可能性がある｜具体的なオンライン化手法を紹介し、既存プラットフォームの活用を再考いただく',
+      'オンライン化時期：【課題3】回答期限が遅い手続が多い｜期限までの回答が多く、十分な検討に着手できていない可能性がある｜検討を具体的に進めていただくために、説明会や検討支援を実施',
+    ],
     'blocker-request': ['業務要件が確定せず設計に着手できない｜業務部門より3/10までにご回答いただきたい', 'テスト環境が未整備｜情報システム部にて3/15までに構築をお願いしたい'],
     'kpi-summary': ['対応リードタイム：50%短縮', '解約率：20%改善', '商談数：15%増加'],
     'bar-chart': ['A地域：120', 'B地域：85', 'C地域：60', 'D地域：45'],
