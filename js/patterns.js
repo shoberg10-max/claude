@@ -547,6 +547,264 @@ window.DocAssist = window.DocAssist || {};
     },
   };
 
+  // ---------- ラベルボックス＋箇条書き（横並び） ----------
+  // 「背景：」のような小見出し記法を、見出しをネイビーの塗りボックスにして左に置き、
+  // 右側に箇条書きを添える横並びの行として縦に積む。小見出し＋箇条書き（複数ブロック）の
+  // 見た目違いバリエーション（parseHeadingGroupsをそのまま再利用）。
+  const labelBoxBulletRows = {
+    id: 'label-box-bullet-rows',
+    name: 'ラベルボックス＋箇条書き（横並び）',
+    category: '汎用',
+    description: '「背景：」のような小見出しを塗りボックスにして左に置き、右側に箇条書きを添えて横並びの行として積む。小見出し＋箇条書きの見た目違いバリエーション。',
+    score(section) {
+      const groups = parseHeadingGroups(section.bullets || []);
+      const valid = groups.filter((g) => g.heading && g.items.length);
+      if (valid.length >= 2) return 7;
+      return 0;
+    },
+    renderBody(bullets) {
+      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      if (!groups.length) return emptyBody();
+      return `<div class="pv-lbr">${groups
+        .map(
+          (g) => `<div class="pv-lbr-row">
+          <div class="pv-lbr-box">${esc(g.heading)}</div>
+          <ul class="pv-lbr-content pv-bullets pv-bullets-square">${g.items.map((it) => `<li>${emphasisHtml(it)}</li>`).join('')}</ul>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      if (!groups.length) return;
+      const n = groups.length;
+      const gap = 0.22;
+      const rowH = (box.h - gap * (n - 1)) / n;
+      const boxW = Math.min(1.9, box.w * 0.22);
+      groups.forEach((g, i) => {
+        const y = box.y + i * (rowH + gap);
+        slide.addShape('rect', { x: box.x, y, w: boxW, h: rowH, fill: { color: theme.primary }, line: { type: 'none' } });
+        slide.addText(g.heading, {
+          x: box.x + 0.1, y, w: boxW - 0.2, h: rowH,
+          fontSize: 13, bold: true, color: theme.white, align: 'center', valign: 'middle',
+        });
+        slide.addText(bulletTextRuns(g.items, theme, { fontSize: 11.5, spaceAfter: 6 }), {
+          x: box.x + boxW + 0.24, y, w: box.w - boxW - 0.24, h: rowH, valign: 'middle',
+        });
+      });
+    },
+  };
+
+  // ---------- ノート風見出し＋箇条書き（サブ項目付き） ----------
+  // 外枠付きのノート風コンテナに、プレーンな見出し文字＋箇条書きを並べる。行頭が
+  // 「-」「－」「–」で始まる行は、直前の箇条書きに対するサブ項目として一段深く
+  // インデントして表示する（メモ書きのような細かい内訳を残したいときに使う）。
+  const SUB_ITEM_RE = /^[-－–]\s*(.+)/;
+  function parseNestedHeadingGroups(bullets) {
+    return parseHeadingGroups(bullets).map((g) => {
+      const items = [];
+      g.items.forEach((raw) => {
+        const m = A.stripEmphasis(raw).trim().match(SUB_ITEM_RE);
+        if (m && items.length) {
+          const rawMatch = raw.match(SUB_ITEM_RE);
+          items[items.length - 1].subs.push(rawMatch ? rawMatch[1] : m[1]);
+        } else {
+          items.push({ text: raw, subs: [] });
+        }
+      });
+      return { heading: g.heading, items };
+    });
+  }
+  function hasNestedSubItems(groups) {
+    return groups.some((g) => g.items.some((it) => it.subs.length));
+  }
+
+  const notebookHeadingBullets = {
+    id: 'notebook-heading-bullets',
+    name: 'ノート風見出し＋箇条書き（サブ項目付き）',
+    category: '汎用',
+    description: '外枠付きのノート風レイアウトで、見出し文字＋箇条書きを並べる。行頭を「-」で始めると直前の項目のサブ項目として一段深くインデントされる。',
+    score(section) {
+      const groups = parseNestedHeadingGroups(section.bullets || []);
+      const valid = groups.filter((g) => g.heading && g.items.length);
+      if (valid.length >= 2 && hasNestedSubItems(valid)) return 9;
+      return 0;
+    },
+    renderBody(bullets) {
+      const groups = parseNestedHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      if (!groups.length) return emptyBody();
+      return `<div class="pv-nb">${groups
+        .map(
+          (g) => `<div class="pv-nb-group">
+          <div class="pv-nb-heading">${esc(g.heading)}</div>
+          <ul class="pv-nb-list">${g.items
+            .map(
+              (it) => `<li>${emphasisHtml(it.text)}${
+                it.subs.length ? `<ul class="pv-nb-sublist">${it.subs.map((s) => `<li>${emphasisHtml(s)}</li>`).join('')}</ul>` : ''
+              }</li>`
+            )
+            .join('')}</ul>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const groups = parseNestedHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      if (!groups.length) return;
+      slide.addShape('rect', {
+        x: box.x, y: box.y, w: box.w, h: box.h, fill: { type: 'none' }, line: { color: theme.border, width: HAIRLINE },
+      });
+      const pad = 0.18;
+      const innerX = box.x + pad;
+      const innerW = box.w - pad * 2;
+      const n = groups.length;
+      const gap = 0.14;
+      const groupH = (box.h - pad * 2 - gap * (n - 1)) / n;
+      groups.forEach((g, i) => {
+        const y = box.y + pad + i * (groupH + gap);
+        slide.addText(g.heading, { x: innerX, y, w: innerW, h: 0.32, fontSize: 14, bold: true, color: theme.primary });
+        const runs = [];
+        g.items.forEach((it) => {
+          const tokens = A.parseEmphasisTokens(it.text);
+          tokens.forEach((t, ti) => {
+            const isLast = ti === tokens.length - 1;
+            const runOpts = { fontSize: 12, bullet: SQUARE_BULLET(), color: t.bold ? theme.primary : theme.text };
+            if (t.bold) runOpts.bold = true;
+            if (isLast) { runOpts.breakLine = true; runOpts.paraSpaceAfter = 3; }
+            runs.push({ text: t.text, options: runOpts });
+          });
+          it.subs.forEach((s, si) => {
+            const subTokens = A.parseEmphasisTokens(s);
+            subTokens.forEach((t, ti) => {
+              const isLast = ti === subTokens.length - 1;
+              const runOpts = { fontSize: 12, indentLevel: 1, bullet: { code: '2013', indent: 14 }, color: t.bold ? theme.primary : theme.text };
+              if (t.bold) runOpts.bold = true;
+              if (isLast) { runOpts.breakLine = true; runOpts.paraSpaceAfter = si === it.subs.length - 1 ? 5 : 2; }
+              runs.push({ text: t.text, options: runOpts });
+            });
+          });
+        });
+        slide.addText(runs, { x: innerX, y: y + 0.34, w: innerW, h: groupH - 0.34, valign: 'top' });
+      });
+    },
+  };
+
+  // ---------- フラッグ見出し＋枠線ボックス ----------
+  // 「背景：」のような小見出しを、右端がとがったフラッグ型の見出しバーにし、下に
+  // 枠線だけのボックスで箇条書きを添える。ボックスごとに独立したカード感を出したい
+  // ときに使う、小見出し＋箇条書きの見た目違いバリエーション。
+  const flagHeadingBoxGroups = {
+    id: 'flag-heading-box-groups',
+    name: 'フラッグ見出し＋枠線ボックス',
+    category: '汎用',
+    description: '「背景：」のような小見出しを右端のとがったフラッグ型バーにし、下に枠線ボックスで箇条書きを添えて縦に積む。小見出し＋箇条書きの見た目違いバリエーション。',
+    score(section) {
+      const groups = parseHeadingGroups(section.bullets || []);
+      const valid = groups.filter((g) => g.heading && g.items.length);
+      if (valid.length >= 2) return 6;
+      return 0;
+    },
+    renderBody(bullets) {
+      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      if (!groups.length) return emptyBody();
+      return `<div class="pv-fb">${groups
+        .map(
+          (g) => `<div class="pv-fb-group">
+          <div class="pv-fb-flag">${esc(g.heading)}</div>
+          <div class="pv-fb-box">
+            <ul class="pv-bullets pv-bullets-square">${g.items.map((it) => `<li>${emphasisHtml(it)}</li>`).join('')}</ul>
+          </div>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      if (!groups.length) return;
+      const n = groups.length;
+      const gap = 0.18;
+      const rowH = (box.h - gap * (n - 1)) / n;
+      const flagH = 0.36;
+      groups.forEach((g, i) => {
+        const y = box.y + i * (rowH + gap);
+        const flagW = Math.min(box.w * 0.32, 2.6);
+        slide.addShape('homePlate', { x: box.x, y, w: flagW, h: flagH, fill: { color: theme.primary }, line: { type: 'none' } });
+        slide.addText(g.heading, {
+          x: box.x + 0.12, y, w: flagW - 0.34, h: flagH, fontSize: 13, bold: true, color: theme.white, valign: 'middle',
+        });
+        slide.addShape('rect', {
+          x: box.x, y: y + flagH, w: box.w, h: rowH - flagH,
+          fill: { type: 'none' }, line: { color: theme.primary, width: HAIRLINE },
+        });
+        slide.addText(bulletTextRuns(g.items, theme, { fontSize: 11.5, spaceAfter: 5 }), {
+          x: box.x + 0.16, y: y + flagH + 0.08, w: box.w - 0.32, h: rowH - flagH - 0.16, valign: 'top',
+        });
+      });
+    },
+  };
+
+  // ---------- 背景→課題→対策（ボックス＋矢印、横並び） ----------
+  // 「背景：」のような小見出しを2〜4個のボックス見出しにして横に並べ、間を矢印で
+  // つなぐ。各ボックスの下にチェックマーク付きの箇条書きを添える。段階を追って
+  // 読ませたい「背景→課題→対策」のような流れに使う、横型バリエーション。
+  const chevronBoxGroups = {
+    id: 'chevron-box-groups',
+    name: '背景→課題→対策（ボックス＋矢印、横並び）',
+    category: 'フロー・プロセス',
+    description: '「背景：」のような小見出しを2〜4個のボックス見出しにして横に並べ、矢印でつなぐ。各ボックスの下にチェックマーク付きの箇条書きを添える。',
+    score(section) {
+      const groups = parseHeadingGroups(section.bullets || []);
+      const valid = groups.filter((g) => g.heading && g.items.length);
+      if (valid.length >= 2 && valid.length <= 4) return 5;
+      return 0;
+    },
+    renderBody(bullets) {
+      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length).slice(0, 4);
+      if (!groups.length) return emptyBody();
+      return `<div class="pv-cbg">${groups
+        .map(
+          (g, i) => `${i > 0 ? '<div class="pv-cbg-arrow"></div>' : ''}<div class="pv-cbg-col">
+          <div class="pv-cbg-head">${esc(g.heading)}</div>
+          <ul class="pv-bullets pv-bullets-check">${g.items.map((it) => `<li>${emphasisHtml(it)}</li>`).join('')}</ul>
+        </div>`
+        )
+        .join('')}</div>`;
+    },
+    buildBody(slide, bullets, theme, box) {
+      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length).slice(0, 4);
+      if (!groups.length) return;
+      const n = groups.length;
+      const arrowW = 0.3;
+      const colW = (box.w - arrowW * (n - 1)) / n;
+      const headH = 0.5;
+      groups.forEach((g, i) => {
+        const x = box.x + i * (colW + arrowW);
+        slide.addShape('rect', { x, y: box.y, w: colW, h: headH, fill: { color: theme.primary }, line: { type: 'none' } });
+        slide.addText(g.heading, {
+          x, y: box.y, w: colW, h: headH, fontSize: 13, bold: true, color: theme.white, align: 'center', valign: 'middle',
+        });
+        const checkRuns = [];
+        g.items.forEach((it) => {
+          const tokens = A.parseEmphasisTokens(it);
+          tokens.forEach((t, ti) => {
+            const isLast = ti === tokens.length - 1;
+            const runOpts = { fontSize: 12, bullet: { code: '2713', indent: 16 }, color: t.bold ? theme.primary : theme.text };
+            if (t.bold) runOpts.bold = true;
+            if (isLast) { runOpts.breakLine = true; runOpts.paraSpaceAfter = 6; }
+            checkRuns.push({ text: t.text, options: runOpts });
+          });
+        });
+        slide.addText(checkRuns, { x, y: box.y + headH + 0.14, w: colW, h: box.h - headH - 0.14, valign: 'top' });
+        if (i < n - 1) {
+          slide.addShape('triangle', {
+            x: x + colW + arrowW / 2 - 0.09, y: box.y + headH / 2 - 0.09, w: 0.18, h: 0.18,
+            rotate: 90, fill: { color: theme.primary }, line: { type: 'none' },
+          });
+        }
+      });
+    },
+  };
+
   // ---------- ボックス比較 ----------
   const boxCompare = {
     id: 'box-compare',
@@ -4886,6 +5144,10 @@ window.DocAssist = window.DocAssist || {};
     bulletTwoCol,
     checklist,
     genericTable,
+    labelBoxBulletRows,
+    notebookHeadingBullets,
+    flagHeadingBoxGroups,
+    chevronBoxGroups,
     agenda,
     sectionDivider,
     pointCallout,
@@ -4964,6 +5226,10 @@ window.DocAssist = window.DocAssist || {};
     'bullet-two-col': { scenes: ['提案書', '報告書', '経営・定例報告', 'データ提示'], role: '本文' },
     checklist: { scenes: ['進捗MTG', 'キックオフ', '報告書'], role: '表' },
     'generic-table': { scenes: ['提案書', '報告書', 'データ提示', '経営・定例報告'], role: '表' },
+    'label-box-bullet-rows': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
+    'notebook-heading-bullets': { scenes: ['提案書', '報告書'], role: '本文' },
+    'flag-heading-box-groups': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
+    'chevron-box-groups': { scenes: ['提案書', 'キックオフ', '構成図'], role: '図解' },
     agenda: { scenes: ['提案書', '報告書', 'キックオフ', '進捗MTG'], role: '目次' },
     'section-divider': { scenes: ['提案書', '報告書', '研修・説明会', '経営・定例報告'], role: '目次' },
     'point-callout': { scenes: ['提案書', '報告書', '経営・定例報告'], role: '本文' },
@@ -5038,6 +5304,10 @@ window.DocAssist = window.DocAssist || {};
     'bullet-two-col': ['項目1：説明テキストが入ります', '項目2：説明テキストが入ります', '項目3：説明テキストが入ります', '項目4：説明テキストが入ります', '項目5：説明テキストが入ります', '項目6：説明テキストが入ります', '項目7：説明テキストが入ります', '項目8：説明テキストが入ります'],
     checklist: ['確認事項：★導入範囲について合意済み', '確認事項：予算枠の確保', '確認事項：プロジェクトオーナーの任命', '確認事項：★キックオフ日程の確定'],
     'generic-table': ['列：拠点｜担当者｜連絡先', '東京本社：山田｜03-xxxx-xxxx', '大阪支社：佐藤｜06-xxxx-xxxx', '名古屋支社：鈴木｜052-xxxx-xxxx'],
+    'label-box-bullet-rows': ['背景：', '顧客情報が部門ごとに分散管理されている', '対応品質のばらつきと解約率上昇が発生している', '課題認識：', '担当者ごとに検索・共有の手間が発生している', '本活動の目的：', 'クラウド型CRMによる一元化を実現する'],
+    'notebook-heading-bullets': ['背景：', '既存システムの保守期限が2027年に到来する', '運用コストが年々増加している、特にライセンス費用が課題である', '-サーバー保守費用', '-ライセンス更新費用', '-運用委託費用', '目的：', '以上の背景を踏まえ、クラウド型システムへの移行を提案する', '-移行スケジュールの策定', '-移行対象システムの選定'],
+    'flag-heading-box-groups': ['背景：', '顧客情報が部門ごとに分散管理されている', '検索・共有に平均15分を要している', '課題認識：', '対応品質にばらつきが生じている', '解約率が前年比で上昇している', '本活動の目的：', 'クラウド型CRMによる一元管理を実現する'],
+    'chevron-box-groups': ['背景：', '顧客情報が部門ごとに分散している', '検索・共有に時間を要している', '課題：', '対応品質にばらつきが生じている', '解約率が上昇している', '対策：', 'クラウド型CRMを導入する', '全社の対応履歴を一元管理する'],
     agenda: ['本日の論点', '現状と課題', 'ご提案', '今後の進め方'],
     'box-compare': ['A案：低コストだが拡張性に課題', 'B案：★推奨 バランスが最も良い', 'C案：高機能だが過剰投資'],
     'compare-vertical': ['初期費用：A社30万円、B社50万円', '運用コスト：A社1万円、B社3万円', '拡張性：★推奨 B社はオプションで拡張可能', 'サポート：B社は電話・チャット対応'],

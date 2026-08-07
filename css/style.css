@@ -797,6 +797,208 @@ b.em {
   flex: 1;
 }
 
+/* --- ラベルボックス＋箇条書き（横並び） --- */
+.pv-lbr {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}
+
+.pv-lbr-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.pv-lbr-box {
+  flex: none;
+  width: 26%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px 6px;
+}
+
+.pv-lbr-content {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+  align-self: center;
+  font-size: 11px;
+}
+
+/* --- ノート風見出し＋箇条書き（サブ項目付き） --- */
+.pv-nb {
+  height: 100%;
+  overflow: hidden auto;
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pv-nb-group {
+  flex: 1;
+  min-height: 0;
+}
+
+.pv-nb-heading {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--primary);
+  margin-bottom: 3px;
+}
+
+.pv-nb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+.pv-nb-list > li {
+  position: relative;
+  padding-left: 14px;
+}
+
+.pv-nb-list > li::before {
+  content: var(--bullet-char, '■');
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 6.5px;
+  color: var(--primary);
+  line-height: 2;
+}
+
+.pv-nb-sublist {
+  list-style: none;
+  margin: 2px 0 4px;
+  padding: 0;
+}
+
+.pv-nb-sublist li {
+  position: relative;
+  padding-left: 14px;
+  color: var(--subtext);
+}
+
+.pv-nb-sublist li::before {
+  content: '–';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--primary);
+}
+
+/* --- フラッグ見出し＋枠線ボックス --- */
+.pv-fb {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}
+
+.pv-fb-group {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pv-fb-flag {
+  flex: none;
+  align-self: flex-start;
+  max-width: 45%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: bold;
+  padding: 4px 16px 4px 10px;
+  clip-path: polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%);
+}
+
+.pv-fb-box {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--primary);
+  padding: 8px 10px;
+  overflow: hidden;
+}
+
+.pv-fb-box .pv-bullets {
+  margin-top: 0;
+  font-size: 10.5px;
+}
+
+/* --- 背景→課題→対策（ボックス＋矢印、横並び） --- */
+.pv-cbg {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  gap: 4px;
+}
+
+.pv-cbg-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pv-cbg-head {
+  flex: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
+  padding: 6px 4px;
+}
+
+.pv-cbg-col .pv-bullets {
+  margin-top: 8px;
+  font-size: 10px;
+}
+
+.pv-cbg-arrow {
+  align-self: center;
+  flex: 0 0 9px;
+  height: 11px;
+  background: var(--primary);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.pv-bullets-check {
+  list-style: none;
+  padding-left: 0;
+}
+
+.pv-bullets-check li {
+  position: relative;
+  padding-left: 16px;
+}
+
+.pv-bullets-check li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 10px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
 .pv-box-row {
   display: flex;
   gap: 8px;
