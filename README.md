@@ -14,6 +14,10 @@
 
 ビルド不要の素の HTML / CSS / JavaScript で作られているので、`index.html` を開くだけで動きます（PowerPoint出力ライブラリの [PptxGenJS](https://gitbrent.github.io/PptxGenJS/) はCDNではなく `js/vendor/` にローカル同梱しているため、社内の隔離ネットワーク環境でもそのまま動作します）。
 
+色・タイポグラフィ・レイアウト寸法・コンポーネントの語彙・記法規約など、見た目に関する
+ルールの詳細は [design.md](./design.md) にまとめています。新しいデザインパターンを
+追加する際はあわせて参照してください。
+
 ## つかいかた
 
 ```
