@@ -41,6 +41,13 @@ window.DocAssist = window.DocAssist || {};
       .join('');
   }
 
+  // 丸囲み数字。自動採番のラベルとして複数パターンで共有する（9個を超える場合は
+  // 呼び出し側で「10.」のような通常の数字にフォールバックする）。
+  const CIRCLED_DIGITS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
+  function autoLabel(i) {
+    return CIRCLED_DIGITS[i] || `${i + 1}.`;
+  }
+
   // ■ を箇条書きマーカーに使う（NRI報告書の本文で多用される記号）。
   // DocAssist.theme.bulletChar を単一ソースとする（テンプレート読み込み機能が
   // 取り込んだ記号に差し替えられるよう、固定値ではなく毎回テーマから読み直す）。
@@ -197,6 +204,101 @@ window.DocAssist = window.DocAssist || {};
     return runs;
   }
 
+  // 箇条書きの1行を「ラベル：本文」に分割する。A.extractItemsは強調記法（**bold**）を
+  // 除去してしまうため、ラベルにも本文にも太字を残せる生の行に対してA.splitKVを直接使う。
+  // コロンが無い行はラベル無し（本文のみ）として扱う。
+  function splitLabelValue(raw) {
+    const kv = A.splitKV(raw);
+    if (kv) return { label: kv.key, body: kv.value };
+    return { label: null, body: raw };
+  }
+
+  // 「文章を並べただけの箇条書き」でも、本文がスライドいっぱいの無地の点リストに
+  // ならないよう、行ごとに必ず何かしらの見出し・ラベルを添える共通レイアウト。
+  // 「ラベル：本文」の行はラベルをそのまま太字見出しにし、ラベルの無い行（コロン無し）
+  // には丸囲み数字を自動で振って見出し代わりにする。タイトル＋メッセージ
+  // （フォールバック）と2列箇条書きの両方から使う。
+  function labeledListRuns(bullets, theme, opts) {
+    const fontSize = (opts && opts.fontSize) || 12;
+    const labelFontSize = (opts && opts.labelFontSize) || fontSize + 1;
+    const spaceAfter = (opts && opts.spaceAfter) || 10;
+    const runs = [];
+    (bullets || []).forEach((raw, i) => {
+      const { label, body } = splitLabelValue(raw);
+      runs.push({
+        text: A.stripEmphasis(label || autoLabel(i)),
+        options: { fontSize: labelFontSize, bold: true, color: theme.primary, breakLine: true, paraSpaceAfter: 2 },
+      });
+      const bodyTokens = A.parseEmphasisTokens(body);
+      bodyTokens.forEach((t, ti) => {
+        const isLast = ti === bodyTokens.length - 1;
+        const runOpts = { fontSize, color: t.bold ? theme.primary : theme.text };
+        if (t.bold) runOpts.bold = true;
+        if (isLast) {
+          runOpts.breakLine = true;
+          runOpts.paraSpaceAfter = spaceAfter;
+        }
+        runs.push({ text: t.text, options: runOpts });
+      });
+    });
+    return runs;
+  }
+
+  function labeledListHtml(bullets) {
+    if (!bullets || !bullets.length) return emptyBody();
+    return `<div class="pv-lbl-list">${bullets
+      .map((raw, i) => {
+        const { label, body } = splitLabelValue(raw);
+        return `<div class="pv-lbl-item">
+          <div class="pv-lbl-label">${esc(A.stripEmphasis(label || autoLabel(i)))}</div>
+          <div class="pv-lbl-body">${emphasisHtml(body)}</div>
+        </div>`;
+      })
+      .join('')}</div>`;
+  }
+
+  // labeledListRunsの軽量版。見出し・本文を別行にせず、同じ行の先頭に太字のラベルを
+  // 置くだけにする（項目数が多く密度を保ちたい場面向け。2列箇条書きから使う）。
+  // startIndexは列分割時に丸囲み数字を通し番号にするためのオフセット。
+  function inlineLabeledBulletRuns(bullets, theme, opts) {
+    const fontSize = (opts && opts.fontSize) || 12;
+    const spaceAfter = (opts && opts.spaceAfter) || 10;
+    const startIndex = (opts && opts.startIndex) || 0;
+    const runs = [];
+    (bullets || []).forEach((raw, i) => {
+      const { label, body } = splitLabelValue(raw);
+      const labelText = A.stripEmphasis(label || autoLabel(startIndex + i));
+      runs.push({
+        text: labelText + (label ? '：' : ' '),
+        options: { fontSize, bold: true, color: theme.primary, bullet: SQUARE_BULLET() },
+      });
+      const bodyTokens = A.parseEmphasisTokens(body);
+      bodyTokens.forEach((t, ti) => {
+        const isLast = ti === bodyTokens.length - 1;
+        const runOpts = { fontSize, color: t.bold ? theme.primary : theme.text };
+        if (t.bold) runOpts.bold = true;
+        if (isLast) {
+          runOpts.breakLine = true;
+          runOpts.paraSpaceAfter = spaceAfter;
+        }
+        runs.push({ text: t.text, options: runOpts });
+      });
+    });
+    return runs;
+  }
+
+  function inlineLabeledBulletHtml(bullets, startIndex) {
+    if (!bullets || !bullets.length) return '';
+    const offset = startIndex || 0;
+    return `<ul class="pv-bullets pv-bullets-square">${bullets
+      .map((raw, i) => {
+        const { label, body } = splitLabelValue(raw);
+        const labelText = A.stripEmphasis(label || autoLabel(offset + i));
+        return `<li><b class="em">${esc(labelText)}${label ? '：' : ' '}</b>${emphasisHtml(body)}</li>`;
+      })
+      .join('')}</ul>`;
+  }
+
   // 「見出し：」（コロンの後に何も続かない行）を新しいブロックの区切りとして扱い、
   // 箇条書きを「小見出し＋その配下の項目」の配列に分解する。
   // 小見出し行が無ければ、全体を見出し無しの1ブロックとして返す
@@ -315,18 +417,17 @@ window.DocAssist = window.DocAssist || {};
     id: 'title-message',
     name: 'タイトル＋メッセージ',
     category: '汎用',
-    description: '補足の箇条書きのみのシンプルな本文。どんな内容にも使える汎用パターン。',
+    description: '補足の箇条書きのみのシンプルな本文。どんな内容にも使える汎用のフォールバック。「ラベル：本文」の行はラベルを見出しにし、ラベルの無い行には丸囲み数字を自動で振る。',
     score(section) {
       const n = (section.bullets || []).length;
       return n <= 4 ? 3 : 2;
     },
     renderBody(bullets) {
-      if (!bullets.length) return emptyBody();
-      return `<ul class="pv-bullets pv-bullets-square">${bullets.map((b) => `<li>${emphasisHtml(b)}</li>`).join('')}</ul>`;
+      return labeledListHtml(bullets);
     },
     buildBody(slide, bullets, theme, box) {
       if (!bullets.length) return;
-      slide.addText(bulletTextRuns(bullets, theme), { x: box.x, y: box.y, w: box.w, h: box.h, valign: 'top' });
+      slide.addText(labeledListRuns(bullets, theme), { x: box.x, y: box.y, w: box.w, h: box.h, valign: 'top' });
     },
   };
 
@@ -456,7 +557,7 @@ window.DocAssist = window.DocAssist || {};
     id: 'bullet-two-col',
     name: '2列箇条書き',
     category: '汎用',
-    description: '見出しの無いフラットな箇条書きを、項目数が多いときに左右2列に均等分割して密度を上げる。',
+    description: '見出しの無いフラットな箇条書きを、項目数が多いときに左右2列に均等分割して密度を上げる。「ラベル：本文」の行はラベルを太字にし、ラベルの無い行には丸囲み数字を自動で振る。',
     score(section) {
       const bullets = section.bullets || [];
       const n = bullets.length;
@@ -470,9 +571,7 @@ window.DocAssist = window.DocAssist || {};
       if (!bullets.length) return emptyBody();
       const mid = Math.ceil(bullets.length / 2);
       const cols = [bullets.slice(0, mid), bullets.slice(mid)];
-      return `<div class="pv-bc2">${cols
-        .map((col) => `<ul class="pv-bullets pv-bullets-square">${col.map((b) => `<li>${emphasisHtml(b)}</li>`).join('')}</ul>`)
-        .join('')}</div>`;
+      return `<div class="pv-bc2">${cols.map((col, i) => inlineLabeledBulletHtml(col, i * mid)).join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
       if (!bullets.length) return;
@@ -483,7 +582,7 @@ window.DocAssist = window.DocAssist || {};
       cols.forEach((col, i) => {
         if (!col.length) return;
         const x = box.x + i * (colW + gap);
-        slide.addText(bulletTextRuns(col, theme, { fontSize: 12, spaceAfter: 10 }), {
+        slide.addText(inlineLabeledBulletRuns(col, theme, { fontSize: 12, spaceAfter: 10, startIndex: i * mid }), {
           x, y: box.y, w: colW, h: box.h, valign: 'top',
         });
       });
@@ -813,7 +912,6 @@ window.DocAssist = window.DocAssist || {};
   // 小見出しとして使う。左側は行頭を「-」で始めると一段深くインデントされる
   // （ノート風見出し＋箇条書きと同じサブ項目記法）。右側の番号は自動で振られる。
   const RECAP_DIVIDER_RE = /^[＝=\-－―ー]{3,}$/;
-  const CIRCLED_DIGITS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
   function parseRecapAgenda(bullets) {
     const list = bullets || [];
     const dividerIdx = list.findIndex((b) => RECAP_DIVIDER_RE.test(A.stripEmphasis(b).trim()));
@@ -5530,11 +5628,11 @@ window.DocAssist = window.DocAssist || {};
   // サムネイルが空になってしまうため個別に定義する。それ以外は共通サンプルを使う。
   const DEFAULT_SAMPLE = ['項目A：説明テキストが入ります', '項目B：説明テキストが入ります', '項目C：説明テキストが入ります'];
   const SAMPLES = {
-    'title-message': ['**重要な語句**を含む説明が入ります', '補足の説明テキストが入ります', '3点目の説明が入ります'],
+    'title-message': ['背景：これまでの検討経緯を踏まえた**重要な語句**を含む説明が入ります', '論点：補足の説明テキストが入ります', '3点目の説明文がラベル無しで入ります（自動で番号が振られます）'],
     'bullet-numbered': ['1つ目の論点：現状の業務プロセスに関する課題', '2つ目の論点：システム間のデータ連携における課題', '3つ目の論点：運用体制における課題'],
     'bullet-heading-groups': ['背景：', '既存システムの保守期限が2027年に到来する', '運用コストが年々増加している', '課題：', '担当者ごとに対応品質にばらつきがある', '対策：', 'クラウド型システムへの移行を検討する'],
     'heading-bullets-2col': ['現状の課題：', '対応品質にばらつきがある', '情報共有に時間がかかる', '期待される効果：', '対応品質を平準化できる', '情報共有の時間を半減できる'],
-    'bullet-two-col': ['項目1：説明テキストが入ります', '項目2：説明テキストが入ります', '項目3：説明テキストが入ります', '項目4：説明テキストが入ります', '項目5：説明テキストが入ります', '項目6：説明テキストが入ります', '項目7：説明テキストが入ります', '項目8：説明テキストが入ります'],
+    'bullet-two-col': ['項目1：説明テキストが入ります', '項目2：説明テキストが入ります', '項目3：説明テキストが入ります', 'ラベルの無い説明文もここに入ります', '項目5：説明テキストが入ります', '項目6：説明テキストが入ります', '項目7：説明テキストが入ります', '項目8：説明テキストが入ります'],
     checklist: ['確認事項：★導入範囲について合意済み', '確認事項：予算枠の確保', '確認事項：プロジェクトオーナーの任命', '確認事項：★キックオフ日程の確定'],
     'generic-table': ['列：拠点｜担当者｜連絡先', '東京本社：山田｜03-xxxx-xxxx', '大阪支社：佐藤｜06-xxxx-xxxx', '名古屋支社：鈴木｜052-xxxx-xxxx'],
     'label-box-bullet-rows': ['背景：', '顧客情報が部門ごとに分散管理されている', '対応品質のばらつきと解約率上昇が発生している', '課題認識：', '担当者ごとに検索・共有の手間が発生している', '本活動の目的：', 'クラウド型CRMによる一元化を実現する'],

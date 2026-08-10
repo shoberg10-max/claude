@@ -678,8 +678,38 @@ b.em {
 .pv-box-body .em,
 .pv-compare-v-desc .em,
 .pv-tree-leaf .em,
+.pv-lbl-body .em,
 .slide-message-sub .em {
   color: var(--primary);
+}
+
+/* --- ラベル付き本文リスト（タイトル＋メッセージ＝汎用フォールバック） ---
+   「ラベル：本文」の行はラベルを見出しにし、ラベルの無い行には丸囲み数字を振る。
+   スライドいっぱいの無地の箇条書きにならないよう、行ごとに必ず見出しを添える。 */
+.pv-lbl-list {
+  height: 100%;
+  overflow: hidden;
+}
+
+.pv-lbl-item {
+  margin-bottom: 9px;
+}
+
+.pv-lbl-item:last-child {
+  margin-bottom: 0;
+}
+
+.pv-lbl-label {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--primary);
+  margin-bottom: 2px;
+}
+
+.pv-lbl-body {
+  font-size: 11.5px;
+  color: var(--text);
+  line-height: 1.55;
 }
 
 .pv-bullets-numbered {
