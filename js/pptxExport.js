@@ -66,6 +66,51 @@ window.DocAssist = window.DocAssist || {};
     return slide;
   }
 
+  // ---------- 出力時アレンジ ----------
+  // ベースとなるデザインパターン（js/patterns.js）自体は変えず、書き出しのタイミングで
+  // 章（見出しの先頭パンくずセグメント）ごとに基調色の濃淡を少し変化させ、資料全体が
+  // 単調に見えることを避ける。オレンジ・レッド（highlight/critical）や本文色（text/
+  // subtext/border）など予約色は一切触らず、primaryから機械的に導出される色階調
+  // （primaryLight/mid/accent/softBlue/light/lighter/pale）だけを再生成する
+  // （js/pptxImport.jsのテンプレート取り込みと同じ考え方・同じ関数を再利用）。
+  // 同時に、デッキ全体で共通の見出しバー（キッカー）の装飾も数パターンから1つ選び、
+  // 資料ごとに異なる「表情」を持たせる。どちらも出力対象のoutline内容から決まる
+  // 決定的な値（同じ入力なら常に同じ結果）で、outline.arrangeSeedを変えると
+  // 別の組み合わせに切り替わる（app.js側の「🔄 アレンジ案を変える」ボタン）。
+  const ARRANGE_TONE_DELTAS = [0, -0.14, 0.16, -0.26, 0.08]; // 0=そのまま、負=少し暗く、正=少し明るく
+  const KICKER_STYLES = ['bar', 'rounded', 'dot'];
+  function hashStr(s) {
+    let h = 0;
+    const str = String(s || '');
+    for (let i = 0; i < str.length; i++) {
+      h = (h * 31 + str.charCodeAt(i)) | 0;
+    }
+    return Math.abs(h);
+  }
+  // heading の先頭パンくずセグメント（「｜」区切りの1つ目）を章のキーとして扱い、
+  // 出現順に章番号（0始まり）を割り当てる。
+  function computeChapterIndices(slides) {
+    const order = [];
+    const seen = {};
+    return (slides || []).map((s) => {
+      const key = String((s.heading || '').split('｜')[0] || '').trim() || '(無題)';
+      if (!(key in seen)) {
+        seen[key] = order.length;
+        order.push(key);
+      }
+      return seen[key];
+    });
+  }
+  // primaryHexを起点に、pptxImport.jsのbuildThemePatchと同じロジックで色階調一式を
+  // 再生成したテーマのコピーを返す（highlight/critical等の予約色・フォント・箇条書き
+  // 記号・タイトルレイアウトはbaseThemeのまま引き継ぐ）。
+  function arrangedTheme(baseTheme, delta) {
+    if (!delta || !DocAssist.pptxImport) return baseTheme;
+    const imp = DocAssist.pptxImport;
+    const tinted = delta > 0 ? imp.tint(baseTheme.primary, delta) : imp.shade(baseTheme.primary, -delta);
+    return Object.assign({}, baseTheme, imp.buildThemePatch(tinted));
+  }
+
   const MARGIN_X = 0.55;
   const BODY_X = MARGIN_X;
   const BODY_W = SLIDE_W - MARGIN_X * 2;
@@ -96,6 +141,25 @@ window.DocAssist = window.DocAssist || {};
     };
   }
 
+  // デッキ全体で共通の見出しバー装飾（buildPptx側で1回だけ決定する）。
+  let currentKickerStyle = 'bar';
+  function drawKicker(slide, x, y, h, theme) {
+    if (currentKickerStyle === 'rounded') {
+      slide.addShape('roundRect', { x, y: y + 0.02, w: BAR_W, h: h - 0.04, rectRadius: BAR_W / 2, fill: { color: theme.primary }, line: { type: 'none' } });
+      return;
+    }
+    if (currentKickerStyle === 'dot') {
+      slide.addShape('rect', { x, y: y + 0.02, w: BAR_W, h: h - 0.04, fill: { color: theme.primary }, line: { type: 'none' } });
+      const d = BAR_W * 2.2;
+      slide.addShape('ellipse', {
+        x: x + BAR_W / 2 - d / 2, y: y + 0.02 - d * 0.35, w: d, h: d,
+        fill: { color: theme.primary }, line: { type: 'none' },
+      });
+      return;
+    }
+    slide.addShape('rect', { x, y: y + 0.02, w: BAR_W, h: h - 0.04, fill: { color: theme.primary }, line: { type: 'none' } });
+  }
+
   // ヘッダー：紺の縦棒＋パンくず（heading内に「｜」があれば複数セグメントとして扱う）＋
   // 結論を言い切る大きな太字ネイビーの見出し文（メッセージ）＋直下の細いヘアライン罫線。
   // 見出し文の長さに応じて1行/2行を判定し、罫線の位置を調整する。
@@ -110,7 +174,7 @@ window.DocAssist = window.DocAssist || {};
     const groupW = titleBox ? titleBox.w : BODY_W;
     const groupY = titleBox ? titleBox.y : HEADER_Y;
 
-    slide.addShape('rect', { x: groupX, y: groupY + 0.02, w: BAR_W, h: CRUMB_H - 0.04, fill: { color: theme.primary }, line: { type: 'none' } });
+    drawKicker(slide, groupX, groupY, CRUMB_H, theme);
     slide.addText(crumbText, {
       x: groupX + BAR_W + 0.1, y: groupY, w: groupW - BAR_W - 0.1, h: CRUMB_H,
       fontSize: 12, bold: true, color: theme.text, valign: 'middle',
@@ -180,7 +244,10 @@ window.DocAssist = window.DocAssist || {};
     });
   }
 
-  // outline: { title, slides: [{ heading, message, subMessage, sourceNote, bullets, patternId }] }
+  // outline: { title, slides: [{ heading, message, subMessage, sourceNote, bullets, patternId }],
+  //            arrangeEnabled, arrangeSeed }
+  // arrangeEnabled: false を指定しない限り既定でON（章ごとの色味アレンジ＋見出しバー装飾を適用）。
+  // arrangeSeed: 数値。値を変えると別の組み合わせに切り替わる（app.jsの「🔄 アレンジ案を変える」）。
   // options.fileName: 保存ファイル名（省略時は資料タイトルから自動生成）
   function buildPptx(outline) {
     if (typeof PptxGenJS === 'undefined') {
@@ -196,10 +263,19 @@ window.DocAssist = window.DocAssist || {};
 
     addCoverSlide(pptx, outline.title, theme);
 
+    const arrangeEnabled = outline.arrangeEnabled !== false;
+    const arrangeSeed = Number(outline.arrangeSeed) || 0;
+    const baseSeed = hashStr(outline.title) + arrangeSeed;
+    currentKickerStyle = arrangeEnabled ? KICKER_STYLES[baseSeed % KICKER_STYLES.length] : 'bar';
+    const chapterIndices = arrangeEnabled ? computeChapterIndices(outline.slides) : [];
+
     (outline.slides || []).forEach((s, idx) => {
       const pattern = DocAssist.patternById[s.patternId] || DocAssist.patternById['title-message'];
       const slide = withDefaultFont(pptx.addSlide());
-      const ruleY = addHeader(slide, s.heading, A.effectiveMessage(s), s.subMessage, theme);
+      const slideTheme = arrangeEnabled
+        ? arrangedTheme(theme, ARRANGE_TONE_DELTAS[(chapterIndices[idx] + baseSeed) % ARRANGE_TONE_DELTAS.length])
+        : theme;
+      const ruleY = addHeader(slide, s.heading, A.effectiveMessage(s), s.subMessage, slideTheme);
       const outerBox = bodyBoxAfterHeader(ruleY);
       const innerBox = {
         x: outerBox.x + BODY_PADDING,
@@ -208,14 +284,14 @@ window.DocAssist = window.DocAssist || {};
         h: outerBox.h - BODY_PADDING * 2,
       };
       try {
-        pattern.buildBody(slide, s.bullets || [], theme, innerBox);
+        pattern.buildBody(slide, s.bullets || [], slideTheme, innerBox);
       } catch (e) {
         console.error('スライド生成エラー:', s.heading, e);
         slide.addText('このスライドの生成中にエラーが発生しました: ' + e.message, {
           x: innerBox.x, y: innerBox.y, w: innerBox.w, h: 1, fontSize: 12, color: 'C00000',
         });
       }
-      addFooter(slide, s.sourceNote, idx + 1, theme);
+      addFooter(slide, s.sourceNote, idx + 1, slideTheme);
     });
 
     return pptx;

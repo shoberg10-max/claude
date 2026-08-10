@@ -116,6 +116,8 @@
     const outline = DocAssist.outlineProvider(state.notesText);
     ensureIds(outline.slides);
     applyTaggedPatterns(outline);
+    outline.arrangeEnabled = true;
+    outline.arrangeSeed = 0;
     state.outline = outline;
     if (!state.outline.slides.length) {
       renderStep1('構成案を読み取れませんでした。見出しや箇条書きを増やして再度お試しください。');
@@ -318,6 +320,14 @@
           ${renderPatternLegend()}
         </details>
         <div class="slide-grid" id="slideGrid"></div>
+        <div class="arrange-row">
+          <label class="arrange-toggle">
+            <input type="checkbox" id="arrangeToggle"${o.arrangeEnabled !== false ? ' checked' : ''}>
+            🎲 出力時に章ごとの色味・見出し装飾を少しアレンジする
+          </label>
+          <button type="button" class="btn ghost" id="arrangeRerollBtn"${o.arrangeEnabled === false ? ' disabled' : ''}>🔄 アレンジ案を変える</button>
+          <span class="hint arrange-hint">デザインパターン自体は変わりません。書き出したPowerPointにのみ反映され、この画面のプレビューは変わりません。</span>
+        </div>
         <div class="export-row">
           <input type="text" class="filename" id="fileName" value="${escapeAttr((o.title || '資料構成案') + '.pptx')}">
           <button class="btn" id="exportBtn">PowerPointを書き出す</button>
@@ -335,6 +345,16 @@
     });
 
     document.getElementById('backBtn').addEventListener('click', () => goToStep(2));
+    document.getElementById('arrangeToggle').addEventListener('change', (e) => {
+      state.outline.arrangeEnabled = e.target.checked;
+      document.getElementById('arrangeRerollBtn').disabled = !e.target.checked;
+    });
+    document.getElementById('arrangeRerollBtn').addEventListener('click', () => {
+      state.outline.arrangeSeed = (state.outline.arrangeSeed || 0) + 1;
+      const statusEl = document.getElementById('exportStatus');
+      statusEl.textContent = `アレンジ案を切り替えました（案 ${state.outline.arrangeSeed + 1}）。書き出すと反映されます。`;
+      statusEl.classList.remove('error');
+    });
     document.getElementById('exportBtn').addEventListener('click', async () => {
       const statusEl = document.getElementById('exportStatus');
       const fileNameInput = document.getElementById('fileName');

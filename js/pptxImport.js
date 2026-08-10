@@ -37,6 +37,11 @@ window.DocAssist = window.DocAssist || {};
     const [r, g, b] = hexToRgb(hex);
     return rgbToHex([r + (255 - r) * pct, g + (255 - g) * pct, b + (255 - b) * pct]);
   }
+  // 黒と混ぜて暗くする（pct=0で元の色、1で黒）。tint()の逆で、章ごとの色味アレンジに使う。
+  function shade(hex, pct) {
+    const [r, g, b] = hexToRgb(hex);
+    return rgbToHex([r * (1 - pct), g * (1 - pct), b * (1 - pct)]);
+  }
 
   // ---- XML読み取りのユーティリティ ----
   // <a:srgbClr val="RRGGBB"/> または <a:sysClr val="windowText" lastClr="RRGGBB"/> を
@@ -414,6 +419,8 @@ window.DocAssist = window.DocAssist || {};
     resetTheme,
     getSaved,
     tint,
+    shade,
+    buildThemePatch,
   };
 
   const restored = restoreOnLoad();

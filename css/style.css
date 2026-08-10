@@ -2034,6 +2034,39 @@ table.pv-table tr:nth-child(even) td {
   flex: none;
 }
 
+/* ---------- 出力時アレンジ ---------- */
+.arrange-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 10px 14px;
+  background: var(--pale, #f5f7fc);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.arrange-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.arrange-toggle input {
+  cursor: pointer;
+}
+
+.arrange-hint {
+  font-size: 12px;
+  color: var(--subtext);
+  flex-basis: 100%;
+}
+
 /* ---------- フッター操作 ---------- */
 .export-row {
   display: flex;
