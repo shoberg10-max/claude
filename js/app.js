@@ -56,6 +56,9 @@
     step: 1,
     notesText: '',
     outline: { title: '', slides: [] },
+    storyType: 'decision',
+    deepDiveKind: 'issues',
+    deepDiveTheme: '',
   };
 
   const screen = document.getElementById('screen');
@@ -157,12 +160,13 @@
       <div class="panel">
         <h2>Step 1. 会議メモ・議事録を入力</h2>
         <p class="hint">次回会議に向けた資料の元になるメモや議事録を貼り付けてください。見出し（# や ##）や箇条書き（- ・）があると構成案の精度が上がりますが、フリーテキストでも解析します。</p>
-        <p class="hint">構成案がうまく組み立てられない場合は、「🪄 社内LLM用プロンプトを作成」でこのアプリの形式に合わせて整形するためのプロンプトを作成できます。社内LLMに貼り付けて実行し、出力結果をこの下の欄に貼り付け直してから「次へ」を押してください。</p>
+        <p class="hint">資料化の元ネタがまだ薄い場合は、まず「🔍 テーマ深掘り用プロンプトを作成」でテーマそのものを社内LLMに掘り下げてもらってください。その出力をこの欄に貼り付けたら、「🪄 社内LLM用プロンプトを作成」でストーリー型（SCQA法・課題原因解決策など）を選んで構成案に整形し、出力結果をこの下の欄に貼り付け直してから「次へ」を押してください。</p>
         <textarea class="notes-input" id="notesInput" placeholder="例：\n# 会議タイトル\n## 現状の課題\n- 課題A\n- 課題B\n## 比較：A案 vs B案\nA案：...\nB案：...">${escapeHtml(state.notesText)}</textarea>
         ${errorMsg ? `<p class="status-msg error">${escapeHtml(errorMsg)}</p>` : ''}
         <div class="btn-row">
           <button class="btn ghost" id="sampleBtn">サンプルを試す</button>
-          <div style="display:flex;gap:10px;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn secondary" id="deepDiveBtn">🔍 テーマ深掘り用プロンプトを作成</button>
             <button class="btn secondary" id="promptBtn">🪄 社内LLM用プロンプトを作成</button>
             <button class="btn" id="nextBtn">次へ：構成案を生成</button>
           </div>
@@ -177,19 +181,88 @@
       state.notesText = SAMPLE_NOTES;
       input.value = SAMPLE_NOTES;
     });
+    document.getElementById('deepDiveBtn').addEventListener('click', () => openDeepDiveModal());
     document.getElementById('promptBtn').addEventListener('click', () => openPromptModal(input.value));
     document.getElementById('nextBtn').addEventListener('click', generateOutlineAndProceed);
   }
 
-  function openPromptModal(rawNotes) {
-    const prompt = DocAssist.buildOutlineFormatPrompt(rawNotes);
+  // テーマ深掘り用プロンプト（Step 0相当）：資料化の元ネタがまだ薄いときに、
+  // テーマそのものを社内LLMで掘り下げるための3つの型（論点整理／提案書向け／MECE）から選ぶ。
+  function openDeepDiveModal() {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
+    const typeOptions = DocAssist.DEEP_DIVE_TYPE_ORDER.map(
+      (id) => `<option value="${id}"${id === state.deepDiveKind ? ' selected' : ''}>${escapeHtml(DocAssist.DEEP_DIVE_TYPES[id].label)}</option>`
+    ).join('');
+    overlay.innerHTML = `
+      <div class="modal-box modal-box-wide">
+        <h3>🔍 テーマ深掘り用プロンプト</h3>
+        <p class="hint">会議メモがまだ無い、または議論が浅い段階で、テーマそのものを社内LLMに掘り下げてもらうためのプロンプトです。出力結果は次のステップ（構成案整形プロンプト）の元ネタとして使います。</p>
+        <label for="deepDiveTheme">テーマ・議題</label>
+        <input type="text" id="deepDiveTheme" placeholder="例：新規顧客管理システムの導入方針" value="${escapeAttr(state.deepDiveTheme)}">
+        <label for="deepDiveKind">型を選ぶ</label>
+        <select id="deepDiveKind">${typeOptions}</select>
+        <p class="hint" id="deepDiveHint"></p>
+        <textarea class="prompt-output" id="deepDiveOutput" readonly></textarea>
+        <div class="btn-row">
+          <span class="status-msg" id="deepDiveCopyStatus"></span>
+          <div style="display:flex;gap:10px;">
+            <button class="btn ghost" id="deepDiveClose">閉じる</button>
+            <button class="btn" id="deepDiveCopy">コピーする</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => document.body.removeChild(overlay);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector('#deepDiveClose').addEventListener('click', close);
+
+    const themeInput = overlay.querySelector('#deepDiveTheme');
+    const kindSelect = overlay.querySelector('#deepDiveKind');
+    const hintEl = overlay.querySelector('#deepDiveHint');
+    const textarea = overlay.querySelector('#deepDiveOutput');
+
+    function refresh() {
+      state.deepDiveTheme = themeInput.value;
+      state.deepDiveKind = kindSelect.value;
+      hintEl.textContent = DocAssist.DEEP_DIVE_TYPES[state.deepDiveKind].hint;
+      textarea.value = DocAssist.buildDeepDivePrompt(state.deepDiveTheme, state.deepDiveKind);
+    }
+    themeInput.addEventListener('input', refresh);
+    kindSelect.addEventListener('change', refresh);
+    refresh();
+
+    overlay.querySelector('#deepDiveCopy').addEventListener('click', async () => {
+      const statusEl = overlay.querySelector('#deepDiveCopyStatus');
+      try {
+        await navigator.clipboard.writeText(textarea.value);
+        statusEl.textContent = 'コピーしました。';
+        statusEl.classList.remove('error');
+      } catch (e) {
+        textarea.select();
+        statusEl.textContent = '自動コピーに失敗しました。テキストを選択したので Ctrl+C（Mac は Cmd+C）でコピーしてください。';
+        statusEl.classList.add('error');
+      }
+    });
+  }
+
+  function openPromptModal(rawNotes) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    const typeOptions = DocAssist.STORY_TYPE_ORDER.map(
+      (id) => `<option value="${id}"${id === state.storyType ? ' selected' : ''}>${escapeHtml(DocAssist.STORY_TYPES[id].label)}</option>`
+    ).join('');
     overlay.innerHTML = `
       <div class="modal-box modal-box-wide">
         <h3>🪄 社内LLM用 構成案整形プロンプト</h3>
         <p class="hint">下のテキストをコピーして社内LLMのチャットに貼り付けて実行してください。出力された構成案をコピーし、Step 1の入力欄に貼り付け直してから「次へ」を押すと、このアプリの形式にきれいに読み込まれます（見出しに含まれる [pattern: ...] タグはデザインパターンの提案として自動的に反映されます）。</p>
-        <textarea class="prompt-output" id="promptOutput" readonly>${escapeHtml(prompt)}</textarea>
+        <label for="storyType">資料全体のストーリー型</label>
+        <select id="storyType">${typeOptions}</select>
+        <p class="hint" id="storyTypeHint"></p>
+        <textarea class="prompt-output" id="promptOutput" readonly></textarea>
         <div class="btn-row">
           <span class="status-msg" id="copyStatus"></span>
           <div style="display:flex;gap:10px;">
@@ -205,11 +278,23 @@
       if (e.target === overlay) close();
     });
     overlay.querySelector('#promptClose').addEventListener('click', close);
+
+    const storySelect = overlay.querySelector('#storyType');
+    const hintEl = overlay.querySelector('#storyTypeHint');
     const textarea = overlay.querySelector('#promptOutput');
+
+    function refresh() {
+      state.storyType = storySelect.value;
+      hintEl.textContent = DocAssist.STORY_TYPES[state.storyType].hint;
+      textarea.value = DocAssist.buildOutlineFormatPrompt(rawNotes, state.storyType);
+    }
+    storySelect.addEventListener('change', refresh);
+    refresh();
+
     overlay.querySelector('#promptCopy').addEventListener('click', async () => {
       const statusEl = overlay.querySelector('#copyStatus');
       try {
-        await navigator.clipboard.writeText(prompt);
+        await navigator.clipboard.writeText(textarea.value);
         statusEl.textContent = 'コピーしました。';
         statusEl.classList.remove('error');
       } catch (e) {
