@@ -540,7 +540,10 @@ window.DocAssist = window.DocAssist || {};
     score(section) {
       const groups = parseHeadingGroups(section.bullets || []);
       const valid = groups.filter((g) => g.heading && g.items.length);
-      if (valid.length === 2) return 8;
+      // ちょうど2ブロックのときは、より汎用的な小見出し＋箇条書き（複数ブロック）
+      // （score 9）より高くして、2カラム版が確実に選ばれるようにする（他の10点パターンと
+      // 同点になった場合の配列順依存を避けるため11にしておく）。
+      if (valid.length === 2) return 11;
       return 0;
     },
     renderBody(bullets) {
@@ -1068,13 +1071,16 @@ window.DocAssist = window.DocAssist || {};
     description: '「背景：」のような小見出しをちょうど4ブロック使い、2×2グリッドで並べる。各ブロックの1行目を太字の小見出し、以降を箇条書きにする。見出しバーはネイビー→ライトブルーのグラデーション。',
     score(section) {
       const groups = parseHeadingGroups(section.bullets || []);
-      const valid = groups.filter((g) => g.heading && g.items.length >= 2);
-      if (valid.length === 4) return 8;
+      const valid = groups.filter((g) => g.heading && g.items.length);
+      // ちょうど4ブロックという形が最も活きるケースなので、より汎用的な
+      // 小見出し＋箇条書き（複数ブロック）（score 9）より高く設定し、条件に
+      // 合致するときは必ずこちらが選ばれるようにする。
+      if (valid.length === 4) return 11;
       return 0;
     },
     renderBody(bullets) {
       const groups = parseHeadingGroups(bullets)
-        .filter((g) => g.heading && g.items.length >= 2)
+        .filter((g) => g.heading && g.items.length)
         .slice(0, 4);
       if (groups.length < 4) return emptyBody();
       return `<div class="pv-qb">${groups
@@ -1094,7 +1100,7 @@ window.DocAssist = window.DocAssist || {};
     },
     buildBody(slide, bullets, theme, box) {
       const groups = parseHeadingGroups(bullets)
-        .filter((g) => g.heading && g.items.length >= 2)
+        .filter((g) => g.heading && g.items.length)
         .slice(0, 4);
       if (groups.length < 4) return;
       const gapX = 0.24;
@@ -1114,9 +1120,11 @@ window.DocAssist = window.DocAssist || {};
         slide.addText(g.items[0], {
           x: x + 0.14, y: y + headH + 0.08, w: cw - 0.28, h: 0.3, fontSize: 12, bold: true, color: theme.text,
         });
-        slide.addText(bulletTextRuns(g.items.slice(1), theme, { fontSize: 11, spaceAfter: 4 }), {
-          x: x + 0.14, y: y + headH + 0.4, w: cw - 0.28, h: ch - headH - 0.48, valign: 'top',
-        });
+        if (g.items.length > 1) {
+          slide.addText(bulletTextRuns(g.items.slice(1), theme, { fontSize: 11, spaceAfter: 4 }), {
+            x: x + 0.14, y: y + headH + 0.4, w: cw - 0.28, h: ch - headH - 0.48, valign: 'top',
+          });
+        }
       });
     },
   };

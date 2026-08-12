@@ -5,6 +5,7 @@
 ## [pattern: pyramid] （１）背景・目的｜①課題認識と対応方針
 > 顧客情報の分散管理が対応品質の低下と解約率上昇を招いており、**クラウド型CRM**による一元化が急務である
 >> 現行体制のまま推移した場合、来期の解約率はさらに悪化する見込みである
+>> 対応品質のばらつきは、担当者間の情報共有不足が主因と分析している
 - 課題：顧客対応の質と速度が低下し、顧客満足度調査のスコアが**前年比8ポイント低下**している
 - 原因：顧客情報が担当者個人のPC・Excelに分散し、組織的な検索・共有ができていない
 - 対策：クラウド型CRMを導入し、顧客情報と対応履歴を全社で一元管理する体制を構築する
@@ -356,7 +357,7 @@
         <button class="icon-btn danger" data-act="del" title="削除">✕</button>
       </div>
       <input type="text" class="message" placeholder="リード文（このスライドの結論を一文で。未入力の場合は先頭の箇条書きを使用）" value="${escapeAttr(slide.message || '')}">
-      <input type="text" class="sub-message" placeholder="サブメッセージ（リード文の補足。任意）" value="${escapeAttr(slide.subMessage || '')}">
+      <textarea class="sub-message" rows="2" placeholder="サブリード文（リード文を補足する箇条書き。1行に1項目、任意）">${escapeHtml(slide.subMessage || '')}</textarea>
       <textarea class="bullets" placeholder="箇条書きを1行ずつ入力（メッセージの根拠となる情報）">${escapeHtml((slide.bullets || []).join('\n'))}</textarea>
     `;
     card.querySelector('.heading').addEventListener('input', (e) => {
@@ -1079,7 +1080,7 @@
     const pattern = DocAssist.patternById[slide.patternId] || DocAssist.patternById['title-message'];
     const reasonAttr = slide.patternReason ? ` title="${escapeAttr(slide.patternReason)}"` : '';
     const message = DocAssist.analyze.effectiveMessage(slide);
-    const subMessage = (slide.subMessage || '').trim();
+    const subLines = (slide.subMessage || '').split('\n').map((s) => s.trim()).filter(Boolean);
 
     wrap.innerHTML = `
       <div class="slide-preview-toolbar">
@@ -1096,7 +1097,7 @@
         </div>
         <div class="slide-message-block">
           <div class="slide-message-lead">${emphasisHtml(message)}</div>
-          ${subMessage ? `<div class="slide-message-sub">${emphasisHtml(subMessage)}</div>` : ''}
+          ${subLines.length ? `<div class="slide-message-sub"><ul class="pv-bullets pv-bullets-square">${subLines.map((l) => `<li>${emphasisHtml(l)}</li>`).join('')}</ul></div>` : ''}
         </div>
         <div class="slide-body"></div>
         <div class="slide-footer">

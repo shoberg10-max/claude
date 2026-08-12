@@ -336,7 +336,7 @@ window.DocAssist = window.DocAssist || {};
   // DocAssist.theme の現在値をCSS変数へ反映する（HTMLプレビュー用）。
   const CSS_VAR_MAP = {
     primary: '--primary', primaryLight: '--primary-light', accent: '--accent', accent2: '--accent2',
-    gray: '--gray', highlight: '--highlight', critical: '--critical', positive: '--positive', negative: '--negative',
+    gray: '--gray', highlight: '--highlight', critical: '--critical', pink: '--pink', positive: '--positive', negative: '--negative',
     light: '--light', lighter: '--lighter', mid: '--mid', softBlue: '--soft-blue', pale: '--pale',
     paleGray: '--pale-gray', border: '--border', text: '--text', subtext: '--subtext',
   };

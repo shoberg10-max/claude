@@ -69,10 +69,10 @@ window.DocAssist = window.DocAssist || {};
   // ---------- 出力時アレンジ ----------
   // ベースとなるデザインパターン（js/patterns.js）自体は変えず、書き出しのタイミングで
   // 章（見出しの先頭パンくずセグメント）ごとに基調色の濃淡を少し変化させ、資料全体が
-  // 単調に見えることを避ける。オレンジ・レッド（highlight/critical）や本文色（text/
-  // subtext/border）など予約色は一切触らず、primaryから機械的に導出される色階調
-  // （primaryLight/mid/accent/softBlue/light/lighter/pale）だけを再生成する
-  // （js/pptxImport.jsのテンプレート取り込みと同じ考え方・同じ関数を再利用）。
+  // 単調に見えることを避ける。強調色（highlight/critical/pink）や本文色（text/
+  // subtext/border）、ボックス塗り色（light/lighter/pale）など予約色・基準色は一切
+  // 触らず、primaryから機械的に導出される色階調（primaryLight/mid/accent/softBlue）
+  // だけを再生成する（js/pptxImport.jsのテンプレート取り込みと同じ考え方・同じ関数を再利用）。
   // 同時に、デッキ全体で共通の見出しバー（キッカー）の装飾も数パターンから1つ選び、
   // 資料ごとに異なる「表情」を持たせる。どちらも出力対象のoutline内容から決まる
   // 決定的な値（同じ入力なら常に同じ結果）で、outline.arrangeSeedを変えると
@@ -104,11 +104,19 @@ window.DocAssist = window.DocAssist || {};
   // primaryHexを起点に、pptxImport.jsのbuildThemePatchと同じロジックで色階調一式を
   // 再生成したテーマのコピーを返す（highlight/critical等の予約色・フォント・箇条書き
   // 記号・タイトルレイアウトはbaseThemeのまま引き継ぐ）。
+  // light/lighter/pale（「ボックスに文章を書く場合」の塗り色）は、章ごとに色味が
+  // ばらつくと指定した基準色からずれてしまうため、アレンジ対象から除外しbaseTheme側の
+  // 固定値をそのまま使う。ヘッダー・帯・チャート系統の色（primaryLight/mid/accent/
+  // softBlueなど）だけを章ごとに動かす。
   function arrangedTheme(baseTheme, delta) {
     if (!delta || !DocAssist.pptxImport) return baseTheme;
     const imp = DocAssist.pptxImport;
     const tinted = delta > 0 ? imp.tint(baseTheme.primary, delta) : imp.shade(baseTheme.primary, -delta);
-    return Object.assign({}, baseTheme, imp.buildThemePatch(tinted));
+    const patch = imp.buildThemePatch(tinted);
+    delete patch.light;
+    delete patch.lighter;
+    delete patch.pale;
+    return Object.assign({}, baseTheme, patch);
   }
 
   const MARGIN_X = 0.55;
@@ -177,7 +185,7 @@ window.DocAssist = window.DocAssist || {};
     drawKicker(slide, groupX, groupY, CRUMB_H, theme);
     slide.addText(crumbText, {
       x: groupX + BAR_W + 0.1, y: groupY, w: groupW - BAR_W - 0.1, h: CRUMB_H,
-      fontSize: 12, bold: true, color: theme.text, valign: 'middle',
+      fontSize: 14, bold: true, color: theme.text, valign: 'middle',
     });
 
     const msg = message || '';
@@ -193,14 +201,20 @@ window.DocAssist = window.DocAssist || {};
       lineSpacingMultiple: 1.15,
     });
 
+    // サブメッセージ（サブリード文）：リード文を補足する箇条書きの説明文。本文の
+    // 箇条書きと同じ■マーカー・地の文色で描き、その下に各パターンのボディ（図表）が
+    // 続くレイアウトに統一する（js/outline.jsが">>"の連続行を1行=1項目として渡す）。
     let y = headlineY + headlineH;
-    const hasSub = !!(subMessage && subMessage.trim());
-    if (hasSub) {
-      slide.addText(A.emphasisRuns(subMessage.trim(), theme.primary), {
-        x: groupX, y, w: groupW, h: 0.3,
-        fontSize: 12, color: theme.subtext, valign: 'top',
+    const subLines = (subMessage || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    if (subLines.length) {
+      const subFontSize = 12.5;
+      const lineH = 0.26;
+      const subH = subLines.length * lineH + 0.06;
+      const PH = DocAssist.patternHelpers;
+      slide.addText(PH.bulletTextRuns(subLines, theme, { fontSize: subFontSize, spaceAfter: 2 }), {
+        x: groupX, y: y + 0.05, w: groupW, h: subH, valign: 'top',
       });
-      y += 0.3;
+      y += subH + 0.05;
     }
 
     const ruleY = y + RULE_GAP;

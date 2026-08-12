@@ -12,11 +12,12 @@
 // 社内LLMにこの形式で構成案を作らせることで、パターン自動選択のヒントを
 // APIを使わずに（コピペで）渡せるようにするためのもの。
 //
-// 見出しの直後に "> リード文（メッセージ）" と ">> サブメッセージ" の行があれば、
-// それぞれ slide.message / slide.subMessage として取り出す。官公庁向け報告書に
-// 典型的な「タイトル→メッセージ→ボディ」の3層構成をこのアプリ全体で共通化するための
-// 入力形式で、js/app.js と js/pptxExport.js の両方がこの2項目を使って
-// スライド上部のメッセージ帯を描画する。
+// 見出しの直後に "> リード文（メッセージ）" と ">> サブリード文"（複数行可）の行が
+// あれば、それぞれ slide.message / slide.subMessage として取り出す。subMessageは
+// 改行区切りの文字列で、1行=1箇条書き項目として扱う。官公庁向け報告書に典型的な
+// 「タイトル→メッセージ（リード文＋サブリード文の箇条書き）→ボディ」の3層構成を
+// このアプリ全体で共通化するための入力形式で、js/app.js と js/pptxExport.js の
+// 両方がこの2項目を使ってスライド上部のメッセージ帯を描画する。
 window.DocAssist = window.DocAssist || {};
 
 (function () {
@@ -64,24 +65,23 @@ window.DocAssist = window.DocAssist || {};
     return { sourceNote, rest };
   }
 
-  // 見出しの直後に並ぶ ">" / ">>" 行をリード文・サブメッセージとして取り出し、
-  // 残りを本文（箇条書き候補の行）として返す。
+  // 見出しの直後に並ぶ ">" 行をリード文として取り出し、続く ">>" 行（複数可）を
+  // サブメッセージ（サブリード文）の箇条書き項目として取り出す。サブメッセージは
+  // 改行区切りの文字列として保持し（1行＝1箇条書き）、js/app.js・js/pptxExport.js の
+  // 両方が箇条書きとして描画する。残りを本文（箇条書き候補の行）として返す。
   function extractMessage(bodyLines) {
     let i = 0;
     let message = '';
-    let subMessage = '';
-    if (bodyLines[i] && isSubMessageLine(bodyLines[i])) {
-      subMessage = stripSubMessage(bodyLines[i]);
-      i++;
-    } else if (bodyLines[i] && isMessageLine(bodyLines[i])) {
+    const subLines = [];
+    if (bodyLines[i] && isMessageLine(bodyLines[i])) {
       message = stripMessage(bodyLines[i]);
       i++;
-      if (bodyLines[i] && isSubMessageLine(bodyLines[i])) {
-        subMessage = stripSubMessage(bodyLines[i]);
-        i++;
-      }
     }
-    return { message, subMessage, rest: bodyLines.slice(i) };
+    while (bodyLines[i] && isSubMessageLine(bodyLines[i])) {
+      subLines.push(stripSubMessage(bodyLines[i]));
+      i++;
+    }
+    return { message, subMessage: subLines.join('\n'), rest: bodyLines.slice(i) };
   }
 
   function parseNotes(rawText) {
