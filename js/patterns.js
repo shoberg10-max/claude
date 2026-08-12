@@ -330,6 +330,9 @@ window.DocAssist = window.DocAssist || {};
   // 箇条書きを「小見出し＋その配下の項目」の配列に分解する。
   // 小見出し行が無ければ、全体を見出し無しの1ブロックとして返す
   // （＝小見出し記法を使っていない普通の箇条書きでもスコア判定・描画とも壊れない）。
+  // score()の判定に使う「正規」の実装なので、挙動を変えない（自動選択のスコアに
+  // 影響するため）。手動でパターンを切り替えたときの救済は
+  // parseHeadingGroupsForRender() 側で行う。
   const HEADING_ONLY_RE = /^(.{1,24})[：:]\s*$/;
   function parseHeadingGroups(bullets) {
     const groups = [];
@@ -349,6 +352,28 @@ window.DocAssist = window.DocAssist || {};
       }
     });
     return groups.filter((g) => g.heading || g.items.length);
+  }
+
+  // renderBody/buildBody専用：parseHeadingGroups()が有効なグループ（見出し＋項目を
+  // 持つもの）を1つも作れなかった場合に、KV形式（「ラベル：本文」の1行完結型）の
+  // データを1行=1グループとして再解釈するフォールバックを追加する。
+  //
+  // 典型的には、ユーザーがテンプレートギャラリーから手動でこのパターン系列（小見出し＋
+  // 箇条書き系）に切り替えたが、元の箇条書きが別系統のパターン向け（例：「前提→検討→
+  // 結論」の「前提：内容」のような1行完結KV形式）で書かれていたケース。何もしないと
+  // parseHeadingGroups()は見出しの無い1ブロックにまとまり、呼び出し側の
+  // `.filter(g => g.heading && g.items.length)` で丸ごと除外されてプレビュー・
+  // 書き出しの両方が空になってしまう。
+  // score()には使わない（自動選択の判定基準を変えないため）。
+  function parseHeadingGroupsForRender(bullets) {
+    const groups = parseHeadingGroups(bullets);
+    if (groups.some((g) => g.heading && g.items.length)) return groups;
+    const list = (bullets || []).filter(Boolean);
+    if (!list.length) return groups;
+    return list.map((b, i) => {
+      const kv = A.splitKV(b);
+      return kv ? { heading: kv.key, items: [kv.value] } : { heading: autoLabel(i), items: [b] };
+    });
   }
 
   // ---------- アイコン ----------
@@ -498,7 +523,7 @@ window.DocAssist = window.DocAssist || {};
       return 0;
     },
     renderBody(bullets) {
-      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      const groups = parseHeadingGroupsForRender(bullets).filter((g) => g.heading && g.items.length);
       if (!groups.length) return emptyBody();
       return `<div class="pv-hg">${groups
         .map(
@@ -510,7 +535,7 @@ window.DocAssist = window.DocAssist || {};
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      const groups = parseHeadingGroupsForRender(bullets).filter((g) => g.heading && g.items.length);
       if (!groups.length) return;
       const n = groups.length;
       const gap = 0.12;
@@ -547,7 +572,7 @@ window.DocAssist = window.DocAssist || {};
       return 0;
     },
     renderBody(bullets) {
-      const groups = parseHeadingGroups(bullets)
+      const groups = parseHeadingGroupsForRender(bullets)
         .filter((g) => g.heading && g.items.length)
         .slice(0, 2);
       if (groups.length < 2) return emptyBody();
@@ -561,7 +586,7 @@ window.DocAssist = window.DocAssist || {};
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const groups = parseHeadingGroups(bullets)
+      const groups = parseHeadingGroupsForRender(bullets)
         .filter((g) => g.heading && g.items.length)
         .slice(0, 2);
       if (groups.length < 2) return;
@@ -692,7 +717,7 @@ window.DocAssist = window.DocAssist || {};
       return 0;
     },
     renderBody(bullets) {
-      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      const groups = parseHeadingGroupsForRender(bullets).filter((g) => g.heading && g.items.length);
       if (!groups.length) return emptyBody();
       return `<div class="pv-lbr">${groups
         .map(
@@ -704,7 +729,7 @@ window.DocAssist = window.DocAssist || {};
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      const groups = parseHeadingGroupsForRender(bullets).filter((g) => g.heading && g.items.length);
       if (!groups.length) return;
       const n = groups.length;
       const gap = 0.22;
@@ -729,8 +754,8 @@ window.DocAssist = window.DocAssist || {};
   // 「-」「－」「–」で始まる行は、直前の箇条書きに対するサブ項目として一段深く
   // インデントして表示する（メモ書きのような細かい内訳を残したいときに使う）。
   const SUB_ITEM_RE = /^[-－–]\s*(.+)/;
-  function parseNestedHeadingGroups(bullets) {
-    return parseHeadingGroups(bullets).map((g) => {
+  function nestSubItems(groups) {
+    return groups.map((g) => {
       const items = [];
       g.items.forEach((raw) => {
         const m = A.stripEmphasis(raw).trim().match(SUB_ITEM_RE);
@@ -743,6 +768,14 @@ window.DocAssist = window.DocAssist || {};
       });
       return { heading: g.heading, items };
     });
+  }
+  function parseNestedHeadingGroups(bullets) {
+    return nestSubItems(parseHeadingGroups(bullets));
+  }
+  // renderBody/buildBody専用。parseHeadingGroupsForRender()の救済フォールバックを
+  // 経由するため、手動でこのパターンに切り替えたときも空にならない。
+  function parseNestedHeadingGroupsForRender(bullets) {
+    return nestSubItems(parseHeadingGroupsForRender(bullets));
   }
   function hasNestedSubItems(groups) {
     return groups.some((g) => g.items.some((it) => it.subs.length));
@@ -760,7 +793,7 @@ window.DocAssist = window.DocAssist || {};
       return 0;
     },
     renderBody(bullets) {
-      const groups = parseNestedHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      const groups = parseNestedHeadingGroupsForRender(bullets).filter((g) => g.heading && g.items.length);
       if (!groups.length) return emptyBody();
       return `<div class="pv-nb">${groups
         .map(
@@ -778,7 +811,7 @@ window.DocAssist = window.DocAssist || {};
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const groups = parseNestedHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      const groups = parseNestedHeadingGroupsForRender(bullets).filter((g) => g.heading && g.items.length);
       if (!groups.length) return;
       slide.addShape('rect', {
         x: box.x, y: box.y, w: box.w, h: box.h, fill: { type: 'none' }, line: { color: theme.border, width: HAIRLINE },
@@ -834,7 +867,7 @@ window.DocAssist = window.DocAssist || {};
       return 0;
     },
     renderBody(bullets) {
-      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      const groups = parseHeadingGroupsForRender(bullets).filter((g) => g.heading && g.items.length);
       if (!groups.length) return emptyBody();
       return `<div class="pv-fb">${groups
         .map(
@@ -848,7 +881,7 @@ window.DocAssist = window.DocAssist || {};
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length);
+      const groups = parseHeadingGroupsForRender(bullets).filter((g) => g.heading && g.items.length);
       if (!groups.length) return;
       const n = groups.length;
       const gap = 0.18;
@@ -888,7 +921,7 @@ window.DocAssist = window.DocAssist || {};
       return 0;
     },
     renderBody(bullets) {
-      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length).slice(0, 4);
+      const groups = parseHeadingGroupsForRender(bullets).filter((g) => g.heading && g.items.length).slice(0, 4);
       if (!groups.length) return emptyBody();
       return `<div class="pv-cbg">${groups
         .map(
@@ -900,7 +933,7 @@ window.DocAssist = window.DocAssist || {};
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const groups = parseHeadingGroups(bullets).filter((g) => g.heading && g.items.length).slice(0, 4);
+      const groups = parseHeadingGroupsForRender(bullets).filter((g) => g.heading && g.items.length).slice(0, 4);
       if (!groups.length) return;
       const n = groups.length;
       const arrowW = 0.3;
@@ -1079,7 +1112,7 @@ window.DocAssist = window.DocAssist || {};
       return 0;
     },
     renderBody(bullets) {
-      const groups = parseHeadingGroups(bullets)
+      const groups = parseHeadingGroupsForRender(bullets)
         .filter((g) => g.heading && g.items.length)
         .slice(0, 4);
       if (groups.length < 4) return emptyBody();
@@ -1099,7 +1132,7 @@ window.DocAssist = window.DocAssist || {};
         .join('')}</div>`;
     },
     buildBody(slide, bullets, theme, box) {
-      const groups = parseHeadingGroups(bullets)
+      const groups = parseHeadingGroupsForRender(bullets)
         .filter((g) => g.heading && g.items.length)
         .slice(0, 4);
       if (groups.length < 4) return;

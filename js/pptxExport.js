@@ -37,9 +37,16 @@ window.DocAssist = window.DocAssist || {};
   // fontSize が最小値を下回っていれば底上げする。
   // 個々のパターン実装（40箇所以上）に手を入れず、フォントを一箇所で統一するための薄いラッパー。
   // 呼び出し側が明示的に fontFace を指定した場合はそちらを優先する。
+  // あわせて addText/addTable/addShape/addChart の呼び出し回数を slide.__drawCount に
+  // 記録する（パターンのbuildBody()が「データの形が合わず何も描かなかった」ケースを
+  // 検出するため。手動でパターンを切り替えたときに空スライドになるのを防ぐ安全網
+  // ＝buildPptx()側のfallbackBuildBodyIfEmptyで使う）。
   function withDefaultFont(slide) {
     const origAddText = slide.addText.bind(slide);
     const origAddTable = slide.addTable.bind(slide);
+    const origAddShape = slide.addShape.bind(slide);
+    const origAddChart = slide.addChart.bind(slide);
+    slide.__drawCount = 0;
     function withFont(opts) {
       const merged = opts && opts.fontFace ? opts : Object.assign({ fontFace: currentFontFace() }, opts || {});
       return clampFontSize(merged);
@@ -52,6 +59,7 @@ window.DocAssist = window.DocAssist || {};
           if (run && run.options) clampFontSize(run.options);
         });
       }
+      slide.__drawCount++;
       return origAddText(text, withFont(options));
     };
     slide.addTable = (rows, options) => {
@@ -61,7 +69,16 @@ window.DocAssist = window.DocAssist || {};
           if (cell && typeof cell === 'object' && cell.options) clampFontSize(cell.options);
         });
       });
+      slide.__drawCount++;
       return origAddTable(rows, withFont(options));
+    };
+    slide.addShape = (shapeType, options) => {
+      slide.__drawCount++;
+      return origAddShape(shapeType, options);
+    };
+    slide.addChart = (type, data, options) => {
+      slide.__drawCount++;
+      return origAddChart(type, data, options);
     };
     return slide;
   }
@@ -297,8 +314,18 @@ window.DocAssist = window.DocAssist || {};
         w: outerBox.w - BODY_PADDING * 2,
         h: outerBox.h - BODY_PADDING * 2,
       };
+      const bullets = s.bullets || [];
       try {
-        pattern.buildBody(slide, s.bullets || [], slideTheme, innerBox);
+        const drawCountBefore = slide.__drawCount;
+        pattern.buildBody(slide, bullets, slideTheme, innerBox);
+        // パターン（特にテンプレートギャラリーから手動で切り替えた場合）が、
+        // 箇条書きの形が合わずに何も描かなかったケースの安全網。ヘッダー描画分は
+        // 差分を取って除外し、buildBody自身が何か描いたかどうかだけを見る。何らかの
+        // 内容があるのに完全に空のボディになるのを避け、汎用フォールバック
+        // （タイトル＋メッセージ）で最低限の内容を表示する。
+        if (slide.__drawCount === drawCountBefore && bullets.length) {
+          DocAssist.patternById['title-message'].buildBody(slide, bullets, slideTheme, innerBox);
+        }
       } catch (e) {
         console.error('スライド生成エラー:', s.heading, e);
         slide.addText('このスライドの生成中にエラーが発生しました: ' + e.message, {

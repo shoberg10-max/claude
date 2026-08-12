@@ -1107,7 +1107,24 @@
       </div>
     `;
 
-    wrap.querySelector('.slide-body').innerHTML = pattern.renderBody(slide.bullets || []);
+    const bullets = slide.bullets || [];
+    let bodyHtml = pattern.renderBody(bullets);
+    // テンプレートギャラリーから手動で切り替えた場合など、箇条書きの形がそのパターンの
+    // 想定と合わず何も描画できなかった（pv-emptyのプレースホルダーになった）ケースの
+    // 安全網。内容自体はあるので、汎用フォールバック（タイトル＋メッセージ）で
+    // 最低限の表示を保証し、書き出し（js/pptxExport.js）と同じ理由づけのヒントを添える。
+    let fellBack = false;
+    if (bullets.length && /class="pv-empty"/.test(bodyHtml)) {
+      bodyHtml = DocAssist.patternById['title-message'].renderBody(bullets);
+      fellBack = true;
+    }
+    wrap.querySelector('.slide-body').innerHTML = bodyHtml;
+    if (fellBack) {
+      const hint = document.createElement('p');
+      hint.className = 'pattern-fallback-hint';
+      hint.textContent = '⚠ このパターンの形式に箇条書きが合わないため、簡易表示（タイトル＋メッセージ）にしています。内容を編集するか、別のパターンを選んでください。';
+      wrap.querySelector('.slide-canvas').insertAdjacentElement('afterend', hint);
+    }
     wrap.querySelector('.tpl-open-btn').addEventListener('click', () => openTemplatePicker(slide));
 
     return wrap;
