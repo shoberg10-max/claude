@@ -1601,7 +1601,7 @@ window.DocAssist = window.DocAssist || {};
     id: 'comparison-table',
     name: '比較表',
     category: '比較',
-    description: '5項目以上を一覧で比較する表形式。',
+    description: '5項目以上を一覧で比較する表形式。「項目名：説明」の形式で1行1項目書く（box-compareと同じKV形式。項目数が多い・説明が長い場合はこちらを使う）。推奨する項目の行頭に「★」または「★推奨」を付けるとハイライトされる。',
     score(section) {
       const bullets = section.bullets || [];
       const text = A.fullText(section);

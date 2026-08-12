@@ -471,6 +471,27 @@
     }
   }
 
+  // 比較表・ボックス比較など「1行=1項目」の箇条書きを使うパターンで、Step 3の
+  // プレビューを見ながら項目数を素早く増減できるようにする。減らす場合は末尾から
+  // 削る。増やす場合は「項目N：説明を入力してください」の仮の行を追加する
+  // （KV形式のため、box-compare/comparison-table系のパターンでそのまま表示できる。
+  // 他のパターンでもラベル付き箇条書きとして表示され、空にはならない）。
+  function setBulletCount(slide, n) {
+    const target = Math.max(1, n);
+    const bullets = (slide.bullets || []).slice();
+    if (target <= bullets.length) {
+      slide.bullets = bullets.slice(0, target);
+    } else {
+      let i = bullets.length;
+      while (bullets.length < target) {
+        i++;
+        bullets.push(`項目${i}：説明を入力してください`);
+      }
+      slide.bullets = bullets;
+    }
+    replaceCard(slide);
+  }
+
   function renderPatternLegend() {
     const groups = [];
     const byCategory = {};
@@ -1082,6 +1103,7 @@
     const message = DocAssist.analyze.effectiveMessage(slide);
     const subLines = (slide.subMessage || '').split('\n').map((s) => s.trim()).filter(Boolean);
 
+    const bulletCountForControl = (slide.bullets || []).length;
     wrap.innerHTML = `
       <div class="slide-preview-toolbar">
         <span class="label"${reasonAttr}>${sourceLabel(slide.patternSource)}</span>
@@ -1089,6 +1111,17 @@
           <span class="tpl-open-name">${escapeHtml(pattern.name)}</span>
           <span class="tpl-open-hint">テンプレートを選ぶ</span>
         </button>
+      </div>
+      <div class="item-count-control">
+        <span class="item-count-label">項目数</span>
+        <div class="item-count-quick">
+          ${[2, 3, 4, 5].map((n) => `<button type="button" class="item-count-quick-btn${bulletCountForControl === n ? ' is-active' : ''}" data-count="${n}">${n}</button>`).join('')}
+        </div>
+        <div class="item-count-stepper">
+          <button type="button" class="item-count-step-btn" data-act="dec" title="項目を1つ減らす">－</button>
+          <span class="item-count-value">${bulletCountForControl}</span>
+          <button type="button" class="item-count-step-btn" data-act="inc" title="項目を1つ増やす">＋</button>
+        </div>
       </div>
       <div class="slide-canvas">
         <div class="slide-title-bar">
@@ -1126,6 +1159,11 @@
       wrap.querySelector('.slide-canvas').insertAdjacentElement('afterend', hint);
     }
     wrap.querySelector('.tpl-open-btn').addEventListener('click', () => openTemplatePicker(slide));
+    wrap.querySelectorAll('.item-count-quick-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setBulletCount(slide, Number(btn.dataset.count)));
+    });
+    wrap.querySelector('[data-act="dec"]').addEventListener('click', () => setBulletCount(slide, bullets.length - 1));
+    wrap.querySelector('[data-act="inc"]').addEventListener('click', () => setBulletCount(slide, bullets.length + 1));
 
     return wrap;
   }

@@ -550,6 +550,86 @@ textarea.bullets {
   border: 1px solid var(--border);
 }
 
+.item-count-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.item-count-label {
+  color: var(--subtext);
+  flex: none;
+}
+
+.item-count-quick {
+  display: flex;
+  gap: 3px;
+}
+
+.item-count-quick-btn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  font-size: 10.5px;
+  color: var(--subtext);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.item-count-quick-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.item-count-quick-btn.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: bold;
+}
+
+.item-count-stepper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  flex: none;
+}
+
+.item-count-step-btn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--subtext);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+}
+
+.item-count-step-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.item-count-value {
+  min-width: 16px;
+  text-align: center;
+  font-weight: bold;
+  color: var(--text);
+}
+
 .slide-canvas {
   width: 100%;
   aspect-ratio: 11.69 / 8.27; /* A4横向き。js/pptxExport.jsのSLIDE_W/SLIDE_Hと一致させる */
