@@ -1193,13 +1193,17 @@
     const bar = document.getElementById('themeBar');
     if (!bar) return;
     const saved = DocAssist.pptxImport.getSaved();
+    const sampleBtnHtml = `<button type="button" class="btn ghost theme-bar-btn" id="sampleExportBtn">📦 全レイアウトをサンプル出力</button>
+         <span class="status-msg theme-bar-status" id="sampleExportStatus"></span>`;
     bar.innerHTML = saved
       ? `<span class="theme-bar-swatch" style="background:#${escapeAttr(saved.primary)};"></span>
          <span class="theme-bar-label">テンプレート適用中：${escapeHtml(saved.sourceFileName)}</span>
          <button type="button" class="btn ghost theme-bar-btn" id="themeChangeBtn">変更</button>
-         <button type="button" class="btn ghost theme-bar-btn" id="themeResetBtn">既定に戻す</button>`
+         <button type="button" class="btn ghost theme-bar-btn" id="themeResetBtn">既定に戻す</button>
+         ${sampleBtnHtml}`
       : `<span class="theme-bar-label">配色：官公庁報告書スタイル（既定）</span>
-         <button type="button" class="btn ghost theme-bar-btn" id="themeChangeBtn">🎨 テンプレートから取り込む</button>`;
+         <button type="button" class="btn ghost theme-bar-btn" id="themeChangeBtn">🎨 テンプレートから取り込む</button>
+         ${sampleBtnHtml}`;
     document.getElementById('themeChangeBtn').addEventListener('click', openTemplateThemeModal);
     const resetBtn = document.getElementById('themeResetBtn');
     if (resetBtn) {
@@ -1208,6 +1212,19 @@
         renderThemeBar();
       });
     }
+    document.getElementById('sampleExportBtn').addEventListener('click', async () => {
+      const statusEl = document.getElementById('sampleExportStatus');
+      statusEl.textContent = '生成中…';
+      statusEl.classList.remove('error');
+      try {
+        await DocAssist.exportSamplePptx();
+        statusEl.textContent = `全${DocAssist.patterns.length}パターンのサンプルを書き出しました。`;
+      } catch (e) {
+        console.error(e);
+        statusEl.textContent = '書き出しに失敗しました: ' + e.message;
+        statusEl.classList.add('error');
+      }
+    });
   }
 
   function openTemplateThemeModal() {

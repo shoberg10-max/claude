@@ -344,6 +344,45 @@ window.DocAssist = window.DocAssist || {};
     return pptx.writeFile({ fileName: name });
   }
 
+  // 全デザインパターンを1つずつスライドにしたサンプル集の構成案を組み立てる。
+  // 各パターンのギャラリー用サンプルデータ（SAMPLES）で描画するため、テンプレート
+  // ギャラリーのサムネイルと同じ内容がそのままPowerPointの実スライドとして並ぶ。
+  // PowerPoint Copilotのブランドキット登録用テンプレートなど、全レイアウトを
+  // 一括で書き出したいときに使う（app.jsの「📦 全レイアウトをサンプル出力」）。
+  function buildSampleOutline() {
+    const categories = DocAssist.patternCategories && DocAssist.patternCategories.length
+      ? DocAssist.patternCategories
+      : Array.from(new Set(DocAssist.patterns.map((p) => p.category)));
+    const byCategory = {};
+    DocAssist.patterns.forEach((p) => {
+      const cat = p.category || 'その他';
+      (byCategory[cat] = byCategory[cat] || []).push(p);
+    });
+    const slides = [];
+    categories.forEach((cat) => {
+      (byCategory[cat] || []).forEach((p) => {
+        slides.push({
+          heading: `${cat}｜${p.name}`,
+          message: p.description || p.name,
+          subMessage: '',
+          bullets: p.sample || [],
+          patternId: p.id,
+          sourceNote: '',
+        });
+      });
+    });
+    return {
+      title: `資料作成支援アプリ デザインパターン集（全${DocAssist.patterns.length}種）`,
+      slides,
+      arrangeEnabled: false,
+    };
+  }
+
+  function exportSamplePptx(fileName) {
+    const outline = buildSampleOutline();
+    return exportPptx(outline, fileName || outline.title + '.pptx');
+  }
+
   // タイトル取り込み機能（js/pptxImport.js）がプレビューCSSの余白計算に使う、
   // このファイルが実際に使っているスライド寸法・余白の単一ソース。
   DocAssist.slideGeometry = {
@@ -353,4 +392,6 @@ window.DocAssist = window.DocAssist || {};
 
   DocAssist.buildPptx = buildPptx;
   DocAssist.exportPptx = exportPptx;
+  DocAssist.buildSampleOutline = buildSampleOutline;
+  DocAssist.exportSamplePptx = exportSamplePptx;
 })();
