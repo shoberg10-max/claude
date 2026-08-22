@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>漢字検定8級 練習アプリ</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ホーム画面 -->
+  <section id="screen-home" class="screen">
+    <header class="app-header">
+      <h1>漢字検定8級<br>もんだいれんしゅう</h1>
+      <p class="sub">小学3年生修了程度の漢字で練習しよう</p>
+    </header>
+
+    <div class="card">
+      <h2>もんだいの しゅるい</h2>
+      <div class="mode-grid" id="mode-grid">
+        <button class="mode-btn" data-mode="reading">
+          <span class="mode-icon">読</span>
+          <span class="mode-label">読み方</span>
+          <span class="mode-desc">漢字をひらがなで書く</span>
+        </button>
+        <button class="mode-btn" data-mode="writing">
+          <span class="mode-icon">書</span>
+          <span class="mode-label">書き取り</span>
+          <span class="mode-desc">ひらがなを漢字で書く</span>
+        </button>
+        <button class="mode-btn" data-mode="strokes">
+          <span class="mode-icon">画</span>
+          <span class="mode-label">画数</span>
+          <span class="mode-desc">総画数を答える</span>
+        </button>
+        <button class="mode-btn" data-mode="mix">
+          <span class="mode-icon">総</span>
+          <span class="mode-label">まとめて</span>
+          <span class="mode-desc">3しゅるいをランダムに</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>もんだい数</h2>
+      <div class="count-grid" id="count-grid">
+        <button class="count-btn" data-count="10">10問</button>
+        <button class="count-btn selected" data-count="20">20問</button>
+        <button class="count-btn" data-count="30">30問</button>
+        <button class="count-btn" data-count="all">全問</button>
+      </div>
+    </div>
+
+    <button id="start-btn" class="primary-btn">はじめる</button>
+
+    <div class="card" id="weak-card" hidden>
+      <h2>にがてな漢字</h2>
+      <p class="sub small">まちがえやすい漢字をもう一度練習しよう</p>
+      <div id="weak-list" class="weak-list"></div>
+      <button id="weak-review-btn" class="secondary-btn">にがてを練習する</button>
+    </div>
+
+    <div class="card" id="stats-card">
+      <h2>これまでのせいせき</h2>
+      <div id="stats-body"></div>
+      <button id="reset-stats-btn" class="text-btn">記録をリセット</button>
+    </div>
+  </section>
+
+  <!-- クイズ画面 -->
+  <section id="screen-quiz" class="screen" hidden>
+    <div class="quiz-topbar">
+      <button id="quit-btn" class="icon-btn" aria-label="やめる">✕</button>
+      <div class="progress-track">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+      <div id="quiz-counter" class="quiz-counter">1 / 20</div>
+    </div>
+
+    <div class="card question-card">
+      <div id="question-type" class="question-type"></div>
+      <div id="question-prompt" class="question-prompt"></div>
+      <div id="question-display" class="question-display"></div>
+
+      <form id="answer-form">
+        <input id="answer-input" class="answer-input" type="text" autocomplete="off" autocapitalize="off" placeholder="ここに こたえを書く">
+        <div id="choice-grid" class="choice-grid" hidden></div>
+        <button id="submit-btn" type="submit" class="primary-btn">こたえる</button>
+      </form>
+
+      <div id="feedback" class="feedback" hidden>
+        <div id="feedback-mark" class="feedback-mark"></div>
+        <div id="feedback-text" class="feedback-text"></div>
+        <button id="next-btn" class="primary-btn">つぎへ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 結果画面 -->
+  <section id="screen-result" class="screen" hidden>
+    <div class="card result-card">
+      <h2 id="result-title">おつかれさま！</h2>
+      <div id="result-score" class="result-score"></div>
+      <div id="result-bar" class="progress-track"><div id="result-bar-fill" class="progress-fill"></div></div>
+      <div id="result-comment" class="result-comment"></div>
+
+      <div id="wrong-review" class="wrong-review"></div>
+
+      <div class="result-actions">
+        <button id="retry-wrong-btn" class="secondary-btn" hidden>まちがえた問題だけやり直す</button>
+        <button id="retry-same-btn" class="secondary-btn">もう一度おなじ設定でやる</button>
+        <button id="home-btn" class="primary-btn">ホームにもどる</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
