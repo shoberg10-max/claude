@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>沖縄本島 家族旅行しおり</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700;900&family=Kaisei+Decol:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ocean:#0E7C9C;
+    --ocean-deep:#0A5A73;
+    --coral:#FF6E4E;
+    --sun:#FFC53D;
+    --leaf:#3F9B6E;
+    --sand:#FFF7E8;
+    --sand-deep:#FBEBCB;
+    --ink:#1C2B33;
+    --paper:#FFFDF7;
+    --purple:#6D6FB0;
+    --steel:#5B7A94;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--sand);
+    color:var(--ink);
+    font-family:'Noto Sans JP', sans-serif;
+    line-height:1.7;
+  }
+  .display{font-family:'Zen Maru Gothic', sans-serif;}
+  .serif-accent{font-family:'Kaisei Decol', serif;}
+
+  /* ===== decorative background texture ===== */
+  .dotted-bg{
+    background-image: radial-gradient(circle, rgba(14,124,156,0.08) 1.6px, transparent 1.6px);
+    background-size: 22px 22px;
+  }
+
+  /* ===== HERO / COVER ===== */
+  .cover{
+    position:relative;
+    overflow:hidden;
+    background:linear-gradient(180deg, var(--ocean) 0%, #14A0C4 55%, #5FD1CE 100%);
+    color:#fff;
+    padding:64px 24px 120px;
+    text-align:center;
+  }
+  .cover .wave{
+    position:absolute; left:0; right:0; bottom:-2px; height:80px;
+    background:var(--sand);
+    clip-path: polygon(0 40%, 5% 45%, 10% 38%, 15% 46%, 20% 40%, 25% 48%, 30% 40%, 35% 46%, 40% 38%, 45% 46%, 50% 40%, 55% 48%, 60% 40%, 65% 46%, 70% 38%, 75% 46%, 80% 40%, 85% 48%, 90% 40%, 95% 46%, 100% 40%, 100% 100%, 0 100%);
+  }
+  .cover .eyebrow{
+    display:inline-block;
+    font-size:13px;
+    letter-spacing:.28em;
+    background:rgba(255,255,255,.18);
+    border:1px solid rgba(255,255,255,.5);
+    padding:6px 18px;
+    border-radius:999px;
+    margin-bottom:22px;
+  }
+  .cover h1{
+    font-size:clamp(34px,8vw,58px);
+    margin:0 0 10px;
+    font-weight:900;
+    text-shadow: 0 4px 0 rgba(10,90,115,.35);
+    letter-spacing:.03em;
+  }
+  .cover .sub{
+    font-size:15px;
+    opacity:.95;
+    margin-bottom:28px;
+  }
+  .cover .meta-row{
+    display:flex; flex-wrap:wrap; gap:10px; justify-content:center;
+  }
+  .meta-chip{
+    background:rgba(255,255,255,.92);
+    color:var(--ocean-deep);
+    font-weight:700;
+    font-size:13px;
+    padding:9px 16px;
+    border-radius:999px;
+    box-shadow:0 3px 0 rgba(10,90,115,.25);
+  }
+  .cover .creatures{
+    position:absolute; font-size:34px; opacity:.9;
+  }
+  .c1{top:20px; left:6%; transform:rotate(-8deg);}
+  .c2{top:70px; right:8%; transform:rotate(10deg);}
+  .c3{top:150px; left:14%; font-size:22px;}
+  .c4{top:180px; right:16%; font-size:26px;}
+
+  /* ===== ROUTE MAP STRIP ===== */
+  .route-strip{
+    background:var(--paper);
+    margin:-88px 16px 0;
+    position:relative; z-index:2;
+    border-radius:22px;
+    box-shadow:0 10px 30px rgba(10,60,80,.14);
+    padding:22px 18px 18px;
+    max-width:920px;
+    margin-left:auto; margin-right:auto;
+    margin-top:-88px;
+  }
+  .route-title{
+    font-size:12px; font-weight:700; color:var(--coral); letter-spacing:.14em; margin-bottom:14px;
+  }
+  .route-track{
+    display:flex; align-items:center; overflow-x:auto; gap:0; padding-bottom:6px;
+  }
+  .route-node{
+    flex:0 0 auto; text-align:center; width:96px;
+  }
+  .route-dot{
+    width:44px; height:44px; border-radius:50%;
+    background:var(--sun); border:3px solid var(--paper); outline:2px solid var(--ocean);
+    display:flex; align-items:center; justify-content:center; margin:0 auto 6px;
+    font-size:20px;
+  }
+  .route-label{font-size:11px; font-weight:700; color:var(--ink); white-space:nowrap;}
+  .route-sub{font-size:10px; color:#7a8890;}
+  .route-line{
+    flex:1 1 auto; height:3px; background:repeating-linear-gradient(90deg, var(--ocean) 0 8px, transparent 8px 14px);
+    min-width:22px; margin-top:-24px;
+  }
+
+  /* ===== CONTAINER ===== */
+  .wrap{max-width:920px; margin:0 auto; padding:40px 16px 20px;}
+
+  /* ===== DAY NAV ===== */
+  .day-nav{
+    display:flex; gap:10px; overflow-x:auto; padding:4px 2px 30px;
+  }
+  .day-nav a{
+    flex:0 0 auto;
+    text-decoration:none;
+    background:var(--paper);
+    border:2px solid var(--sand-deep);
+    color:var(--ocean-deep);
+    font-weight:700; font-size:13px;
+    padding:10px 16px; border-radius:14px;
+  }
+
+  /* ===== DAY SECTION ===== */
+  .day{
+    background:var(--paper);
+    border-radius:26px;
+    margin-bottom:36px;
+    overflow:hidden;
+    box-shadow:0 8px 26px rgba(10,60,80,.09);
+    border:1px solid rgba(10,90,115,.08);
+  }
+  .day-head{
+    padding:26px 26px 20px;
+    position:relative;
+    color:#fff;
+  }
+  .day-head .num{
+    font-family:'Kaisei Decol', serif;
+    font-size:13px;
+    letter-spacing:.2em;
+    opacity:.85;
+  }
+  .day-head h2{
+    margin:4px 0 10px;
+    font-size:clamp(22px,5vw,30px);
+    font-weight:900;
+  }
+  .day-head .date-line{font-size:12.5px; opacity:.92;}
+  .day1 .day-head{background:linear-gradient(120deg,#0E7C9C,#1FA5C4);}
+  .day2 .day-head{background:linear-gradient(120deg,#1E9E9A,#3FC7B0);}
+  .day3 .day-head{background:linear-gradient(120deg,#FF8A5B,#FF6E4E);}
+  .day4 .day-head{background:linear-gradient(120deg,#6D6FB0,#8C8FD1);}
+
+  .day-body{padding:6px 22px 26px;}
+
+  .timeline{position:relative; padding-left:26px;}
+  .timeline::before{
+    content:''; position:absolute; left:8px; top:6px; bottom:6px; width:2px;
+    background:var(--sand-deep);
+  }
+  .tl-item{position:relative; padding:14px 0;}
+  .tl-item::before{
+    content:''; position:absolute; left:-26px; top:20px; width:12px; height:12px; border-radius:50%;
+    background:var(--sun); border:2px solid var(--paper); box-shadow:0 0 0 2px var(--ocean);
+  }
+  .tl-time{
+    display:inline-block; font-weight:700; font-size:12.5px; color:var(--ocean-deep);
+    background:var(--sand-deep); padding:3px 10px; border-radius:8px; margin-bottom:6px;
+  }
+  .tl-title{font-weight:700; font-size:16px; margin:2px 0 4px;}
+  .tl-desc{font-size:13.5px; color:#4b5a62;}
+  .tl-tag{
+    display:inline-block; font-size:10.5px; font-weight:700; color:#fff;
+    background:var(--leaf); padding:2px 9px; border-radius:999px; margin-left:6px; vertical-align:middle;
+  }
+  .tl-link{
+    display:inline-block; margin-left:6px; font-size:11px; font-weight:700;
+    color:var(--ocean-deep); text-decoration:none; border-bottom:1.5px dotted var(--ocean-deep);
+  }
+
+  /* ===== GOURMET CARD ===== */
+  .gourmet-box{
+    margin-top:18px;
+    background:var(--sand);
+    border:2px dashed var(--coral);
+    border-radius:18px;
+    padding:16px 18px;
+  }
+  .gourmet-box .g-head{
+    display:flex; align-items:center; gap:8px;
+    font-weight:900; color:var(--coral); font-size:13.5px; letter-spacing:.06em; margin-bottom:10px;
+  }
+  .g-head .stamp{
+    background:var(--coral); color:#fff; font-size:11px; padding:3px 8px; border-radius:6px; transform:rotate(-3deg);
+  }
+  .g-list{display:grid; gap:10px;}
+  .g-item{
+    display:flex; gap:10px; align-items:flex-start;
+    background:var(--paper); border-radius:12px; padding:10px 12px;
+  }
+  .g-emoji{font-size:22px; line-height:1;}
+  .g-name-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .g-name{font-weight:700; font-size:13.5px;}
+  .g-note{font-size:12px; color:#5c6a71; margin-top:2px;}
+  .g-links{display:flex; gap:6px; margin-top:6px;}
+  .g-link{
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:11px; font-weight:700; text-decoration:none;
+    padding:3px 9px; border-radius:999px;
+    border:1.5px solid currentColor;
+  }
+  .g-link.tabelog{color:#ff5722;}
+  .g-link.gnavi{color:#0b6e4f;}
+  .g-link.official{color:var(--ocean-deep);}
+
+  /* ===== MAP LINKS ===== */
+  .map-link{
+    margin-top:16px;
+    display:flex; align-items:center; gap:14px;
+    background:linear-gradient(135deg,#EAF6F5,#DFF1EE);
+    border:1.5px solid rgba(14,124,156,.25);
+    border-radius:16px;
+    padding:14px 16px;
+    text-decoration:none;
+    color:var(--ink);
+    box-shadow:0 4px 14px rgba(10,60,80,.06);
+  }
+  .map-link .pin{
+    flex:0 0 auto;
+    width:42px; height:42px; border-radius:50%;
+    background:var(--ocean);
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px;
+  }
+  .map-link .txt{flex:1 1 auto;}
+  .map-link .map-title{font-weight:700; font-size:13.5px; color:var(--ocean-deep);}
+  .map-link .map-sub{font-size:11.5px; color:#5c6a71; margin-top:2px;}
+  .map-link .arrow{font-size:16px; color:var(--ocean); flex:0 0 auto;}
+  .map-links-row{display:flex; flex-direction:column; gap:10px;}
+
+  /* ===== SPOT GUIDE (図鑑) ===== */
+  .spotguide-section{
+    background:var(--paper);
+    border-radius:26px;
+    margin-bottom:36px;
+    padding:30px 24px 34px;
+    box-shadow:0 8px 26px rgba(10,60,80,.09);
+    border:1px solid rgba(10,90,115,.08);
+  }
+  .spotguide-head{margin-bottom:26px;}
+  .spotguide-head .eyebrow2{
+    font-size:12px; font-weight:700; color:var(--coral); letter-spacing:.16em; margin-bottom:6px;
+  }
+  .spotguide-head h2{
+    margin:0 0 6px; font-size:clamp(22px,5vw,28px); font-weight:900; color:var(--ocean-deep);
+  }
+  .spotguide-head p{margin:0; font-size:13px; color:#5c6a71;}
+
+  .spotday-label{
+    display:flex; align-items:center; gap:10px;
+    font-weight:900; font-size:14px; color:#fff;
+    padding:8px 16px; border-radius:12px; margin:30px 0 16px;
+  }
+  .spotday-label:first-of-type{margin-top:8px;}
+  .spotday-label.sd1{background:linear-gradient(120deg,#0E7C9C,#1FA5C4);}
+  .spotday-label.sd2{background:linear-gradient(120deg,#1E9E9A,#3FC7B0);}
+  .spotday-label.sd3{background:linear-gradient(120deg,#FF8A5B,#FF6E4E);}
+
+  .spot-grid{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:18px;
+  }
+  .spot-card{
+    background:var(--sand);
+    border-radius:20px;
+    overflow:hidden;
+    display:flex; flex-direction:column;
+    box-shadow:0 5px 16px rgba(10,60,80,.08);
+    border:1px solid rgba(10,90,115,.06);
+  }
+  .spot-banner{
+    position:relative; height:128px; overflow:hidden;
+  }
+  .spot-banner .scene{position:absolute;}
+  .spot-banner .cat-chip{
+    position:absolute; top:10px; left:10px;
+    font-size:10.5px; font-weight:700; color:#fff;
+    background:rgba(0,0,0,.28); padding:4px 10px; border-radius:999px;
+    letter-spacing:.03em; backdrop-filter:blur(2px);
+  }
+  .bg-sight{background:linear-gradient(135deg,#0E7C9C,#5FD1CE);}
+  .bg-food{background:linear-gradient(135deg,#FF8A5B,#FF6E4E);}
+  .bg-exp{background:linear-gradient(135deg,#1E9E9A,#3FC7B0);}
+  .bg-stay{background:linear-gradient(135deg,#6D6FB0,#8C8FD1);}
+  .bg-shop{background:linear-gradient(135deg,#FFC53D,#FFA53D);}
+  .bg-rest{background:linear-gradient(135deg,#5B7A94,#7C93A8);}
+
+  .spot-body{padding:14px 15px 17px; display:flex; flex-direction:column; gap:7px; flex:1;}
+  .spot-area{font-size:10.5px; font-weight:700; color:var(--ocean-deep); letter-spacing:.03em;}
+  .spot-name{font-size:15.5px; font-weight:900; line-height:1.35; margin:0;}
+  .spot-desc{font-size:12px; color:#4b5a62; margin:0;}
+  .spot-points{list-style:none; margin:2px 0 0; padding:0; display:grid; gap:5px;}
+  .spot-points li{font-size:11.5px; color:#3a474e; display:flex; gap:6px; align-items:flex-start;}
+  .spot-points li::before{content:'●'; color:var(--coral); font-size:7px; margin-top:5px; flex:0 0 auto;}
+
+  /* ===== PLOTTED SVG MAP ===== */
+  .plot-map{
+    margin-top:16px;
+    background:linear-gradient(135deg,#EAF6F5,#DFF1EE);
+    border:1.5px solid rgba(14,124,156,.2);
+    border-radius:18px;
+    padding:14px 14px 10px;
+  }
+  .plot-map .pm-title{
+    font-size:12px; font-weight:700; color:var(--ocean-deep); margin-bottom:8px;
+  }
+  .plot-map svg{width:100%; height:auto; display:block;}
+  .plot-legend{
+    display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;
+  }
+  .plot-legend-item{
+    display:flex; align-items:center; gap:6px;
+    background:var(--paper); border-radius:999px; padding:4px 10px 4px 6px;
+    font-size:11.5px; font-weight:700; color:var(--ink);
+  }
+  .plot-legend-num{
+    width:18px; height:18px; border-radius:50%;
+    background:var(--coral); color:#fff; font-size:10px;
+    display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+  }
+
+  /* ===== RAIN PLAN ===== */
+  .rain-section{
+    background:linear-gradient(120deg,#5B7A94,#7C93A8);
+    border-radius:26px; margin-bottom:36px; padding:28px 24px;
+    color:#fff; box-shadow:0 8px 26px rgba(20,40,60,.15);
+  }
+  .rain-section .rs-title{
+    font-size:clamp(20px,5vw,26px); font-weight:900; margin:6px 0 4px;
+  }
+  .rain-section .rs-sub{font-size:13px; opacity:.9; margin-bottom:22px;}
+  .rain-day{
+    background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.25);
+    border-radius:16px; padding:16px 18px; margin-bottom:12px;
+  }
+  .rain-day h4{margin:0 0 10px; font-size:14.5px; display:flex; align-items:center; gap:8px;}
+  .rain-row{display:flex; gap:10px; align-items:flex-start; font-size:12.5px; margin-bottom:8px; line-height:1.6;}
+  .rain-row:last-child{margin-bottom:0;}
+  .rain-icon{flex:0 0 auto; width:20px; text-align:center;}
+  .rain-keep{color:#D7F5E0;}
+  .rain-swap{color:#FFE7B3;}
+
+  /* ===== INFO GRID (movement / logistics) ===== */
+  .info-grid{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:14px; margin:34px 0;
+  }
+  .info-card{
+    background:var(--paper); border-radius:18px; padding:18px;
+    border-top:5px solid var(--ocean);
+    box-shadow:0 6px 18px rgba(10,60,80,.08);
+  }
+  .info-card h3{
+    margin:0 0 8px; font-size:14.5px; display:flex; gap:8px; align-items:center;
+  }
+  .info-card p{margin:0; font-size:12.5px; color:#4b5a62;}
+  .info-card ul{margin:6px 0 0; padding-left:18px; font-size:12.5px; color:#4b5a62;}
+
+  footer{
+    text-align:center; padding:30px 20px 50px; font-size:11.5px; color:#7a8890;
+  }
+
+  @media (max-width:640px){
+    .route-strip{margin-top:-70px; padding:18px 14px 14px;}
+    .day-body{padding:4px 16px 22px;}
+    .day-head{padding:22px 18px 16px;}
+    .spotguide-section{padding:24px 16px 28px;}
+  }
+</style>
+</head>
+<body class="dotted-bg">
+
+  <!-- ===== COVER ===== -->
+  <div class="cover">
+    <span class="creatures c1">🐠</span>
+    <span class="creatures c2">🌺</span>
+    <span class="creatures c3">🐢</span>
+    <span class="creatures c4">🌴</span>
+    <div class="eyebrow display">FAMILY TRIP GUIDE · OKINAWA</div>
+    <h1 class="display">沖縄本島<br>家族旅行しおり</h1>
+    <div class="sub">美ら海 × 古宇利ビーチ × 北部グルメ × 那覇さんぽ、3泊4日</div>
+    <div class="meta-row">
+      <div class="meta-chip">👨‍👩‍👧‍👦 4人家族（8歳・7歳）</div>
+      <div class="meta-chip">🏨 Twin-Line Hotel／空港近くホテル</div>
+      <div class="meta-chip">✈️ 11:45着 → 10:50発</div>
+    </div>
+    <div class="wave"></div>
+  </div>
+
+  <!-- ===== ROUTE STRIP ===== -->
+  <div class="route-strip">
+    <div class="route-title display">🗺️ 4日間のルート</div>
+    <div class="route-track">
+      <div class="route-node">
+        <div class="route-dot">✈️</div>
+        <div class="route-label">那覇空港</div>
+        <div class="route-sub">Day1 到着</div>
+      </div>
+      <div class="route-line"></div>
+      <div class="route-node">
+        <div class="route-dot">🌿</div>
+        <div class="route-label">名護・北部</div>
+        <div class="route-sub">Day1-2 宿泊</div>
+      </div>
+      <div class="route-line"></div>
+      <div class="route-node">
+        <div class="route-dot">🏝️</div>
+        <div class="route-label">古宇利島</div>
+        <div class="route-sub">Day2</div>
+      </div>
+      <div class="route-line"></div>
+      <div class="route-node">
+        <div class="route-dot">🏙️</div>
+        <div class="route-label">那覇市内</div>
+        <div class="route-sub">Day3</div>
+      </div>
+      <div class="route-line"></div>
+      <div class="route-node">
+        <div class="route-dot">🛫</div>
+        <div class="route-label">空港近く</div>
+        <div class="route-sub">Day3泊→Day4</div>
+      </div>
+    </div>
+    <div class="map-links-row">
+      <a class="map-link" href="https://www.google.com/maps?q=%E6%B2%96%E7%B8%84%E6%9C%AC%E5%B3%B6" target="_blank" rel="noopener">
+        <div class="pin">🗺️</div>
+        <div class="txt">
+          <div class="map-title">全体ルートをGoogleマップで見る</div>
+          <div class="map-sub">空港→名護→古宇利島→那覇→空港近く</div>
+        </div>
+        <div class="arrow">›</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- ===== DAY NAV ===== -->
+    <div class="day-nav">
+      <a href="#day1">① 到着・北部へ</a>
+      <a href="#day2">② 美ら海＆古宇利</a>
+      <a href="#day3">③ 那覇さんぽ</a>
+      <a href="#day4">④ 出発</a>
+      <a href="#spotguide">📖 スポット図鑑</a>
+      <a href="#rainplan">☔ 雨の日プランB</a>
+    </div>
+
+    <!-- ===== DAY 1 ===== -->
+    <section class="day day1" id="day1">
+      <div class="day-head">
+        <div class="num display">DAY 1 ・ ARRIVAL</div>
+        <h2 class="display">到着からフル稼働で北部へ</h2>
+        <div class="date-line">那覇空港 11:45着 → A&amp;W牧港店 → 北部エリア泊</div>
+      </div>
+      <div class="day-body">
+        <div class="timeline">
+          <div class="tl-item">
+            <span class="tl-time">11:45</span>
+            <div class="tl-title">那覇空港 到着</div>
+            <div class="tl-desc">カヌチャレンタカーの送迎車で空港から3分の営業所へ。待ち時間ほぼナシでスムーズに手続き。<span class="tl-tag">レンタカー</span></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">12:30頃</span>
+            <div class="tl-title">出発、北上開始</div>
+            <div class="tl-desc">58号線を北上。まずは腹ごしらえへ。</div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">13:00頃</span>
+            <div class="tl-title">A&W 牧港店でランチ</div>
+            <div class="tl-desc">日本第1号店の歴史あるドライブイン。ルートビア・オニオンリングは必食。<span class="tl-tag">必見</span> <a class="tl-link" href="#spot-aw">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">13:45頃</span>
+            <div class="tl-title">アメリカンビレッジ(北谷)に寄り道</div>
+            <div class="tl-desc">カラフルな街並みを散策、写真スポット多数。1時間程度の軽めの滞在。<span class="tl-tag">寄り道</span> <a class="tl-link" href="#spot-amevillage">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">15:00頃</span>
+            <div class="tl-title">道の駅 許田で寄り道</div>
+            <div class="tl-desc">揚げたてサーターアンダギー、沖縄天ぷらで小腹を満たす。北部ドライブの定番スポット。<a class="tl-link" href="#spot-kyoda">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">16:00頃</span>
+            <div class="tl-title">MEGAドン・キホーテ名護店でお土産調達</div>
+            <div class="tl-desc">ブルーシール・オリオンビール柄のTシャツをコスパ良くまとめ買い。<span class="tl-tag">お土産</span> <a class="tl-link" href="#spot-donki">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">16:30頃</span>
+            <div class="tl-title">ホテル チェックイン</div>
+            <div class="tl-desc">Twin-Line Hotel到着。荷物を置いたら即ビーチへ。 <a class="tl-link" href="#spot-hotel">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">17:00〜</span>
+            <div class="tl-title">目の前の幸喜ビーチでのんびり</div>
+            <div class="tl-desc">ホテルすぐ前のビーチで夕方まで散歩・波打ち際で水遊び。 <a class="tl-link" href="#spot-kouki">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">夜</span>
+            <div class="tl-title">アグー豚しゃぶしゃぶで乾杯</div>
+            <div class="tl-desc">初日から沖縄グルメを満喫。要事前予約。</div>
+          </div>
+        </div>
+
+        <div class="gourmet-box">
+          <div class="g-head">🍽 <span class="stamp">GOURMET</span> Day1 立ち寄りスポット</div>
+          <div class="g-list">
+            <div class="g-item"><div class="g-emoji">🍔</div><div>
+              <div class="g-name">A&W 牧港店</div>
+              <div class="g-note">日本第1号店(1963年開業)の歴史あるドライブイン。ルートビアが名物。</div>
+            </div></div>
+            <div class="g-item"><div class="g-emoji">🏖️</div><div>
+              <div class="g-name">アメリカンビレッジ(北谷)</div>
+              <div class="g-note">カラフルな街並みとフォトスポット。軽めの街歩き。</div>
+            </div></div>
+            <div class="g-item"><div class="g-emoji">🛍️</div><div>
+              <div class="g-name">MEGAドン・キホーテ 名護店</div>
+              <div class="g-note">ブルーシール・オリオンビールTシャツをコスパ良く調達。</div>
+            </div></div>
+            <div class="g-item"><div class="g-emoji">🍲</div><div>
+              <div class="g-name">百年古家 大家（うふやー）</div>
+              <div class="g-note">滝を眺めながら食事できる古民家レストラン。座敷ありでファミリー向け。</div>
+              <div class="g-links">
+                <a class="g-link tabelog" href="https://tabelog.com/okinawa/A4702/A470201/47000122/" target="_blank" rel="noopener">食べログ</a>
+              </div>
+            </div></div>
+            <div class="g-item"><div class="g-emoji">🐷</div><div>
+              <div class="g-name">ちゃぶ〜 名護店</div>
+              <div class="g-note">皮付きあぐー豚が名物。個室・掘りごたつ席あり。</div>
+              <div class="g-links">
+                <a class="g-link gnavi" href="https://r.gnavi.co.jp/3rgg1ctb0000/" target="_blank" rel="noopener">ぐるなび</a>
+              </div>
+            </div></div>
+            <div class="g-item"><div class="g-emoji">🍡</div><div>
+              <div class="g-name">道の駅許田（休憩スポット）</div>
+              <div class="g-note">サーターアンダギー／おっぱジェラート／沖縄天ぷら</div>
+            </div></div>
+          </div>
+        </div>
+
+        <a class="map-link" href="https://www.google.com/maps?q=%E9%81%93%E3%81%AE%E9%A7%85%E8%A8%B1%E7%94%B0+%E5%90%8D%E8%AD%B7%E5%B8%82" target="_blank" rel="noopener">
+          <div class="pin">📍</div>
+          <div class="txt">
+            <div class="map-title">道の駅許田・名護エリアをマップで見る</div>
+            <div class="map-sub">Googleマップで開く</div>
+          </div>
+          <div class="arrow">›</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ===== DAY 2 ===== -->
+    <section class="day day2" id="day2">
+      <div class="day-head">
+        <div class="num display">DAY 2 ・ OCEAN DAY</div>
+        <h2 class="display">美ら海水族館 ＆ 古宇利島</h2>
+        <div class="date-line">北部満喫デー：水族館 → 離島ビーチ → ホテル連泊</div>
+      </div>
+      <div class="day-body">
+        <div class="timeline">
+          <div class="tl-item">
+            <span class="tl-time">午前</span>
+            <div class="tl-title">沖縄美ら海水族館</div>
+            <div class="tl-desc">開館直後の入場が狙い目。ホテルから車で40〜50分。<span class="tl-tag">必見</span> <a class="tl-link" href="#spot-churaumi">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">昼</span>
+            <div class="tl-title">きしもと食堂で沖縄そば</div>
+            <div class="tl-desc">明治38年創業、本部そば街道の名店。木灰(もっかい)を使った昔ながらの製法。開店直前は行列必至。<span class="tl-tag">必見</span> <a class="tl-link" href="#spot-kishimoto">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">午後</span>
+            <div class="tl-title">古宇利島へ移動（約30分）</div>
+            <div class="tl-desc">古宇利大橋を渡って恋の島へ。</div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">14:00〜</span>
+            <div class="tl-title">古宇利ビーチでシュノーケリング</div>
+            <div class="tl-desc">クラゲ防止ネット＆浅瀬で子供も安心。魚もしっかり見える。<span class="tl-tag">海水浴</span> <a class="tl-link" href="#spot-kouri-beach">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">16:00頃</span>
+            <div class="tl-title">ハートロック（ティーヌ浜）</div>
+            <div class="tl-desc">古宇利島のシンボルで記念撮影。 <a class="tl-link" href="#spot-heartrock">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">夕方</span>
+            <div class="tl-title">ホテルへ戻り連泊</div>
+            <div class="tl-desc">古宇利島から20〜30分。</div>
+          </div>
+        </div>
+
+        <div class="gourmet-box">
+          <div class="g-head">🍽 <span class="stamp">GOURMET</span> 古宇利島のカフェ休憩</div>
+          <div class="g-list">
+            <div class="g-item"><div class="g-emoji">🌊</div><div>
+              <div class="g-name">Cafe フクルビ</div>
+              <div class="g-note">高台のオーシャンビュー。キッズスペースありで子連れ安心。</div>
+              <div class="g-links">
+                <a class="g-link tabelog" href="https://tabelog.com/okinawa/rstLst/?vs=1&sk=Cafe%E3%83%95%E3%82%AF%E3%83%AB%E3%83%93" target="_blank" rel="noopener">食べログで探す</a>
+                <a class="g-link official" href="https://fukurubi.com/" target="_blank" rel="noopener">公式サイト</a>
+              </div>
+            </div></div>
+            <div class="g-item"><div class="g-emoji">🍛</div><div>
+              <div class="g-name">Cafe 古宇利家</div>
+              <div class="g-note">カレー・タコライスが人気。ハートロックから徒歩圏。</div>
+              <div class="g-links">
+                <a class="g-link tabelog" href="https://tabelog.com/okinawa/rstLst/?vs=1&sk=%E5%8F%A4%E5%AE%87%E5%88%A9%E5%AE%B6" target="_blank" rel="noopener">食べログで探す</a>
+              </div>
+            </div></div>
+          </div>
+        </div>
+
+        <a class="map-link" href="https://www.google.com/maps?q=%E5%8F%A4%E5%AE%87%E5%88%A9%E5%B3%B6" target="_blank" rel="noopener">
+          <div class="pin">📍</div>
+          <div class="txt">
+            <div class="map-title">美ら海水族館・古宇利島をマップで見る</div>
+            <div class="map-sub">Googleマップで開く</div>
+          </div>
+          <div class="arrow">›</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ===== DAY 3 ===== -->
+    <section class="day day3" id="day3">
+      <div class="day-head">
+        <div class="num display">DAY 3 ・ NAHA STROLL</div>
+        <h2 class="display">南下して那覇さんぽ</h2>
+        <div class="date-line">チェックアウト → 国際通り → ウミカジテラス → 空港近くホテル泊</div>
+      </div>
+      <div class="day-body">
+        <div class="timeline">
+          <div class="tl-item">
+            <span class="tl-time">午前</span>
+            <div class="tl-title">ホテルをチェックアウトし南下</div>
+            <div class="tl-desc">名護から那覇まで約90分のドライブ。</div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">昼</span>
+            <div class="tl-title">国際通りでステーキランチ</div>
+            <div class="tl-desc">キッズメニュー・ドリンクバー・ブルーシールアイス付きの店を選ぶと一石二鳥。<span class="tl-tag">必見</span> <a class="tl-link" href="#spot-steak88">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">午後</span>
+            <div class="tl-title">国際通り食べ歩き＆お土産</div>
+            <div class="tl-desc">ポーたま、ブルーシール、タコライスなど定番グルメを制覇。 <a class="tl-link" href="#spot-kokusai">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">15:30頃</span>
+            <div class="tl-title">琉球ガラス村（糸満）で体験</div>
+            <div class="tl-desc">琉球グラス作り＋シーサー絵付けが1施設で完結。当日予約不要のプランもあり。<span class="tl-tag">体験</span> <a class="tl-link" href="#spot-glassvillage">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">17:00頃</span>
+            <div class="tl-title">ウミカジテラスへ移動（約15分）</div>
+            <div class="tl-desc">糸満から瀬長島まで無理のない距離。 <a class="tl-link" href="#spot-umikaji">→ 詳細を見る</a></div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">夜</span>
+            <div class="tl-title">夕日を見ながらディナー</div>
+            <div class="tl-desc">タコス・海鮮など軽めに、旅の最後の夜を海辺で。</div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">宿泊</span>
+            <div class="tl-title">空港近くのホテルへ</div>
+            <div class="tl-desc">ウミカジテラスから徒歩圏 or 車で数分。翌朝の負担を最小化。<span class="tl-tag">最終泊</span></div>
+          </div>
+        </div>
+
+        <div class="gourmet-box">
+          <div class="g-head">🍽 <span class="stamp">GOURMET</span> 那覇 定番グルメ制覇リスト</div>
+          <div class="g-list">
+            <div class="g-item"><div class="g-emoji">🥩</div><div>
+              <div class="g-name">ステーキ88 国際通り店</div>
+              <div class="g-note">キッズカレー・ハンバーグあり。スープ＆サラダバー付き、ブルーシールおかわり可の店舗も。</div>
+              <div class="g-links">
+                <a class="g-link tabelog" href="https://tabelog.com/okinawa/A4701/A470101/47000456/" target="_blank" rel="noopener">食べログ</a>
+                <a class="g-link official" href="https://s88.co.jp/shop/steak88/nishiguchi/" target="_blank" rel="noopener">公式（西口店）</a>
+              </div>
+            </div></div>
+            <div class="g-item"><div class="g-emoji">🍙</div><div>
+              <div class="g-name">ポーたま 牧志市場店</div>
+              <div class="g-note">ポークたまごおにぎりを軽くつまみ食い。</div>
+              <div class="g-links">
+                <a class="g-link tabelog" href="https://tabelog.com/okinawa/A4701/A470101/47015021/" target="_blank" rel="noopener">食べログ</a>
+              </div>
+            </div></div>
+            <div class="g-item"><div class="g-emoji">🍦</div><div>
+              <div class="g-name">ブルーシール 国際通り店</div>
+              <div class="g-note">てんぶす館隣。定番フレーバーで一休み。</div>
+              <div class="g-links">
+                <a class="g-link tabelog" href="https://tabelog.com/okinawa/A4701/A470101/47004385/" target="_blank" rel="noopener">食べログ</a>
+              </div>
+            </div></div>
+            <div class="g-item"><div class="g-emoji">🌯</div><div>
+              <div class="g-name">タコライス（国際通り沿いの店）</div>
+              <div class="g-note">発祥の店(金武町)にはこだわらず、国際通り沿いの人気店で軽めのハーフサイズを。</div>
+            </div></div>
+            <div class="g-item"><div class="g-emoji">🎨</div><div>
+              <div class="g-name">琉球ガラス村（糸満）</div>
+              <div class="g-note">グラス作り＋シーサー絵付けが1ヶ所で完結。子供も参加しやすい。</div>
+            </div></div>
+            <div class="g-item"><div class="g-emoji">🌮</div><div>
+              <div class="g-name">ウミカジテラス内の飲食店</div>
+              <div class="g-note">夕日を見ながらタコス・海鮮系ディナー。店舗多数、当日の気分で。</div>
+              <div class="g-links">
+                <a class="g-link tabelog" href="https://tabelog.com/okinawa/rstLst/?vs=1&sk=%E3%82%A6%E3%83%9F%E3%82%AB%E3%82%B8%E3%83%86%E3%83%A9%E3%82%B9" target="_blank" rel="noopener">食べログで探す</a>
+              </div>
+            </div></div>
+          </div>
+        </div>
+
+        <div class="map-links-row">
+          <a class="map-link" href="https://www.google.com/maps?q=%E5%9B%BD%E9%9A%9B%E9%80%9A%E3%82%8A%E3%80%81%E9%82%A3%E8%A6%87%E5%B8%82" target="_blank" rel="noopener">
+            <div class="pin">📍</div>
+            <div class="txt">
+              <div class="map-title">国際通りをマップで見る</div>
+              <div class="map-sub">Googleマップで開く</div>
+            </div>
+            <div class="arrow">›</div>
+          </a>
+          <a class="map-link" href="https://www.google.com/maps?q=%E3%82%A6%E3%83%9F%E3%82%AB%E3%82%B8%E3%83%86%E3%83%A9%E3%82%B9" target="_blank" rel="noopener">
+            <div class="pin">📍</div>
+            <div class="txt">
+              <div class="map-title">瀬長島ウミカジテラスをマップで見る</div>
+              <div class="map-sub">Googleマップで開く</div>
+            </div>
+            <div class="arrow">›</div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== DAY 4 ===== -->
+    <section class="day day4" id="day4">
+      <div class="day-head">
+        <div class="num display">DAY 4 ・ DEPARTURE</div>
+        <h2 class="display">身軽に帰路へ</h2>
+        <div class="date-line">10:50発 → 朝はゆったり、レンタカー返却のみ</div>
+      </div>
+      <div class="day-body">
+        <div class="timeline">
+          <div class="tl-item">
+            <span class="tl-time">朝</span>
+            <div class="tl-title">ホテルで朝食 → チェックアウト</div>
+            <div class="tl-desc">空港近くなので移動の余裕あり。</div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">出発90分前目安</span>
+            <div class="tl-title">レンタカー返却</div>
+            <div class="tl-desc">カヌチャレンタカーの送迎で空港へスムーズに。</div>
+          </div>
+          <div class="tl-item">
+            <span class="tl-time">10:50</span>
+            <div class="tl-title">搭乗、帰路へ</div>
+            <div class="tl-desc">3泊4日、おつかれさまでした！</div>
+          </div>
+        </div>
+
+        <a class="map-link" href="https://www.google.com/maps?q=%E9%82%A3%E8%A6%87%E7%A9%BA%E6%B8%AF" target="_blank" rel="noopener">
+          <div class="pin">📍</div>
+          <div class="txt">
+            <div class="map-title">那覇空港周辺をマップで見る</div>
+            <div class="map-sub">Googleマップで開く</div>
+          </div>
+          <div class="arrow">›</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ===== SPOT GUIDE (図鑑) ===== -->
+    <section class="spotguide-section" id="spotguide">
+      <div class="spotguide-head">
+        <div class="eyebrow2 display">PHOTO &amp; GUIDE</div>
+        <h2 class="display">📖 主要スポット図鑑</h2>
+        <p>立ち寄る19スポットの概要とおすすめポイントをまとめました。各タイムラインの「→ 詳細を見る」からもジャンプできます。</p>
+      </div>
+
+      <!-- DAY1 スポット -->
+      <div class="spotday-label sd1">DAY 1 のスポット</div>
+      <div class="spot-grid">
+        <div class="spot-card" id="spot-aw">
+          <div class="spot-banner bg-food">
+            <span class="cat-chip">グルメ</span>
+            <span class="scene" style="font-size:52px; left:14px; bottom:-6px;">🍔</span>
+            <span class="scene" style="font-size:32px; right:34px; top:14px;">🥤</span>
+            <span class="scene" style="font-size:28px; right:12px; bottom:6px;">🍟</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">浦添市</div>
+            <h3 class="spot-name">A&amp;W 牧港店</h3>
+            <p class="spot-desc">1963年開業、日本第1号店のA&amp;W。ドライブインスタイルで、名物ルートビアがサーバーから飲み放題。</p>
+            <ul class="spot-points">
+              <li>名物ルートビアはおかわり自由</li>
+              <li>オニオンリングは必食</li>
+              <li>ドライブイン形式で車のままオーダーも可</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-amevillage">
+          <div class="spot-banner bg-sight">
+            <span class="cat-chip">観光・街歩き</span>
+            <span class="scene" style="font-size:46px; left:16px; bottom:0;">🎡</span>
+            <span class="scene" style="font-size:34px; right:20px; top:16px;">🏢</span>
+            <span class="scene" style="font-size:30px; right:60px; bottom:4px;">🌇</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">北谷町</div>
+            <h3 class="spot-name">アメリカンビレッジ</h3>
+            <p class="spot-desc">米軍基地跡地に広がる、まるでアメリカの街のようなカラフルな複合エリア。大観覧車が目印。</p>
+            <ul class="spot-points">
+              <li>パステルカラーの建物でフォト映え</li>
+              <li>大型観覧車が目印でわかりやすい</li>
+              <li>隣接のサンセットビーチも徒歩圏</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-kyoda">
+          <div class="spot-banner bg-rest">
+            <span class="cat-chip">休憩スポット</span>
+            <span class="scene" style="font-size:44px; left:18px; bottom:0;">🍡</span>
+            <span class="scene" style="font-size:34px; right:24px; top:18px;">🍤</span>
+            <span class="scene" style="font-size:26px; right:70px; bottom:8px;">🚗</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">名護市</div>
+            <h3 class="spot-name">道の駅 許田</h3>
+            <p class="spot-desc">やんばるドライブの定番休憩ポイント。揚げたてサーターアンダギーや沖縄天ぷらが人気。</p>
+            <ul class="spot-points">
+              <li>揚げたてサーターアンダギー</li>
+              <li>地元産の沖縄天ぷらでひと休み</li>
+              <li>お土産コーナーも充実</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-donki">
+          <div class="spot-banner bg-shop">
+            <span class="cat-chip">買い物</span>
+            <span class="scene" style="font-size:44px; left:18px; bottom:0;">🛒</span>
+            <span class="scene" style="font-size:32px; right:26px; top:16px;">👕</span>
+            <span class="scene" style="font-size:28px; right:74px; bottom:6px;">🎁</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">名護市</div>
+            <h3 class="spot-name">MEGAドン・キホーテ 名護店</h3>
+            <p class="spot-desc">24時間営業の大型ディスカウントストア。ブルーシールやオリオンビール柄グッズが豊富。</p>
+            <ul class="spot-points">
+              <li>ブルーシール／オリオンビール柄Tシャツ</li>
+              <li>お菓子・雑貨もコスパ良く調達できる</li>
+              <li>夜遅い時間でも買い物OK</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-hotel">
+          <div class="spot-banner bg-stay">
+            <span class="cat-chip">宿泊</span>
+            <span class="scene" style="font-size:46px; left:16px; bottom:-4px;">🏨</span>
+            <span class="scene" style="font-size:30px; right:20px; top:16px;">🌅</span>
+            <span class="scene" style="font-size:26px; right:66px; bottom:6px;">🌊</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">名護市</div>
+            <h3 class="spot-name">TWIN-LINE HOTEL YANBARU OKINAWA</h3>
+            <p class="spot-desc">名護市の海沿いに佇む、朝食付きのホテル。目の前が幸喜ビーチという好立地。</p>
+            <ul class="spot-points">
+              <li>目の前がビーチで移動ゼロ</li>
+              <li>朝食付きで朝もゆったり過ごせる</li>
+              <li>北部観光の拠点として便利な立地</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-kouki">
+          <div class="spot-banner bg-sight">
+            <span class="cat-chip">観光</span>
+            <span class="scene" style="font-size:46px; left:16px; bottom:-2px;">🏖️</span>
+            <span class="scene" style="font-size:30px; right:22px; top:16px;">🐚</span>
+            <span class="scene" style="font-size:26px; right:70px; bottom:8px;">🌊</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">名護市</div>
+            <h3 class="spot-name">幸喜ビーチ</h3>
+            <p class="spot-desc">ホテル目の前に広がる天然ビーチ。透き通った海で夕方の散歩にぴったり。</p>
+            <ul class="spot-points">
+              <li>ホテルから徒歩0分</li>
+              <li>夕方の散歩コースに最適</li>
+              <li>天然ビーチのためネットなし、ハブクラゲに注意</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-ufuya">
+          <div class="spot-banner bg-food">
+            <span class="cat-chip">グルメ</span>
+            <span class="scene" style="font-size:44px; left:16px; bottom:-2px;">🏯</span>
+            <span class="scene" style="font-size:30px; right:24px; top:16px;">💦</span>
+            <span class="scene" style="font-size:28px; right:70px; bottom:8px;">🍲</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">名護市</div>
+            <h3 class="spot-name">百年古家 大家（うふやー）</h3>
+            <p class="spot-desc">滝を望む古民家を改装したレストラン。座敷席でファミリーもゆったり過ごせる。</p>
+            <ul class="spot-points">
+              <li>滝を眺めながら食事できる</li>
+              <li>座敷席で子供連れも安心</li>
+              <li>要予約</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-chabu">
+          <div class="spot-banner bg-food">
+            <span class="cat-chip">グルメ</span>
+            <span class="scene" style="font-size:44px; left:16px; bottom:-2px;">🐷</span>
+            <span class="scene" style="font-size:32px; right:24px; top:16px;">🍲</span>
+            <span class="scene" style="font-size:26px; right:70px; bottom:8px;">🥢</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">名護市</div>
+            <h3 class="spot-name">ちゃぶ〜 名護店</h3>
+            <p class="spot-desc">皮付きあぐー豚しゃぶしゃぶが名物の専門店。個室・掘りごたつ席あり。</p>
+            <ul class="spot-points">
+              <li>あぐー豚の旨みが凝縮したしゃぶしゃぶ</li>
+              <li>個室／掘りごたつで子連れも安心</li>
+              <li>要予約</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- DAY2 スポット -->
+      <div class="spotday-label sd2">DAY 2 のスポット</div>
+      <div class="spot-grid">
+        <div class="spot-card" id="spot-churaumi">
+          <div class="spot-banner bg-sight">
+            <span class="cat-chip">観光</span>
+            <span class="scene" style="font-size:48px; left:14px; bottom:-4px;">🐋</span>
+            <span class="scene" style="font-size:30px; right:24px; top:14px;">🐠</span>
+            <span class="scene" style="font-size:24px; right:72px; bottom:10px;">🫧</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">本部町</div>
+            <h3 class="spot-name">沖縄美ら海水族館</h3>
+            <p class="spot-desc">「黒潮の海」大水槽でジンベエザメやマンタが悠々と泳ぐ、世界屈指の規模を誇る水族館。</p>
+            <ul class="spot-points">
+              <li>開館直後は比較的空いていて狙い目</li>
+              <li>ジンベエザメの給餌タイムをチェック</li>
+              <li>海が見えるカフェも人気</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-kishimoto">
+          <div class="spot-banner bg-food">
+            <span class="cat-chip">グルメ</span>
+            <span class="scene" style="font-size:46px; left:16px; bottom:-2px;">🍜</span>
+            <span class="scene" style="font-size:28px; right:24px; top:16px;">🏮</span>
+            <span class="scene" style="font-size:24px; right:70px; bottom:10px;">🥢</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">本部町</div>
+            <h3 class="spot-name">きしもと食堂</h3>
+            <p class="spot-desc">明治38年創業、本部そば街道を代表する老舗。木灰(もっかい)を使った昔ながらの製法。</p>
+            <ul class="spot-points">
+              <li>もっちり麺と優しいだしが名物</li>
+              <li>開店直後は行列必至</li>
+              <li>そば以外にゆし豆腐もおすすめ</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-kouri-beach">
+          <div class="spot-banner bg-sight">
+            <span class="cat-chip">観光・海水浴</span>
+            <span class="scene" style="font-size:46px; left:16px; bottom:-2px;">🏝️</span>
+            <span class="scene" style="font-size:30px; right:22px; top:16px;">🐟</span>
+            <span class="scene" style="font-size:26px; right:68px; bottom:8px;">🌊</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">今帰仁村</div>
+            <h3 class="spot-name">古宇利ビーチ</h3>
+            <p class="spot-desc">遠浅でクラゲ防止ネットもあり、子連れでも安心して泳げるエメラルドグリーンのビーチ。</p>
+            <ul class="spot-points">
+              <li>遠浅で子供も安心して遊べる</li>
+              <li>シュノーケルで熱帯魚が見える</li>
+              <li>シャワー・売店も完備</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-heartrock">
+          <div class="spot-banner bg-sight">
+            <span class="cat-chip">観光</span>
+            <span class="scene" style="font-size:44px; left:18px; bottom:0;">🪨</span>
+            <span class="scene" style="font-size:28px; right:24px; top:16px;">💗</span>
+            <span class="scene" style="font-size:26px; right:70px; bottom:8px;">🌊</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">今帰仁村</div>
+            <h3 class="spot-name">ハートロック（ティーヌ浜）</h3>
+            <p class="spot-desc">古宇利島のシンボルとして知られるハート型の岩。恋の島を象徴するフォトスポット。</p>
+            <ul class="spot-points">
+              <li>干潮時は岩の近くまで歩いて近づける</li>
+              <li>夕方は逆光になりやすいので時間帯に注意</li>
+              <li>周辺に軽食カフェも点在</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-fukurubi">
+          <div class="spot-banner bg-food">
+            <span class="cat-chip">グルメ</span>
+            <span class="scene" style="font-size:42px; left:18px; bottom:0;">☕</span>
+            <span class="scene" style="font-size:30px; right:24px; top:16px;">🌊</span>
+            <span class="scene" style="font-size:26px; right:70px; bottom:8px;">🧁</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">今帰仁村</div>
+            <h3 class="spot-name">Cafe フクルビ</h3>
+            <p class="spot-desc">高台に立つオーシャンビューカフェ。キッズスペースがあり子連れでもゆったり過ごせる。</p>
+            <ul class="spot-points">
+              <li>海を見渡すテラス席</li>
+              <li>キッズスペースあり</li>
+              <li>軽食・スイーツメニューが充実</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- DAY3 スポット -->
+      <div class="spotday-label sd3">DAY 3 のスポット</div>
+      <div class="spot-grid">
+        <div class="spot-card" id="spot-kokusai">
+          <div class="spot-banner bg-sight">
+            <span class="cat-chip">観光・グルメ</span>
+            <span class="scene" style="font-size:44px; left:18px; bottom:0;">🏮</span>
+            <span class="scene" style="font-size:30px; right:22px; top:16px;">🛍️</span>
+            <span class="scene" style="font-size:26px; right:68px; bottom:8px;">🎏</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">那覇市</div>
+            <h3 class="spot-name">国際通り</h3>
+            <p class="spot-desc">那覇の中心を貫く約1.6kmのメインストリート。お土産店や食べ歩きグルメがずらりと並ぶ。</p>
+            <ul class="spot-points">
+              <li>食べ歩きグルメが豊富</li>
+              <li>アーケードもあり雨の日も歩きやすい</li>
+              <li>お土産探しはこの1本で完結</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-steak88">
+          <div class="spot-banner bg-food">
+            <span class="cat-chip">グルメ</span>
+            <span class="scene" style="font-size:46px; left:16px; bottom:-2px;">🥩</span>
+            <span class="scene" style="font-size:30px; right:22px; top:16px;">🔥</span>
+            <span class="scene" style="font-size:26px; right:68px; bottom:8px;">🥤</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">那覇市</div>
+            <h3 class="spot-name">ステーキ88 国際通り店</h3>
+            <p class="spot-desc">沖縄ならではのボリューム満点ステーキ店。キッズメニューやドリンクバー付きの店舗も。</p>
+            <ul class="spot-points">
+              <li>キッズカレー・ハンバーグあり</li>
+              <li>スープ＆サラダバー付き</li>
+              <li>ブルーシールおかわり可の店舗も</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-potama">
+          <div class="spot-banner bg-food">
+            <span class="cat-chip">グルメ</span>
+            <span class="scene" style="font-size:44px; left:18px; bottom:0;">🍙</span>
+            <span class="scene" style="font-size:30px; right:24px; top:16px;">🥚</span>
+            <span class="scene" style="font-size:26px; right:70px; bottom:8px;">🥓</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">那覇市</div>
+            <h3 class="spot-name">ポーたま 牧志市場店</h3>
+            <p class="spot-desc">沖縄式おにぎり「ポークたまごおにぎり」の専門店。市場内で軽くつまみ食いするのに最適。</p>
+            <ul class="spot-points">
+              <li>注文後に握る出来立て</li>
+              <li>具材の組み合わせが豊富</li>
+              <li>食べ歩きサイズで小腹満たしに最適</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-blueseal">
+          <div class="spot-banner bg-food">
+            <span class="cat-chip">グルメ</span>
+            <span class="scene" style="font-size:46px; left:16px; bottom:-2px;">🍦</span>
+            <span class="scene" style="font-size:30px; right:22px; top:16px;">🍨</span>
+            <span class="scene" style="font-size:24px; right:70px; bottom:10px;">🌺</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">那覇市</div>
+            <h3 class="spot-name">ブルーシール 国際通り店</h3>
+            <p class="spot-desc">沖縄生まれのアイスクリームブランド。常時20種類以上のフレーバーが並ぶ。</p>
+            <ul class="spot-points">
+              <li>紅いも・塩ちんすこうなど沖縄限定味</li>
+              <li>てんぶす館のすぐ隣で立ち寄りやすい</li>
+              <li>食べ歩きにもぴったり</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-glassvillage">
+          <div class="spot-banner bg-exp">
+            <span class="cat-chip">体験</span>
+            <span class="scene" style="font-size:42px; left:18px; bottom:0;">🔥</span>
+            <span class="scene" style="font-size:30px; right:22px; top:16px;">🥃</span>
+            <span class="scene" style="font-size:28px; right:66px; bottom:6px;">🎨</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">糸満市</div>
+            <h3 class="spot-name">琉球ガラス村</h3>
+            <p class="spot-desc">沖縄最大級の琉球ガラス工房兼体験施設。吹きガラス作り体験と絵付け体験が1施設で完結。</p>
+            <ul class="spot-points">
+              <li>ガラス作り＋シーサー絵付けが1ヶ所で完結</li>
+              <li>小さな子供でもスタッフがサポート</li>
+              <li>工房見学だけでも楽しい</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="spot-card" id="spot-umikaji">
+          <div class="spot-banner bg-sight">
+            <span class="cat-chip">観光・グルメ</span>
+            <span class="scene" style="font-size:44px; left:16px; bottom:-2px;">🌅</span>
+            <span class="scene" style="font-size:30px; right:22px; top:16px;">🏖️</span>
+            <span class="scene" style="font-size:26px; right:68px; bottom:8px;">🌮</span>
+          </div>
+          <div class="spot-body">
+            <div class="spot-area">豊見城市（瀬長島）</div>
+            <h3 class="spot-name">ウミカジテラス</h3>
+            <p class="spot-desc">瀬長島の高台に広がる、白壁の建物が並ぶリゾート風商業施設。海と夕日を一望できる。</p>
+            <ul class="spot-points">
+              <li>夕日の絶景スポット</li>
+              <li>タコス・海鮮など飲食店多数</li>
+              <li>空港からのアクセスも良好</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== RAIN PLAN ===== -->
+    <div class="rain-section" id="rainplan">
+      <div class="rs-title display">☔ 雨の日プランB</div>
+      <div class="rs-sub">屋外ビーチ・水遊びだけを差し替え。それ以外はそのままでOK。</div>
+
+      <div class="rain-day">
+        <h4>Day1</h4>
+        <div class="rain-row"><span class="rain-icon rain-keep">✓</span><span>A&amp;W牧港店・アメリカンビレッジ・道の駅許田・MEGAドンキはすべて屋根のあるエリア中心なのでそのまま決行(アメ村は屋根付きアーケードもあり傘があれば十分)</span></div>
+        <div class="rain-row"><span class="rain-icon rain-swap">⇄</span><span>幸喜ビーチの散歩は<b>カット</b>。代わりに名護博物館(赤瓦の古民家展示、屋内)に立ち寄るか、ホテルでゆっくり過ごす</span></div>
+        <div class="rain-row"><span class="rain-icon rain-keep">✓</span><span>夜のアグー豚しゃぶしゃぶはそのまま</span></div>
+      </div>
+
+      <div class="rain-day">
+        <h4>Day2</h4>
+        <div class="rain-row"><span class="rain-icon rain-keep">✓</span><span>美ら海水族館・きしもと食堂はそのまま(水族館は完全屋内、雨の日はむしろ空いていておすすめ)</span></div>
+        <div class="rain-row"><span class="rain-icon rain-swap">⇄</span><span>古宇利ビーチでのシュノーケリングは<b>中止</b>。代わりに同じ海洋博公園内の<b>海洋文化館・プラネタリウム</b>(屋内で沖縄の海洋文化・星空を学べる)、または古宇利島の<b>古宇利オーシャンタワー</b>(屋内移動+貝殻ミュージアム併設)へ</span></div>
+        <div class="rain-row"><span class="rain-icon rain-swap">⇄</span><span>ハートロックは車から眺めるだけに切り替え(徒歩での接近は濡れる)</span></div>
+      </div>
+
+      <div class="rain-day">
+        <h4>Day3</h4>
+        <div class="rain-row"><span class="rain-icon rain-keep">✓</span><span>国際通りはアーケード街なので雨でも歩きやすい。ステーキ88・ポーたま・ブルーシール・タコライス・琉球ガラス村(屋内体験)はすべてそのまま決行</span></div>
+        <div class="rain-row"><span class="rain-icon rain-swap">⇄</span><span>ウミカジテラスは屋外モールで風情が半減するため、とまりん周辺や空港直結の屋内商業施設での夕食に切り替えも検討</span></div>
+      </div>
+
+      <div class="rain-day">
+        <h4>持ち物</h4>
+        <div class="rain-row"><span class="rain-icon">🎒</span><span>折りたたみ傘よりレインコート推奨(沖縄はスコール性の雨が多く、機動力◎)。濡れた後の着替え1セットもあると安心</span></div>
+      </div>
+    </div>
+
+    <!-- ===== INFO GRID ===== -->
+    <div class="info-grid">
+      <div class="info-card">
+        <h3>🚗 レンタカーメモ</h3>
+        <p>カヌチャレンタカー（空港前営業所）</p>
+        <ul>
+          <li>空港から送迎3分、待ち時間ほぼナシ</li>
+          <li>車種：ミニバン or コンパクトカー</li>
+          <li>返却は出発90〜120分前が目安</li>
+        </ul>
+      </div>
+      <div class="info-card">
+        <h3>🧭 移動時間の目安</h3>
+        <ul>
+          <li>空港⇄名護ホテル：約75分</li>
+          <li>ホテル⇄美ら海水族館：約40〜50分</li>
+          <li>ホテル⇄古宇利島：約20〜30分</li>
+          <li>名護⇄那覇：約90分</li>
+        </ul>
+      </div>
+      <div class="info-card">
+        <h3>🎒 持ち物メモ</h3>
+        <ul>
+          <li>ラッシュガード・水着・タオル</li>
+          <li>マリンシューズ（古宇利島）</li>
+          <li>日焼け止め・帽子</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    OKINAWA FAMILY TRIP · 3 nights 4 days ／ 家族で楽しい沖縄旅行を ☀️🌊
+  </footer>
+
+</body>
+</html>
