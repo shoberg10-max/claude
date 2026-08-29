@@ -495,3 +495,7 @@ main#screen {
 .charScreenTop { padding: 30px 20px; }
 .xpBar { background: #eee; border-radius: 999px; height: 14px; margin: 14px 0 6px; overflow: hidden; }
 .xpBarFill { background: linear-gradient(90deg, var(--green), var(--green-dark)); height: 100%; }
+
+.feedbackHint { color: #777; font-size: 0.9rem; margin-bottom: 10px; }
+.itemArt { display: inline-flex; }
+.itemCell .hatIcon { display: block; margin: 0 auto; }

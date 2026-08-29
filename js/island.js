@@ -31,9 +31,20 @@ const Island = (() => {
     return el('div', { className: 'bigCardEmoji', text: opts.fallback || '' });
   }
 
-  function equippedHatEmoji() {
-    const item = TREASURE_ITEMS.find(i => i.id === Storage.getEquippedItem());
+  // かぶりものはドット絵があれば ID を、なければ絵文字を渡す
+  function equippedHat() {
+    const id = Storage.getEquippedItem();
+    if (!id) return null;
+    if (Sprites.hasHat(id)) return id;
+    const item = TREASURE_ITEMS.find(i => i.id === id);
     return item ? item.emoji : null;
+  }
+
+  function itemFigure(item, size) {
+    if (Sprites.hasHat(item.id)) {
+      return el('span', { className: 'itemArt', html: Sprites.renderHatIcon(item.id, { size, label: item.name }) });
+    }
+    return el('span', { className: 'bigCardEmoji', text: item.emoji });
   }
 
   // ---------- 共通：ステータスバー ----------
@@ -151,7 +162,7 @@ const Island = (() => {
     const missionNo = Storage.getMissionCount(level) + 1;
 
     const card = el('div', { className: 'quizCard missionIntroCard' }, [
-      charFigure('mojimaru', { size: 120, face: 'happy', hat: equippedHatEmoji(), label: 'もじまる', fallback: '🌱' }),
+      charFigure('mojimaru', { size: 120, face: 'happy', hat: equippedHat(), label: 'もじまる', fallback: '🌱' }),
       el('div', { className: 'questionText', text: `ミッション ${missionNo}` }),
       el('div', { className: 'heartsRow', text: '❤️❤️❤️' }),
       el('div', { className: 'quizInstruction', text: 'かんじを 8もん とこう！さいごに 書く れんしゅうもあるよ。' }),
@@ -194,19 +205,27 @@ const Island = (() => {
 
     function showFeedback(isCorrect, correctText) {
       feedback.innerHTML = '';
-      feedback.appendChild(el('div', { className: 'feedbackRow' }, [
-        charFigure('mojimaru', {
-          size: 72,
-          face: isCorrect ? 'happy' : 'sad',
-          hat: equippedHatEmoji(),
-          className: isCorrect ? 'charSpritePop' : '',
-          label: 'もじまる'
-        }),
-        el('div', {
-          className: isCorrect ? 'feedbackOk' : 'feedbackNg',
-          text: isCorrect ? '⭕ せいかい！ もじまる「やったね！」' : `✕ ざんねん… こたえは ${correctText}`
-        })
-      ]));
+      if (isCorrect) {
+        feedback.appendChild(el('div', { className: 'feedbackRow' }, [
+          charFigure('mojimaru', {
+            size: 72, face: 'happy', hat: equippedHat(),
+            className: 'charSpritePop', label: 'もじまる'
+          }),
+          el('div', { className: 'feedbackOk', text: '⭕ せいかい！ もじまる「やったね！」' })
+        ]));
+      } else {
+        // まちがい＝失敗ではなく「敵があらわれた」ことにする
+        const oni = ENEMIES[0];
+        feedback.appendChild(el('div', { className: 'feedbackRow' }, [
+          charFigure(oni.sprite, {
+            size: 72, face: 'angry', className: 'charSpritePop', label: oni.name
+          }),
+          el('div', {}, [
+            el('div', { className: 'feedbackNg', text: oni.lines[0] }),
+            el('div', { className: 'feedbackHint', text: `こたえは 「${correctText}」。おぼえて やっつけよう！` })
+          ])
+        ]));
+      }
       const nextBtn = el('button', { className: 'nextBtn', text: index + 1 >= questions.length ? 'つぎへ →' : 'つぎへ →' });
       nextBtn.addEventListener('click', () => goNext(isCorrect));
       feedback.appendChild(nextBtn);
@@ -387,7 +406,7 @@ const Island = (() => {
     renderStatBar();
     UI.clearScreen();
     screenEl.appendChild(el('div', { className: 'resultCard' }, [
-      charFigure('mojimaru', { size: 140, face: 'surprised', hat: equippedHatEmoji(), className: 'charSpritePop', label: 'もじまる', fallback: stage.emoji }),
+      charFigure('mojimaru', { size: 140, face: 'surprised', hat: equippedHat(), className: 'charSpritePop', label: 'もじまる', fallback: stage.emoji }),
       el('div', { className: 'resultScore', text: `もじまるが Lv.${level} に なった！` }),
       el('div', { className: 'resultScore', text: stage.title }),
       el('button', { className: 'primaryBtn', text: 'つぎへ →', onClick: next })
@@ -399,7 +418,9 @@ const Island = (() => {
     renderStatBar();
     UI.clearScreen();
     screenEl.appendChild(el('div', { className: 'resultCard' }, [
-      el('div', { className: 'bigCardEmoji', text: companion.emoji }),
+      companion.sprite
+        ? charFigure(companion.sprite, { size: 140, face: 'happy', className: 'charSpritePop', label: companion.name })
+        : el('div', { className: 'bigCardEmoji', text: companion.emoji }),
       el('div', { className: 'resultScore', text: `${companion.name} が なかまになった！` }),
       el('div', { className: 'quizInstruction', text: companion.desc }),
       el('button', { className: 'primaryBtn', text: 'つぎへ →', onClick: next })
@@ -461,7 +482,7 @@ const Island = (() => {
     if (!isNew) Storage.addCoins(20);
 
     screenEl.appendChild(el('div', { className: 'resultCard' }, [
-      el('div', { className: 'bigCardEmoji', text: item.emoji }),
+      itemFigure(item, 120),
       el('div', { className: 'resultScore', text: isNew ? `NEW！「${item.name}」を手に入れた！` : `「${item.name}」はもう持っていたので コイン+20！` }),
       el('div', { className: 'quizInstruction', text: 'レア度：' + (item.rarity === 'epic' ? '✨ エピック' : item.rarity === 'rare' ? '🌟 レア' : '⭐ ノーマル') }),
       el('button', { className: 'primaryBtn', text: 'つぎへ →', onClick: next })
@@ -482,7 +503,7 @@ const Island = (() => {
     const xpPct = Math.round((info.xpIntoLevel / info.xpForNext) * 100);
 
     screenEl.appendChild(el('div', { className: 'quizCard charScreenTop' }, [
-      charFigure('mojimaru', { size: 160, face: 'happy', hat: equippedItem ? equippedItem.emoji : null, label: 'もじまる', fallback: (equippedItem ? equippedItem.emoji + ' ' : '') + stage.emoji }),
+      charFigure('mojimaru', { size: 160, face: 'happy', hat: equippedHat(), label: 'もじまる', fallback: (equippedItem ? equippedItem.emoji + ' ' : '') + stage.emoji }),
       el('div', { className: 'questionText', text: `もじまる Lv.${info.level}` }),
       el('div', { className: 'quizInstruction', text: stage.title }),
       el('div', { className: 'xpBar' }, [el('div', { className: 'xpBarFill', attrs: { style: `width:${xpPct}%` } })]),
@@ -509,15 +530,17 @@ const Island = (() => {
     const itemGrid = el('div', { className: 'itemGrid' });
     TREASURE_ITEMS.forEach(item => {
       const owned = ownedItems.includes(item.id);
-      itemGrid.appendChild(el('button', {
+      const cellOpts = {
         className: 'itemCell' + (owned ? ' itemOwned' : '') + (equipped === item.id ? ' itemEquipped' : ''),
-        text: owned ? item.emoji : '❔',
         onClick: () => {
           if (!owned) return;
           Storage.equipItem(equipped === item.id ? null : item.id);
           renderCharacter();
         }
-      }));
+      };
+      if (owned) cellOpts.html = Sprites.renderHatIcon(item.id, { size: 42, label: item.name });
+      else cellOpts.text = '❔';
+      itemGrid.appendChild(el('button', cellOpts));
     });
     screenEl.appendChild(itemGrid);
 

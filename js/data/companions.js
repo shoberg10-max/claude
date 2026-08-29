@@ -10,6 +10,7 @@ const COMPANIONS = [
   },
   {
     id: 'hanapyon',
+    sprite: 'hanapyon',
     emoji: '🌸',
     name: 'はなぴょん',
     desc: 'やさしくておしゃれな女の子。花のようにやさしく教えてくれるよ。',
@@ -18,6 +19,7 @@ const COMPANIONS = [
   },
   {
     id: 'pentan',
+    sprite: 'pentan',
     emoji: '🐧',
     name: 'ぺんたん',
     desc: 'まじめでがんばりやさん。ノートとえんぴつが手放せない。',
@@ -26,6 +28,7 @@ const COMPANIONS = [
   },
   {
     id: 'koganecchi',
+    sprite: 'koganecchi',
     emoji: '⭐',
     name: 'こがねっち',
     desc: 'キラキラが大好きなひよこ。宝がいっぱいあると、レアなアイテムをくれるよ！',
@@ -34,11 +37,31 @@ const COMPANIONS = [
   },
   {
     id: 'nekojiro',
+    sprite: 'nekojiro',
     emoji: '🐱',
     name: 'ねこじろう',
     desc: 'ちょっとミステリアスなねこ。クイズや なぞなぞが得意。',
     need: 90,
     hint: 'かんじを 90こ おぼえると なかまになるよ'
+  }
+];
+
+// 敵キャラ（漢字の苦手ポイント）。
+// 「まちがえた＝失敗」ではなく「敵をたおすチャンス」に見せるための存在。
+const ENEMIES = [
+  {
+    id: 'machigaeoni',
+    sprite: 'machigaeoni',
+    name: 'まちがえ鬼',
+    desc: '漢字をまちがえるとあらわれるぞ！',
+    lines: ['まちがえ鬼が でた！', 'ぐぬぬ……おぼえられたか！']
+  },
+  {
+    id: 'wasurenbo',
+    sprite: 'wasurenbo',
+    name: 'わすれんぼう',
+    desc: '漢字をすぐ忘れちゃう困ったやつ！',
+    lines: ['わすれんぼうが でた！', 'あれ？ 思い出したの？']
   }
 ];
 
