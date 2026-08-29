@@ -69,6 +69,22 @@ html, body {
   white-space: nowrap;
 }
 
+.statBar { flex: 0 0 auto; }
+.statBarInner { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.statChip {
+  font-weight: bold;
+  font-size: 0.8rem;
+  background: rgba(255,255,255,0.25);
+  padding: 5px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .topbar { flex-wrap: wrap; }
+  .topbar h1 { order: -1; flex-basis: 100%; margin-bottom: 4px; font-size: 1rem; }
+}
+
 main#screen {
   flex: 1;
   padding: 20px 16px 60px;
@@ -218,7 +234,7 @@ main#screen {
   font-family: inherit;
 }
 .submitBtn:active, .nextBtn:active, .primaryBtn:active { transform: translateY(3px); box-shadow: none; }
-.submitBtn:disabled { opacity: 0.6; }
+.submitBtn:disabled, .nextBtn:disabled, .primaryBtn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 
 .choiceRow {
   display: flex;
@@ -305,3 +321,131 @@ main#screen {
 .kanjiListChar { font-size: 1.9rem; font-weight: bold; }
 .kanjiListChar.mastered { color: #f08c00; }
 .kanjiListReading { font-size: 0.65rem; color: #777; margin-top: 4px; line-height: 1.3; word-break: break-all; }
+
+/* ===== ゆるもじ島テーマ ===== */
+
+.levelTabs { display: flex; gap: 10px; margin-bottom: 14px; }
+.levelTab {
+  flex: 1;
+  background: white;
+  border: 3px solid #dbeeff;
+  border-radius: 16px;
+  padding: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+}
+.levelTab.levelTabActive { background: linear-gradient(135deg, var(--green), var(--green-dark)); color: white; border-color: var(--green-dark); }
+.levelTabTitle { font-weight: bold; font-size: 1rem; }
+.levelTabSub { font-size: 0.75rem; opacity: 0.85; margin-top: 2px; }
+
+.islandMapGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  background: linear-gradient(180deg, #bfe7ff, #eaf6ff);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.mapTile {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  background: rgba(255,255,255,0.5);
+  border-radius: 12px;
+}
+.mapTileFog { opacity: 0.6; filter: grayscale(0.3); }
+.mapProgress { text-align: center; font-weight: bold; margin: 12px 0 18px; color: var(--green-dark); }
+
+.homeTilesGrid { margin-bottom: 8px; }
+
+.bottomNav {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 2px solid #dbeeff;
+}
+.navBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: #888;
+  padding: 6px 10px;
+  border-radius: 12px;
+}
+.navBtn.navBtnActive { color: var(--blue-dark); background: #eaf6ff; }
+.navBtnEmoji { font-size: 1.4rem; }
+.navBtnLabel { font-size: 0.7rem; margin-top: 2px; }
+
+.missionIntroCard { padding: 40px 20px; }
+.heartsRow { font-size: 1.6rem; margin: 10px 0; }
+
+.rewardRow { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 14px 0; }
+.rewardChip {
+  background: #fff3bf;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: bold;
+  font-size: 0.95rem;
+}
+
+.writingStage {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 16px;
+  border: 3px dashed #cfe6ff;
+  overflow: hidden;
+}
+.writingGuide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9rem;
+  color: #d3d3d3;
+  font-weight: bold;
+  pointer-events: none;
+}
+.writingCanvas { position: absolute; inset: 0; touch-action: none; cursor: crosshair; }
+.writingHint { margin-top: 14px; color: #888; font-size: 0.95rem; }
+
+.sectionTitle { font-weight: bold; font-size: 1.05rem; margin: 22px 0 10px; color: var(--blue-dark); }
+
+.companionGrid, .itemGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+.companionCard {
+  background: white;
+  border-radius: 16px;
+  padding: 14px 8px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+.companionCard.companionLocked { opacity: 0.55; }
+
+.itemGrid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
+.itemCell {
+  aspect-ratio: 1;
+  font-size: 1.6rem;
+  background: white;
+  border: 3px solid #eee;
+  border-radius: 14px;
+  cursor: default;
+  opacity: 0.4;
+}
+.itemCell.itemOwned { opacity: 1; cursor: pointer; border-color: #dbeeff; }
+.itemCell.itemEquipped { border-color: var(--green-dark); background: #d3f9d8; }
+
+.charScreenTop { padding: 30px 20px; }
+.xpBar { background: #eee; border-radius: 999px; height: 14px; margin: 14px 0 6px; overflow: hidden; }
+.xpBarFill { background: linear-gradient(90deg, var(--green), var(--green-dark)); height: 100%; }

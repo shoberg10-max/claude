@@ -1,31 +1,21 @@
-// 画面の切りかえと全体の動き
+// 画面の切りかえと全体の動き（３年生 さんすう・かんじドリル：レガシー機能）
 const App = (() => {
-  const screenEl = document.getElementById('screen');
-  const titleEl = document.getElementById('pageTitle');
-  const starTotalEl = document.getElementById('starTotal');
+  const screenEl = UI.screenEl;
+  const el = UI.el;
+  const setTitle = UI.setTitle;
+  const clearScreen = UI.clearScreen;
 
   function refreshStars() {
-    starTotalEl.textContent = Storage.getStars();
+    UI.setStatBar(el('div', { className: 'starCount' }, [
+      document.createTextNode('⭐ ' + Storage.getStars())
+    ]));
   }
-
-  function setTitle(t) { titleEl.textContent = t; }
-
-  function el(tag, opts = {}, children = []) {
-    const e = document.createElement(tag);
-    if (opts.className) e.className = opts.className;
-    if (opts.text !== undefined) e.textContent = opts.text;
-    if (opts.html !== undefined) e.innerHTML = opts.html;
-    if (opts.attrs) Object.entries(opts.attrs).forEach(([k, v]) => e.setAttribute(k, v));
-    if (opts.onClick) e.addEventListener('click', opts.onClick);
-    children.forEach(c => c && e.appendChild(c));
-    return e;
-  }
-
-  function clearScreen() { screenEl.innerHTML = ''; }
 
   // ---------- ホーム画面 ----------
   function renderHome() {
     setTitle('３年生 さんすう・かんじ ドリル');
+    UI.setHomeHandler(() => Island.renderHome());
+    refreshStars();
     clearScreen();
     const wrap = el('div', { className: 'homeGrid' }, [
       el('button', {
@@ -40,10 +30,15 @@ const App = (() => {
         onClick: renderKanjiMenu
       }, [
         el('div', { className: 'bigCardEmoji', text: '📖' }),
-        el('div', { className: 'bigCardTitle', text: 'かんじ' })
+        el('div', { className: 'bigCardTitle', text: 'かんじ（3年生）' })
       ])
     ]);
     screenEl.appendChild(wrap);
+    screenEl.appendChild(el('button', {
+      className: 'backBtn',
+      text: '← ゆるもじ島にもどる',
+      onClick: () => Island.renderHome()
+    }));
   }
 
   // ---------- さんすう：メニュー ----------
@@ -320,14 +315,7 @@ const App = (() => {
     screenEl.appendChild(el('button', { className: 'backBtn', text: '← もどる', onClick: renderKanjiMenu }));
   }
 
-  document.getElementById('homeBtn').addEventListener('click', renderHome);
-
   return {
-    start() {
-      refreshStars();
-      renderHome();
-    }
+    renderHome
   };
 })();
-
-App.start();
