@@ -33,6 +33,7 @@ const Storage = (() => {
       lastPlayDate: null,
       missionCount: { k9: 0, k8: 0 },
       kanjiState: {},          // `${level}:${kanji}` -> 0..3
+      kanjiSeen: {},           // `${level}:${kanji}` -> 'YYYY-MM-DD'（最後に出題した日）
       companions: ['mojimaru'],
       items: [],
       equippedItem: null,
@@ -112,7 +113,22 @@ const Storage = (() => {
       const key = level + ':' + kanji;
       const cur = state.island.kanjiState[key] || 0;
       state.island.kanjiState[key] = correct ? Math.min(cur + 1, 3) : Math.max(cur - 1, 0);
+      state.island.kanjiSeen[key] = todayStr();
       save(state);
+    },
+
+    // しばらく出していない、覚えた漢字＝「忘れかけ」。ふくしゅうミッションの出題元。
+    getForgettingKanji(level, kanjiList, days = 3) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      return kanjiList.filter(e => {
+        const key = level + ':' + e.k;
+        const lv = state.island.kanjiState[key] || 0;
+        if (lv < 2) return false;             // まだ覚えていない字は対象外
+        const seen = state.island.kanjiSeen[key];
+        return !seen || seen <= cutoffStr;
+      });
     },
 
     getIslandMasteredCount(level, kanjiList) {

@@ -7,7 +7,8 @@ const Island = (() => {
     k9: { key: 'k9', label: '9級', grade: '1年生の漢字', total: 80 },
     k8: { key: 'k8', label: '8級', grade: '2年生の漢字', total: 160 }
   };
-  const TERRAIN = ['🌳', '🌸', '🌴', '⛰️', '🌊', '🏠', '🌻', '🏯', '🌵', '🐚', '🌼', '⭐'];
+  const TERRAIN = ['tree', 'blossom', 'palm', 'mountain', 'wave', 'house',
+                   'sunflower', 'castle', 'cactus', 'shell', 'bluebell', 'star'];
 
   function currentLevel() { return Storage.getIsland().level; }
   function dataset(level) { return KanjiGame.datasetFor(level); }
@@ -51,10 +52,14 @@ const Island = (() => {
   function renderStatBar() {
     const info = Storage.getCharLevelInfo();
     const island = Storage.getIsland();
+    const chip = (icon, value) => el('span', { className: 'statChip' }, [
+      el('span', { className: 'statChipIcon', html: Icons.render(icon, { size: 18 }) }),
+      el('span', { text: String(value) })
+    ]);
     UI.setStatBar(el('div', { className: 'statBarInner' }, [
-      el('span', { className: 'statChip', text: '🪙' + island.coins }),
-      el('span', { className: 'statChip', text: '🎫' + island.tickets }),
-      el('span', { className: 'statChip', text: '🔥' + island.streak }),
+      chip('coin', island.coins),
+      chip('ticket', island.tickets),
+      chip('fire', island.streak),
       el('span', { className: 'statChip', text: 'Lv.' + info.level })
     ]));
   }
@@ -62,17 +67,17 @@ const Island = (() => {
   // ---------- 共通：ボトムナビ ----------
   function bottomNav(active) {
     const items = [
-      { id: 'home', emoji: '🏠', label: 'ホーム', onClick: renderHome },
-      { id: 'mission', emoji: '📖', label: 'ミッション', onClick: renderMissionIntro },
-      { id: 'treasure', emoji: '🎁', label: 'たからばこ', onClick: renderTreasure },
-      { id: 'char', emoji: '👤', label: 'キャラ', onClick: renderCharacter }
+      { id: 'home', icon: 'house', label: 'ホーム', onClick: renderHome },
+      { id: 'mission', icon: 'book', label: 'ミッション', onClick: renderMissionIntro },
+      { id: 'treasure', icon: 'gift', label: 'たからばこ', onClick: renderTreasure },
+      { id: 'char', icon: 'face', label: 'キャラ', onClick: renderCharacter }
     ];
     return el('nav', { className: 'bottomNav' }, items.map(it =>
       el('button', {
         className: 'navBtn' + (it.id === active ? ' navBtnActive' : ''),
         onClick: it.onClick
       }, [
-        el('div', { className: 'navBtnEmoji', text: it.emoji }),
+        el('div', { className: 'navBtnEmoji', html: Icons.render(it.icon, { size: 26, label: it.label }) }),
         el('div', { className: 'navBtnLabel', text: it.label })
       ])
     ));
@@ -107,10 +112,11 @@ const Island = (() => {
     const revealedCount = Math.max(1, Math.round(ratio * TERRAIN.length));
 
     const mapGrid = el('div', { className: 'islandMapGrid' });
-    TERRAIN.forEach((emoji, i) => {
+    TERRAIN.forEach((name, i) => {
+      const revealed = i < revealedCount;
       mapGrid.appendChild(el('div', {
-        className: 'mapTile' + (i < revealedCount ? '' : ' mapTileFog'),
-        text: i < revealedCount ? emoji : '☁️'
+        className: 'mapTile' + (revealed ? '' : ' mapTileFog'),
+        html: Icons.render(revealed ? name : 'fog', { size: 44 })
       }));
     });
 
@@ -120,22 +126,27 @@ const Island = (() => {
 
     const tiles = el('div', { className: 'menuGrid homeTilesGrid' }, [
       el('button', { className: 'menuCard', onClick: renderMissionIntro }, [
-        el('div', { className: 'menuCardEmoji', text: '📖' }),
+        el('div', { className: 'menuCardEmoji', html: Icons.render('book', { size: 40 }) }),
         el('div', { className: 'menuCardTitle', text: '今日の冒険' }),
         el('div', { className: 'menuCardScore', text: `ミッション ${Storage.getMissionCount(level) + 1}` })
       ]),
       el('button', { className: 'menuCard', onClick: renderZukan }, [
-        el('div', { className: 'menuCardEmoji', text: '📚' }),
+        el('div', { className: 'menuCardEmoji', html: Icons.render('books', { size: 40 }) }),
         el('div', { className: 'menuCardTitle', text: 'かんじ図鑑' }),
         el('div', { className: 'menuCardScore', text: `${mastered}/${meta.total} 字` })
       ]),
       el('button', { className: 'menuCard', onClick: renderChallengeIntro }, [
-        el('div', { className: 'menuCardEmoji', text: '🏆' }),
+        el('div', { className: 'menuCardEmoji', html: Icons.render('trophy', { size: 40 }) }),
         el('div', { className: 'menuCardTitle', text: '漢検チャレンジ' }),
         el('div', { className: 'menuCardScore', text: (() => { const b = Storage.getKankenBest(level); return b ? `ベスト ${Math.round(b.pct)}%` : 'ちょうせん！'; })() })
       ]),
+      el('button', { className: 'menuCard', onClick: renderReviewIntro }, [
+        el('div', { className: 'menuCardEmoji', html: Icons.render('review', { size: 40 }) }),
+        el('div', { className: 'menuCardTitle', text: 'ふくしゅう' }),
+        el('div', { className: 'menuCardScore', text: forgettingCount(level) ? `わすれかけ ${forgettingCount(level)}字` : 'いまはナシ' })
+      ]),
       el('button', { className: 'menuCard', onClick: renderParentGate }, [
-        el('div', { className: 'menuCardEmoji', text: '👪' }),
+        el('div', { className: 'menuCardEmoji', html: Icons.render('family', { size: 40 }) }),
         el('div', { className: 'menuCardTitle', text: 'おうちの方へ' }),
         el('div', { className: 'menuCardScore', text: 'がくしゅう記録' })
       ])
@@ -162,7 +173,7 @@ const Island = (() => {
     const missionNo = Storage.getMissionCount(level) + 1;
 
     const card = el('div', { className: 'quizCard missionIntroCard' }, [
-      charFigure('mojimaru', { size: 120, face: 'happy', hat: equippedHat(), label: 'もじまる', fallback: '🌱' }),
+      charFigure('mojimaru', { size: 120, face: 'happy', hat: equippedHat(), stage: currentStage(), label: 'もじまる', fallback: '🌱' }),
       el('div', { className: 'questionText', text: `ミッション ${missionNo}` }),
       el('div', { className: 'heartsRow', text: '❤️❤️❤️' }),
       el('div', { className: 'quizInstruction', text: 'かんじを 8もん とこう！さいごに 書く れんしゅうもあるよ。' }),
@@ -179,13 +190,58 @@ const Island = (() => {
     runMission(level, questions, 0, 0);
   }
 
-  function runMission(level, questions, index, correctCount) {
-    UI.setTitle('ミッション');
+  // ---------- ふくしゅうミッション（わすれんぼう） ----------
+  function forgettingList(level) {
+    return Storage.getForgettingKanji(level, dataset(level), 3);
+  }
+  function forgettingCount(level) { return forgettingList(level).length; }
+
+  function renderReviewIntro() {
+    UI.setHomeHandler(renderHome);
+    UI.setTitle('ふくしゅうミッション');
+    renderStatBar();
+    UI.clearScreen();
+
+    const level = currentLevel();
+    const list = forgettingList(level);
+    const boo = ENEMIES[1];
+
+    if (list.length < 4) {
+      screenEl.appendChild(el('div', { className: 'quizCard missionIntroCard' }, [
+        charFigure('mojimaru', { size: 120, face: 'happy', hat: equippedHat(), stage: currentStage(), label: 'もじまる' }),
+        el('div', { className: 'questionText', text: 'ふくしゅうは まだナシ！' }),
+        el('div', { className: 'quizInstruction', text: 'おぼえた かんじが しばらく たつと、わすれんぼうが あらわれるよ。そのとき ふくしゅうしよう！' }),
+        el('button', { className: 'primaryBtn', text: 'しまマップへ', onClick: renderHome })
+      ]));
+    } else {
+      screenEl.appendChild(el('div', { className: 'quizCard missionIntroCard' }, [
+        charFigure(boo.sprite, { size: 120, face: 'dizzy', className: 'charSpritePop', label: boo.name }),
+        el('div', { className: 'questionText', text: boo.lines[0] }),
+        el('div', { className: 'quizInstruction', text: `おぼえた かんじを ${list.length}字 わすれかけているよ。ふくしゅうして やっつけよう！` }),
+        el('button', { className: 'primaryBtn', text: 'ふくしゅう スタート！', onClick: startReview })
+      ]));
+    }
+    screenEl.appendChild(el('button', { className: 'backBtn', text: '← しまマップへ', onClick: renderHome }));
+    screenEl.appendChild(bottomNav('home'));
+  }
+
+  function startReview() {
+    const level = currentLevel();
+    const questions = KanjiGame.generateReview(level, forgettingList(level), 8);
+    runMission(level, questions, 0, 0, true);
+  }
+
+  function currentStage() {
+    return charStageForLevel(Storage.getCharLevelInfo().level).stage;
+  }
+
+  function runMission(level, questions, index, correctCount, isReview) {
+    UI.setTitle(isReview ? 'ふくしゅうミッション' : 'ミッション');
     renderStatBar();
     UI.clearScreen();
 
     if (index >= questions.length) {
-      startWritingBonus(level, questions, correctCount);
+      startWritingBonus(level, questions, correctCount, isReview);
       return;
     }
 
@@ -200,7 +256,7 @@ const Island = (() => {
 
     function goNext(wasCorrect) {
       Storage.recordIslandKanjiResult(level, q.kanji, wasCorrect);
-      runMission(level, questions, index + 1, correctCount + (wasCorrect ? 1 : 0));
+      runMission(level, questions, index + 1, correctCount + (wasCorrect ? 1 : 0), isReview);
     }
 
     function showFeedback(isCorrect, correctText) {
@@ -208,7 +264,7 @@ const Island = (() => {
       if (isCorrect) {
         feedback.appendChild(el('div', { className: 'feedbackRow' }, [
           charFigure('mojimaru', {
-            size: 72, face: 'happy', hat: equippedHat(),
+            size: 72, face: 'happy', hat: equippedHat(), stage: currentStage(),
             className: 'charSpritePop', label: 'もじまる'
           }),
           el('div', { className: 'feedbackOk', text: '⭕ せいかい！ もじまる「やったね！」' })
@@ -256,7 +312,7 @@ const Island = (() => {
   }
 
   // ---------- 書きれんしゅう（ボーナス） ----------
-  function startWritingBonus(level, questions, correctCount) {
+  function startWritingBonus(level, questions, correctCount, isReview) {
     const uniqueKanji = [];
     const seen = new Set();
     questions.forEach(q => {
@@ -267,7 +323,7 @@ const Island = (() => {
       }
     });
     const picks = KanjiGame.pickWritingKanji(level, uniqueKanji, 2);
-    renderWritingPractice(level, picks, 0, () => finishMission(level, questions.length, correctCount));
+    renderWritingPractice(level, picks, 0, () => finishMission(level, questions.length, correctCount, isReview));
   }
 
   function renderWritingPractice(level, list, idx, onDone) {
@@ -346,7 +402,7 @@ const Island = (() => {
   }
 
   // ---------- ミッション結果・ごほうび ----------
-  function finishMission(level, total, correctCount) {
+  function finishMission(level, total, correctCount, isReview) {
     const coins = correctCount * 10;
     const xp = correctCount * 15;
     const earnedTicket = correctCount >= Math.ceil(total * 0.75) ? 1 : 0;
@@ -365,6 +421,7 @@ const Island = (() => {
     });
 
     const steps = [];
+    if (isReview) steps.push(next => renderReviewClearStep(correctCount, total, next));
     steps.push(next => renderMissionResultStep(correctCount, total, coins, xp, next));
     if (xpResult.leveledUp) steps.push(next => renderLevelUpStep(xpResult.level, next));
     newlyUnlocked.forEach(c => steps.push(next => renderCompanionUnlockStep(c, next)));
@@ -381,6 +438,20 @@ const Island = (() => {
       step(next);
     }
     next();
+  }
+
+  function renderReviewClearStep(correctCount, total, next) {
+    const boo = ENEMIES[1];
+    const beaten = correctCount >= Math.ceil(total * 0.6);
+    UI.setTitle('ふくしゅう けっか');
+    renderStatBar();
+    UI.clearScreen();
+    screenEl.appendChild(el('div', { className: 'resultCard' }, [
+      charFigure(boo.sprite, { size: 130, face: beaten ? 'sad' : 'dizzy', label: boo.name }),
+      el('div', { className: 'resultScore', text: beaten ? `${boo.name} を やっつけた！` : `${boo.name}「まだまだ〜」` }),
+      el('div', { className: 'quizInstruction', text: beaten ? boo.lines[1] : 'もう一回 ふくしゅうすると やっつけられるよ！' }),
+      el('button', { className: 'primaryBtn', text: 'つぎへ →', onClick: next })
+    ]));
   }
 
   function renderMissionResultStep(correctCount, total, coins, xp, next) {
@@ -406,7 +477,7 @@ const Island = (() => {
     renderStatBar();
     UI.clearScreen();
     screenEl.appendChild(el('div', { className: 'resultCard' }, [
-      charFigure('mojimaru', { size: 140, face: 'surprised', hat: equippedHat(), className: 'charSpritePop', label: 'もじまる', fallback: stage.emoji }),
+      charFigure('mojimaru', { size: 140, face: 'surprised', hat: equippedHat(), stage: stage.stage, className: 'charSpritePop', label: 'もじまる', fallback: stage.emoji }),
       el('div', { className: 'resultScore', text: `もじまるが Lv.${level} に なった！` }),
       el('div', { className: 'resultScore', text: stage.title }),
       el('button', { className: 'primaryBtn', text: 'つぎへ →', onClick: next })
@@ -503,11 +574,15 @@ const Island = (() => {
     const xpPct = Math.round((info.xpIntoLevel / info.xpForNext) * 100);
 
     screenEl.appendChild(el('div', { className: 'quizCard charScreenTop' }, [
-      charFigure('mojimaru', { size: 160, face: 'happy', hat: equippedHat(), label: 'もじまる', fallback: (equippedItem ? equippedItem.emoji + ' ' : '') + stage.emoji }),
+      charFigure('mojimaru', { size: 160, face: 'happy', hat: equippedHat(), stage: stage.stage, label: 'もじまる', fallback: (equippedItem ? equippedItem.emoji + ' ' : '') + stage.emoji }),
       el('div', { className: 'questionText', text: `もじまる Lv.${info.level}` }),
       el('div', { className: 'quizInstruction', text: stage.title }),
       el('div', { className: 'xpBar' }, [el('div', { className: 'xpBarFill', attrs: { style: `width:${xpPct}%` } })]),
-      el('div', { className: 'quizInstruction', text: `つぎのレベルまで ${info.xpForNext - info.xpIntoLevel} けいけんち` })
+      el('div', { className: 'quizInstruction', text: `つぎのレベルまで ${info.xpForNext - info.xpIntoLevel} けいけんち` }),
+      (() => {
+        const nx = nextStageLevel(info.level);
+        return el('div', { className: 'stageHint', text: nx ? `Lv.${nx} で つぎの すがたに しんかするよ` : 'さいごの すがたに なった！' });
+      })()
     ]));
 
     screenEl.appendChild(el('div', { className: 'sectionTitle', text: 'なかまたち' }));
@@ -517,7 +592,7 @@ const Island = (() => {
       const unlocked = c.always || unlockedIds.includes(c.id);
       companionGrid.appendChild(el('div', { className: 'companionCard' + (unlocked ? '' : ' companionLocked') }, [
         unlocked && c.sprite
-          ? charFigure(c.sprite, { size: 84, face: 'normal', label: c.name })
+          ? charFigure(c.sprite, { size: 84, face: 'normal', stage: c.id === 'mojimaru' ? currentStage() : 0, label: c.name })
           : el('div', { className: 'bigCardEmoji', text: unlocked ? c.emoji : '🔒' }),
         el('div', { className: 'menuCardTitle', text: unlocked ? c.name : '？？？' }),
         el('div', { className: 'menuCardScore', text: unlocked ? c.desc : c.hint })

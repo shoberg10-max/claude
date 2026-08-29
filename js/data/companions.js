@@ -88,9 +88,18 @@ function rollTreasureItem() {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// stage は Sprites の芽の成長段階（0〜3）に対応する
 function charStageForLevel(level) {
-  if (level >= 30) return { title: '漢字マスター', emoji: '👑' };
-  if (level >= 20) return { title: 'すごうで探検家', emoji: '🧭' };
-  if (level >= 10) return { title: 'たんけんもじまる', emoji: '🎒' };
-  return { title: 'ちびもじまる', emoji: '🌱' };
+  if (level >= 30) return { stage: 3, title: '漢字マスター', emoji: '👑' };
+  if (level >= 20) return { stage: 2, title: 'すごうで探検家', emoji: '🧭' };
+  if (level >= 10) return { stage: 1, title: 'たんけんもじまる', emoji: '🎒' };
+  return { stage: 0, title: 'ちびもじまる', emoji: '🌱' };
+}
+
+// つぎの進化レベル（もう最終段階なら null）
+function nextStageLevel(level) {
+  if (level < 10) return 10;
+  if (level < 20) return 20;
+  if (level < 30) return 30;
+  return null;
 }

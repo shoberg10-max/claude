@@ -200,14 +200,36 @@ const Sprites = (() => {
   };
 
   const PIXEL_CHARS = {
-    // 主人公：芽
+    // 主人公：芽。レベルが上がると頭の芽が育つ（stages[0..3]）
     mojimaru: {
       rows: {
         0: '......GG....GG......',
         1: '.....GGG.GG.GGG.....',
         2: '.........GG.........'
       },
-      colors: { B: CREAM, G: '#7CC15C' }
+      colors: { B: CREAM, G: '#7CC15C', A: '#FFC93C' },
+      stages: [
+        // Lv.1〜 ちびもじまる：小さな双葉（rows のまま）
+        null,
+        // Lv.10〜 たんけんもじまる：葉が増える
+        {
+          0: '.....GGG..GGG.......',
+          1: '....GGGG.GG.GGGG....',
+          2: '.......G.GG.G.......'
+        },
+        // Lv.20〜 すごうで探検家：つぼみがつく
+        {
+          0: '.........AA.........',
+          1: '....GGG..AA..GGG....',
+          2: '...GGGGG.GG.GGGGG...'
+        },
+        // Lv.30〜 漢字マスター：花が咲く
+        {
+          0: '.......AA..AA.......',
+          1: '......AAAAAAAA......',
+          2: '...GGG.AAAAAA.GGG...'
+        }
+      ]
     },
 
     // うさぎ：長い耳
@@ -385,11 +407,16 @@ const Sprites = (() => {
     return grid;
   }
 
-  function buildGrid(char, faceName, hat) {
+  function buildGrid(char, faceName, hat, stage) {
     const grid = [];
     for (let y = 0; y < H_; y++) grid.push(EMPTY_ROW);
     overlay(grid, BASE_BODY);
     overlay(grid, char.rows);
+    // 成長段階がある場合は、頭の飾り（芽）を差し替える
+    if (char.stages && stage > 0 && char.stages[stage]) {
+      for (let y = 0; y < 3; y++) grid[y] = EMPTY_ROW;
+      overlay(grid, char.stages[stage]);
+    }
     if (faceName !== null) overlay(grid, PIXEL_FACES[faceName] || PIXEL_FACES.normal);
     if (hat) overlay(grid, hat.rows);
     return grid;
@@ -430,7 +457,7 @@ const Sprites = (() => {
     if (!char) return '';
     const hat = opts.hat ? PIXEL_HATS[opts.hat] : null;
     const mode = opts.palette === 'lcd' ? 'lcd' : 'color';
-    const grid = buildGrid(char, opts.face || 'normal', hat);
+    const grid = buildGrid(char, opts.face || 'normal', hat, opts.stage || 0);
     const pal = paletteFor(char, hat, mode);
     const size = opts.size || 96;
     const pad = opts.lcd ? 2 : 0;

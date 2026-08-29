@@ -499,3 +499,13 @@ main#screen {
 .feedbackHint { color: #777; font-size: 0.9rem; margin-bottom: 10px; }
 .itemArt { display: inline-flex; }
 .itemCell .hatIcon { display: block; margin: 0 auto; }
+
+/* ドット絵アイコン */
+.pxIcon { display: block; image-rendering: pixelated; }
+.statChip { display: inline-flex; align-items: center; gap: 4px; }
+.statChipIcon { display: inline-flex; }
+.mapTile .pxIcon, .navBtn .pxIcon, .menuCardEmoji .pxIcon { margin: 0 auto; }
+.menuCardEmoji { display: flex; justify-content: center; min-height: 40px; }
+.navBtnEmoji { display: flex; justify-content: center; }
+.mapTileFog .pxIcon { opacity: 0.75; }
+.stageHint { font-size: 0.85rem; color: var(--green-dark); font-weight: bold; margin-top: 8px; }

@@ -105,6 +105,13 @@ const KanjiGame = (() => {
     });
   }
 
+  // ふくしゅうミッション用：忘れかけの漢字だけを出す
+  function generateReview(level, entries, count = 8) {
+    return shuffle(entries).slice(0, count).map(entry => {
+      return Math.random() < 0.5 ? makeReadingQuestion(level, entry) : makeFindQuestion(level, entry);
+    });
+  }
+
   // 漢検チャレンジ用：全字からまんべんなく出題
   function generateChallenge(level, count = 20) {
     const dataset = shuffle(datasetFor(level)).slice(0, count);
@@ -120,6 +127,7 @@ const KanjiGame = (() => {
   return {
     datasetFor,
     generateMission,
+    generateReview,
     generateChallenge,
     pickWritingKanji
   };
