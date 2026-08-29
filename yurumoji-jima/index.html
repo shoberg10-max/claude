@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>ゆるもじ島の漢字たんけん隊</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <header id="statusbar" hidden>
+    <span class="stat"><span class="stat-emoji">🌱</span><span id="stat-level">Lv.1</span></span>
+    <span class="stat"><span class="stat-emoji">🪙</span><span id="stat-coins">0</span></span>
+    <span class="stat"><span class="stat-emoji">🔥</span><span id="stat-streak">0日</span></span>
+    <button id="btn-parent" class="link-btn" title="保護者のかたへ">👪</button>
+  </header>
+
+  <!-- 01. オープニング -->
+  <section class="screen" id="screen-opening">
+    <div class="opening-card">
+      <div class="big-emoji bounce">🌱🏝️</div>
+      <h1>ゆるもじ島の<br>漢字たんけん隊</h1>
+      <p class="mascot-line">「いっしょに かんじを あつめて、島をそだてよう！」</p>
+      <button class="btn btn-primary btn-large" id="btn-start">はじめる</button>
+      <button class="btn btn-ghost" id="btn-reset">さいしょから やりなおす</button>
+    </div>
+  </section>
+
+  <!-- 03. 島MAP -->
+  <section class="screen" id="screen-map">
+    <div class="island-card">
+      <p class="island-label" id="island-label">きりに つつまれた島</p>
+      <div class="island-grid" id="island-grid"></div>
+      <div class="tamago-row">
+        <span id="tamago-emoji">🥚</span>
+        <span id="tamago-label">たまご</span>
+      </div>
+    </div>
+    <div class="map-buttons">
+      <button class="btn btn-primary btn-large" id="btn-go-mission">🧭 今日の冒険へ</button>
+      <div class="map-buttons-row">
+        <button class="btn btn-secondary" id="btn-go-zukan">📖 かんじ図鑑</button>
+        <button class="btn btn-secondary" id="btn-go-kentei">🏆 漢検チャレンジ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04. 今日のミッション -->
+  <section class="screen" id="screen-mission-select">
+    <h2>どの冒険に行く？</h2>
+    <div class="mission-choice-list">
+      <button class="mission-choice" data-level="9">
+        <span class="mission-choice-emoji">🌳</span>
+        <span class="mission-choice-title">はじまりの森（9級）</span>
+        <span class="mission-choice-sub" id="mission-progress-9"></span>
+      </button>
+      <button class="mission-choice" data-level="8">
+        <span class="mission-choice-emoji">🌋</span>
+        <span class="mission-choice-title">かんじ火山（8級）</span>
+        <span class="mission-choice-sub" id="mission-progress-8"></span>
+      </button>
+      <button class="mission-choice" data-level="all">
+        <span class="mission-choice-emoji">🎲</span>
+        <span class="mission-choice-title">おまかせ たんけん</span>
+        <span class="mission-choice-sub">にがてな かんじを ちゅうしんに出るよ</span>
+      </button>
+    </div>
+    <button class="btn btn-ghost" id="btn-back-from-mission-select">もどる</button>
+  </section>
+
+  <!-- 05-07. クイズ画面（読み・書き・意味を共通で表示） -->
+  <section class="screen" id="screen-quiz">
+    <div class="quiz-progress" id="quiz-progress"></div>
+    <div class="quiz-card" id="quiz-card">
+      <!-- JSで動的に描画 -->
+    </div>
+  </section>
+
+  <!-- 08. リザルト -->
+  <section class="screen" id="screen-result">
+    <div class="result-card">
+      <div class="big-emoji">🎉</div>
+      <h2>ミッション クリア！</h2>
+      <p class="result-score" id="result-score">3 / 9 せいかい</p>
+      <div class="result-rewards" id="result-rewards"></div>
+      <div id="result-levelup" class="result-levelup" hidden></div>
+      <div id="result-streak" class="result-streak"></div>
+      <button class="btn btn-primary btn-large" id="btn-result-next">つぎへ</button>
+    </div>
+  </section>
+
+  <!-- 09. 宝箱 -->
+  <section class="screen" id="screen-treasure">
+    <div class="treasure-card">
+      <div class="big-emoji bounce" id="treasure-chest">🎁</div>
+      <h2 id="treasure-title">たからばこ発見！</h2>
+      <div id="treasure-reveal" hidden>
+        <div class="big-emoji" id="treasure-item-emoji">✨</div>
+        <p id="treasure-item-name"></p>
+      </div>
+      <button class="btn btn-primary btn-large" id="btn-open-treasure">あける！</button>
+      <button class="btn btn-secondary" id="btn-treasure-done" hidden>島にもどる</button>
+    </div>
+  </section>
+
+  <!-- 10. 漢検チャレンジ -->
+  <section class="screen" id="screen-kentei-intro">
+    <div class="kentei-card">
+      <div class="big-emoji">🏯</div>
+      <h2>かんじマスター城</h2>
+      <p id="kentei-intro-text">漢検チャレンジに挑戦できます！</p>
+      <button class="btn btn-primary btn-large" id="btn-start-kentei">チャレンジする</button>
+      <button class="btn btn-ghost" id="btn-back-from-kentei">もどる</button>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-kentei-result">
+    <div class="kentei-card">
+      <div class="big-emoji" id="kentei-result-emoji">🟢</div>
+      <h2 id="kentei-result-label">合格圏！</h2>
+      <p class="result-score" id="kentei-result-score">9 / 10 (90%)</p>
+      <p id="kentei-result-hint"></p>
+      <button class="btn btn-primary btn-large" id="btn-kentei-done">島にもどる</button>
+    </div>
+  </section>
+
+  <!-- かんじ図鑑 -->
+  <section class="screen" id="screen-zukan">
+    <h2>かんじ図鑑</h2>
+    <div class="zukan-tabs">
+      <button class="zukan-tab active" data-level="9">9級</button>
+      <button class="zukan-tab" data-level="8">8級</button>
+    </div>
+    <div class="zukan-grid" id="zukan-grid"></div>
+    <div class="zukan-detail" id="zukan-detail" hidden></div>
+    <button class="btn btn-ghost" id="btn-back-from-zukan">もどる</button>
+  </section>
+
+  <!-- 保護者画面 -->
+  <section class="screen" id="screen-parent">
+    <h2>保護者のかたへ</h2>
+    <div class="parent-card" id="parent-card"></div>
+    <button class="btn btn-ghost" id="btn-back-from-parent">もどる</button>
+  </section>
+
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/game.js"></script>
+<script src="js/quiz.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

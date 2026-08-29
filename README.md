@@ -2,6 +2,8 @@
 
 小学校３年生向けの、算数と漢字を練習できるブラウザアプリです。ビルド不要の素の HTML / CSS / JavaScript で作られているので、`index.html` を開くだけで動きます。
 
+> 漢検9級・8級向けの育成ゲーム版は [`yurumoji-jima/`](./yurumoji-jima/) にあります（[くわしい説明](./yurumoji-jima/README.md)）。
+
 ## あそびかた
 
 ```
