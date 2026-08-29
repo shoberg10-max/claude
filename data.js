@@ -285,7 +285,7 @@ const GRADE2_DATA = [
   { kanji: "丸", word: "丸い", reading: "まるい", strokes: 3 },
   { kanji: "岩", word: "岩", reading: "いわ", strokes: 8 },
   { kanji: "顔", word: "顔", reading: "かお", strokes: 18 },
-  { kanji: "汽", word: "汽車", reading: "きしゃ", strokes: 6 },
+  { kanji: "汽", word: "汽車", reading: "きしゃ", strokes: 7 },
   { kanji: "記", word: "日記", reading: "にっき", strokes: 10 },
   { kanji: "帰", word: "帰る", reading: "かえる", strokes: 10 },
   { kanji: "弓", word: "弓", reading: "ゆみ", strokes: 3 },

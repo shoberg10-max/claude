@@ -11,7 +11,14 @@
     choice: "漢字えらび",
     pair: "ことばのペア",
     radical: "部首なかま",
+    strokeorder: "筆順",
   };
+
+  // その漢字に筆順データがあり、かつ4択の distractor を確実に作れる(総画数4以上)か
+  function hasStrokeOrderData(kanji) {
+    const paths = STROKE_ORDER_DATA[kanji];
+    return !!paths && paths.length >= 4;
+  }
 
   // レベルごとのデータセット。「radical」は学年をまたぐ共通データなのでここには含めない。
   const LEVELS = {
@@ -58,6 +65,34 @@
       extra++;
     }
     return [correct, ...wrong];
+  }
+
+  // 筆順クイズの4択(正解の画数位置1つ+誤り3つ、1〜総画数の範囲で重複なし)を作る。
+  function generateStrokePositionChoices(correctPos, totalStrokes) {
+    const pool = [];
+    for (let i = 1; i <= totalStrokes; i++) if (i !== correctPos) pool.push(i);
+    const wrong = shuffle(pool).slice(0, 3);
+    return [correctPos, ...wrong];
+  }
+
+  // 指定した画(1始まり)だけ強調したSVGのHTML文字列を作る。
+  function renderStrokeSvg(paths, highlightIndex) {
+    const strokeEls = paths
+      .map((d, i) => {
+        const isHi = i + 1 === highlightIndex;
+        const color = isHi ? "#e5484d" : "#c3cbd6";
+        const width = isHi ? 6 : 3;
+        return `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      })
+      .join("");
+    return `<svg viewBox="0 0 109 109" class="stroke-svg">${strokeEls}</svg>`;
+  }
+
+  // 選択肢・正解表示の文字列フォーマット(問題タイプごとに単位が違う)
+  function formatAnswerValue(type, value) {
+    if (type === "strokes") return `${value}画`;
+    if (type === "strokeorder") return `${value}画目`;
+    return value;
   }
 
   function loadStats() {
@@ -131,6 +166,7 @@
     const entry = findKanjiEntry(key);
     if (!entry) return null;
     const types = ["reading", "writing", "strokes"];
+    if (hasStrokeOrderData(entry.kanji)) types.push("strokeorder");
     return { qtype: types[Math.floor(Math.random() * types.length)], entry };
   }
 
@@ -241,11 +277,29 @@
     };
   }
 
+  function buildStrokeOrderQuestion(entry) {
+    const paths = STROKE_ORDER_DATA[entry.kanji];
+    const total = paths.length;
+    const correctPos = 1 + Math.floor(Math.random() * total);
+    const choices = shuffle(generateStrokePositionChoices(correctPos, total));
+    return {
+      type: "strokeorder",
+      kanji: entry.kanji,
+      prompt: `次の「${entry.kanji}」の太い画は、何画目に書きますか。`,
+      display: renderStrokeSvg(paths, correctPos),
+      reviewLabel: entry.kanji,
+      answer: correctPos,
+      choices,
+      _meta: { qtype: "strokeorder", entry },
+    };
+  }
+
   function rebuildQuestion(meta) {
     if (!meta) return null;
     if (meta.qtype === "choice") return buildChoiceQuestion(meta.entry);
     if (meta.qtype === "pair") return buildPairQuestion(meta.entry, meta.direction);
     if (meta.qtype === "radical") return buildRadicalQuestion(meta.group, meta.shown);
+    if (meta.qtype === "strokeorder") return buildStrokeOrderQuestion(meta.entry);
     return buildQuestion(meta.entry, meta.qtype);
   }
 
@@ -266,6 +320,7 @@
         candidates.push(buildQuestion(entry, "reading"));
         candidates.push(buildQuestion(entry, "writing"));
         candidates.push(buildQuestion(entry, "strokes"));
+        if (hasStrokeOrderData(entry.kanji)) candidates.push(buildStrokeOrderQuestion(entry));
       });
       L.choiceData.forEach((entry) => candidates.push(buildChoiceQuestion(entry)));
       L.pairData.forEach((entry) => {
@@ -279,6 +334,8 @@
       candidates = L.pairData.flatMap((e) => [buildPairQuestion(e, "a2b"), buildPairQuestion(e, "b2a")]);
     } else if (mode === "radical") {
       candidates = allRadicalCandidates();
+    } else if (mode === "strokeorder") {
+      candidates = L.kanjiData.filter((e) => hasStrokeOrderData(e.kanji)).map((e) => buildStrokeOrderQuestion(e));
     } else {
       candidates = L.kanjiData.map((e) => buildQuestion(e, mode));
     }
@@ -415,7 +472,7 @@
   }
 
   function isChoiceLike(type) {
-    return type === "strokes" || type === "choice" || type === "radical";
+    return type === "strokes" || type === "choice" || type === "radical" || type === "strokeorder";
   }
 
   function renderQuestion() {
@@ -425,6 +482,8 @@
     questionPrompt.textContent = q.prompt;
     if (q.type === "pair") {
       questionDisplay.innerHTML = `${q.display}<span class="furigana-hint">→（　${q.hint}　）</span>`;
+    } else if (q.type === "strokeorder") {
+      questionDisplay.innerHTML = q.display;
     } else {
       questionDisplay.textContent = q.display;
     }
@@ -436,9 +495,8 @@
     if (isChoiceLike(q.type)) {
       answerInput.hidden = true;
       choiceGrid.hidden = false;
-      const label = q.type === "strokes" ? (c) => `${c}画` : (c) => c;
       choiceGrid.innerHTML = q.choices
-        .map((c) => `<button type="button" class="choice-btn" data-value="${c}">${label(c)}</button>`)
+        .map((c) => `<button type="button" class="choice-btn" data-value="${c}">${formatAnswerValue(q.type, c)}</button>`)
         .join("");
     } else {
       answerInput.hidden = false;
@@ -466,7 +524,7 @@
 
     if (isChoiceLike(q.type)) {
       if (chosenChoice === null) return;
-      if (q.type === "strokes") {
+      if (q.type === "strokes" || q.type === "strokeorder") {
         userAnswer = Number(chosenChoice);
         isCorrect = userAnswer === q.answer;
       } else {
@@ -497,7 +555,7 @@
     } else {
       feedbackMark.textContent = "✕ ざんねん";
       feedbackMark.className = "feedback-mark wrong";
-      const ansText = q.type === "strokes" ? `${q.answer}画` : q.answer;
+      const ansText = formatAnswerValue(q.type, q.answer);
       feedbackText.innerHTML = `正しいこたえ: <b>${ansText}</b>`;
     }
   });
@@ -544,9 +602,10 @@
         `<h2>まちがえた問題 (${session.wrong.length})</h2>` +
         session.wrong
           .map(({ q, userAnswer }) => {
-            const ans = q.type === "strokes" ? `${q.answer}画` : q.answer;
-            const mine = q.type === "strokes" ? `${userAnswer}画` : userAnswer || "(未回答)";
-            return `<div class="wrong-item"><span class="w-q">${q.display}<br><span style="font-size:.8em">あなた: ${mine}</span></span><span class="w-a">${ans}</span></div>`;
+            const ans = formatAnswerValue(q.type, q.answer);
+            const mine = userAnswer === "" || userAnswer == null ? "(未回答)" : formatAnswerValue(q.type, userAnswer);
+            const label = q.reviewLabel || q.display;
+            return `<div class="wrong-item"><span class="w-q">${label}<br><span style="font-size:.8em">あなた: ${mine}</span></span><span class="w-a">${ans}</span></div>`;
           })
           .join("");
       retryWrongBtn.hidden = false;
