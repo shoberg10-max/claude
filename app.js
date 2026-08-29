@@ -8,10 +8,12 @@
     reading: "読み方",
     writing: "書き取り",
     strokes: "画数",
+    choice: "漢字えらび",
+    pair: "ことばのペア",
   };
 
   /* ---------- 状態 ---------- */
-  let session = null; // { queue, index, correct, wrong: [], mode, count, isReview }
+  let session = null; // { queue, index, correct, wrong: [], mode, count, isReview, metas? }
   let selectedMode = "reading";
   let selectedCount = 20;
 
@@ -43,12 +45,8 @@
       return {
         totalAnswered: 0,
         totalCorrect: 0,
-        byCategory: {
-          reading: { correct: 0, total: 0 },
-          writing: { correct: 0, total: 0 },
-          strokes: { correct: 0, total: 0 },
-        },
-        weak: {}, // kanji -> { wrongCount }
+        byCategory: {},
+        weak: {}, // weakKey -> { wrongCount }
       };
     }
   }
@@ -57,20 +55,53 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
   }
 
-  function recordAnswer(kanji, category, isCorrect) {
+  // KANJI_DATA由来(読み方/書き取り/画数)は漢字1字をキーにしてまとめる。
+  // 漢字えらび/ことばのペアは種類ごとに別キーにする。
+  function weakKeyFor(meta) {
+    if (meta.qtype === "choice") return `choice:${meta.entry.correct}`;
+    if (meta.qtype === "pair") return `pair:${meta.entry.a.kanji}|${meta.entry.b.kanji}`;
+    return meta.entry.kanji;
+  }
+
+  function weakLabel(key) {
+    if (key.startsWith("choice:")) return key.slice(7);
+    if (key.startsWith("pair:")) return key.slice(5).replace("|", "⇔");
+    return key;
+  }
+
+  function metaFromWeakKey(key) {
+    if (key.startsWith("choice:")) {
+      const word = key.slice(7);
+      const entry = CHOICE_DATA.find((e) => e.correct === word);
+      return entry ? { qtype: "choice", entry } : null;
+    }
+    if (key.startsWith("pair:")) {
+      const [ak, bk] = key.slice(5).split("|");
+      const entry = PAIR_DATA.find((e) => e.a.kanji === ak && e.b.kanji === bk);
+      return entry ? { qtype: "pair", entry, direction: Math.random() < 0.5 ? "a2b" : "b2a" } : null;
+    }
+    const entry = KANJI_DATA.find((e) => e.kanji === key);
+    if (!entry) return null;
+    const types = ["reading", "writing", "strokes"];
+    return { qtype: types[Math.floor(Math.random() * types.length)], entry };
+  }
+
+  function recordAnswer(meta, isCorrect) {
     const stats = loadStats();
     stats.totalAnswered++;
     if (isCorrect) stats.totalCorrect++;
-    if (!stats.byCategory[category]) stats.byCategory[category] = { correct: 0, total: 0 };
-    stats.byCategory[category].total++;
-    if (isCorrect) stats.byCategory[category].correct++;
+    const cat = meta.qtype;
+    if (!stats.byCategory[cat]) stats.byCategory[cat] = { correct: 0, total: 0 };
+    stats.byCategory[cat].total++;
+    if (isCorrect) stats.byCategory[cat].correct++;
 
-    if (!stats.weak[kanji]) stats.weak[kanji] = { wrongCount: 0 };
+    const key = weakKeyFor(meta);
+    if (!stats.weak[key]) stats.weak[key] = { wrongCount: 0 };
     if (isCorrect) {
-      stats.weak[kanji].wrongCount = Math.max(0, stats.weak[kanji].wrongCount - 1);
-      if (stats.weak[kanji].wrongCount === 0) delete stats.weak[kanji];
+      stats.weak[key].wrongCount = Math.max(0, stats.weak[key].wrongCount - 1);
+      if (stats.weak[key].wrongCount === 0) delete stats.weak[key];
     } else {
-      stats.weak[kanji].wrongCount += 2;
+      stats.weak[key].wrongCount += 2;
     }
     saveStats(stats);
   }
@@ -84,6 +115,7 @@
         prompt: "次のことばの読み方を、ひらがなで書きましょう。",
         display: entry.word,
         answer: entry.reading,
+        _meta: { qtype: type, entry },
       };
     }
     if (type === "writing") {
@@ -93,6 +125,7 @@
         prompt: "次のひらがなを、漢字を使って書きましょう。",
         display: entry.reading,
         answer: entry.word,
+        _meta: { qtype: type, entry },
       };
     }
     // strokes
@@ -114,18 +147,69 @@
       display: entry.kanji,
       answer: correct,
       choices,
+      _meta: { qtype: type, entry },
     };
   }
 
-  function buildQueue(mode, count, sourceEntries) {
-    const pool = shuffle(sourceEntries || KANJI_DATA);
-    const n = count === "all" ? pool.length : Math.min(count, pool.length);
-    const picked = pool.slice(0, n);
-    const types = ["reading", "writing", "strokes"];
-    return picked.map((entry) => {
-      const type = mode === "mix" ? types[Math.floor(Math.random() * types.length)] : mode;
-      return buildQuestion(entry, type);
-    });
+  function buildChoiceQuestion(entry) {
+    const choices = shuffle([entry.correct, entry.wrong]);
+    return {
+      type: "choice",
+      kanji: entry.correct,
+      prompt: "次のひらがなを漢字で書くと、どちらが正しいですか。正しいほうを選びましょう。",
+      display: entry.reading,
+      answer: entry.correct,
+      choices,
+      _meta: { qtype: "choice", entry },
+    };
+  }
+
+  function buildPairQuestion(entry, direction) {
+    const dir = direction || (Math.random() < 0.5 ? "a2b" : "b2a");
+    const src = dir === "a2b" ? entry.a : entry.b;
+    const tgt = dir === "a2b" ? entry.b : entry.a;
+    return {
+      type: "pair",
+      kanji: tgt.kanji,
+      prompt: "次のことばと対になることばを、漢字で書きましょう。",
+      display: src.kanji,
+      hint: tgt.reading,
+      answer: tgt.kanji,
+      _meta: { qtype: "pair", entry, direction: dir },
+    };
+  }
+
+  function rebuildQuestion(meta) {
+    if (!meta) return null;
+    if (meta.qtype === "choice") return buildChoiceQuestion(meta.entry);
+    if (meta.qtype === "pair") return buildPairQuestion(meta.entry, meta.direction);
+    return buildQuestion(meta.entry, meta.qtype);
+  }
+
+  function buildQueue(mode, count) {
+    let candidates;
+    if (mode === "mix") {
+      candidates = [];
+      KANJI_DATA.forEach((entry) => {
+        candidates.push(buildQuestion(entry, "reading"));
+        candidates.push(buildQuestion(entry, "writing"));
+        candidates.push(buildQuestion(entry, "strokes"));
+      });
+      CHOICE_DATA.forEach((entry) => candidates.push(buildChoiceQuestion(entry)));
+      PAIR_DATA.forEach((entry) => {
+        candidates.push(buildPairQuestion(entry, "a2b"));
+        candidates.push(buildPairQuestion(entry, "b2a"));
+      });
+    } else if (mode === "choice") {
+      candidates = CHOICE_DATA.map((e) => buildChoiceQuestion(e));
+    } else if (mode === "pair") {
+      candidates = PAIR_DATA.flatMap((e) => [buildPairQuestion(e, "a2b"), buildPairQuestion(e, "b2a")]);
+    } else {
+      candidates = KANJI_DATA.map((e) => buildQuestion(e, mode));
+    }
+    candidates = shuffle(candidates);
+    const n = count === "all" ? candidates.length : Math.min(count, candidates.length);
+    return candidates.slice(0, n);
   }
 
   /* ---------- 画面切り替え ---------- */
@@ -162,15 +246,14 @@
   modeGrid.querySelector('[data-mode="reading"]').classList.add("selected");
 
   document.getElementById("start-btn").addEventListener("click", () => {
-    startSession(selectedMode, selectedCount, KANJI_DATA, false);
+    startSession(selectedMode, selectedCount);
   });
 
   document.getElementById("weak-review-btn").addEventListener("click", () => {
     const stats = loadStats();
-    const weakKanji = Object.keys(stats.weak);
-    const entries = KANJI_DATA.filter((e) => weakKanji.includes(e.kanji));
-    if (entries.length === 0) return;
-    startSession("mix", "all", entries, true);
+    const metas = Object.keys(stats.weak).map(metaFromWeakKey).filter(Boolean);
+    if (metas.length === 0) return;
+    startReviewFromMetas(metas);
   });
 
   document.getElementById("reset-stats-btn").addEventListener("click", () => {
@@ -190,15 +273,16 @@
     } else {
       const pct = Math.round((stats.totalCorrect / stats.totalAnswered) * 100);
       let html = `<div class="stat-row"><span>全体の正答率</span><b>${pct}% (${stats.totalCorrect}/${stats.totalAnswered})</b></div>`;
-      for (const cat of ["reading", "writing", "strokes"]) {
+      for (const cat of Object.keys(MODE_LABEL)) {
         const c = stats.byCategory[cat] || { correct: 0, total: 0 };
-        const p = c.total ? Math.round((c.correct / c.total) * 100) : 0;
+        if (c.total === 0) continue;
+        const p = Math.round((c.correct / c.total) * 100);
         html += `<div class="stat-row"><span>${MODE_LABEL[cat]}</span><b>${p}% (${c.correct}/${c.total})</b></div>`;
       }
       statsBody.innerHTML = html;
     }
 
-    // にがて漢字
+    // にがて
     const weakCard = document.getElementById("weak-card");
     const weakList = document.getElementById("weak-list");
     const weakEntries = Object.entries(stats.weak).sort((a, b) => b[1].wrongCount - a[1].wrongCount);
@@ -208,7 +292,7 @@
       weakCard.hidden = false;
       weakList.innerHTML = weakEntries
         .slice(0, 16)
-        .map(([k]) => `<span class="weak-chip">${k}</span>`)
+        .map(([k]) => `<span class="weak-chip">${weakLabel(k)}</span>`)
         .join("");
     }
   }
@@ -230,12 +314,24 @@
 
   let chosenChoice = null;
 
-  function startSession(mode, count, sourceEntries, isReview) {
-    const queue = buildQueue(mode, count, sourceEntries);
+  function startSession(mode, count) {
+    const queue = buildQueue(mode, count);
     if (queue.length === 0) return;
-    session = { queue, index: 0, correct: 0, wrong: [], mode, count, isReview };
+    session = { queue, index: 0, correct: 0, wrong: [], mode, count, isReview: false };
     showScreen("quiz");
     renderQuestion();
+  }
+
+  function startReviewFromMetas(metas) {
+    const queue = shuffle(metas.map(rebuildQuestion).filter(Boolean));
+    if (queue.length === 0) return;
+    session = { queue, index: 0, correct: 0, wrong: [], mode: "review", count: "all", isReview: true, metas };
+    showScreen("quiz");
+    renderQuestion();
+  }
+
+  function isChoiceLike(type) {
+    return type === "strokes" || type === "choice";
   }
 
   function renderQuestion() {
@@ -243,17 +339,22 @@
     chosenChoice = null;
     questionType.textContent = MODE_LABEL[q.type];
     questionPrompt.textContent = q.prompt;
-    questionDisplay.textContent = q.display;
+    if (q.type === "pair") {
+      questionDisplay.innerHTML = `${q.display}<span class="furigana-hint">→（　${q.hint}　）</span>`;
+    } else {
+      questionDisplay.textContent = q.display;
+    }
 
     feedback.hidden = true;
     answerForm.hidden = false;
     answerInput.value = "";
 
-    if (q.type === "strokes") {
+    if (isChoiceLike(q.type)) {
       answerInput.hidden = true;
       choiceGrid.hidden = false;
+      const label = q.type === "strokes" ? (c) => `${c}画` : (c) => c;
       choiceGrid.innerHTML = q.choices
-        .map((c) => `<button type="button" class="choice-btn" data-value="${c}">${c}画</button>`)
+        .map((c) => `<button type="button" class="choice-btn" data-value="${c}">${label(c)}</button>`)
         .join("");
     } else {
       answerInput.hidden = false;
@@ -270,7 +371,7 @@
   choiceGrid.addEventListener("click", (e) => {
     const btn = e.target.closest(".choice-btn");
     if (!btn) return;
-    chosenChoice = Number(btn.dataset.value);
+    chosenChoice = btn.dataset.value;
     [...choiceGrid.children].forEach((b) => b.classList.toggle("chosen", b === btn));
   });
 
@@ -279,17 +380,22 @@
     const q = session.queue[session.index];
     let userAnswer, isCorrect;
 
-    if (q.type === "strokes") {
+    if (isChoiceLike(q.type)) {
       if (chosenChoice === null) return;
-      userAnswer = chosenChoice;
-      isCorrect = chosenChoice === q.answer;
+      if (q.type === "strokes") {
+        userAnswer = Number(chosenChoice);
+        isCorrect = userAnswer === q.answer;
+      } else {
+        userAnswer = chosenChoice;
+        isCorrect = userAnswer === q.answer;
+      }
     } else {
       userAnswer = answerInput.value;
       if (normalize(userAnswer) === "") return;
       isCorrect = normalize(userAnswer) === normalize(q.answer);
     }
 
-    recordAnswer(q.kanji, q.type, isCorrect);
+    recordAnswer(q._meta, isCorrect);
 
     if (isCorrect) {
       session.correct++;
@@ -298,7 +404,6 @@
     }
 
     feedback.hidden = false;
-    answerForm.querySelector(".answer-input");
     submitBtn.disabled = true;
 
     if (isCorrect) {
@@ -371,13 +476,24 @@
   }
 
   retryWrongBtn.addEventListener("click", () => {
-    const entries = session.wrong.map(({ q }) => KANJI_DATA.find((e) => e.kanji === q.kanji)).filter(Boolean);
-    const uniqueEntries = Array.from(new Map(entries.map((e) => [e.kanji, e])).values());
-    startSession("mix", "all", uniqueEntries, true);
+    const seen = new Set();
+    const metas = [];
+    session.wrong.forEach(({ q }) => {
+      const id = `${q._meta.qtype}:${weakKeyFor(q._meta)}`;
+      if (!seen.has(id)) {
+        seen.add(id);
+        metas.push(q._meta);
+      }
+    });
+    startReviewFromMetas(metas);
   });
 
   document.getElementById("retry-same-btn").addEventListener("click", () => {
-    startSession(session.mode, session.count, KANJI_DATA, false);
+    if (session.isReview) {
+      startReviewFromMetas(session.metas);
+    } else {
+      startSession(session.mode, session.count);
+    }
   });
 
   document.getElementById("home-btn").addEventListener("click", () => {

@@ -201,3 +201,57 @@ const KANJI_DATA = [
   { kanji: "安", word: "安い", reading: "やすい", strokes: 6 },
   { kanji: "暗", word: "暗い", reading: "くらい", strokes: 13 },
 ];
+
+// 「正しい漢字えらび」用データ
+// reading: 出題することば(ひらがな), correct: 正しい漢字での表記, wrong: 形が似ているが誤った漢字での表記
+const CHOICE_DATA = [
+  { reading: "ようじん", correct: "用心", wrong: "用思" },
+  { reading: "りかしつ", correct: "理科室", wrong: "里科室" },
+  { reading: "ためいけ", correct: "ため池", wrong: "ため地" },
+  { reading: "まるい", correct: "丸い", wrong: "九い" },
+  { reading: "すいりょく", correct: "水力", wrong: "水刀" },
+  { reading: "おやどり", correct: "親鳥", wrong: "親鳴" },
+  { reading: "けんきゅう", correct: "研究", wrong: "研空" },
+  { reading: "しゅじん", correct: "主人", wrong: "王人" },
+  { reading: "ぎんこう", correct: "銀行", wrong: "根行" },
+  { reading: "かぞく", correct: "家族", wrong: "家旅" },
+  { reading: "へや", correct: "部屋", wrong: "都屋" },
+  { reading: "しゃしん", correct: "写真", wrong: "写直" },
+  { reading: "べんきょう", correct: "勉強", wrong: "勉弱" },
+  { reading: "どうろ", correct: "道路", wrong: "道略" },
+  { reading: "かんそう", correct: "感想", wrong: "感相" },
+  { reading: "びょういん", correct: "病院", wrong: "病完" },
+  { reading: "うんどう", correct: "運動", wrong: "運働" },
+  { reading: "たいよう", correct: "太陽", wrong: "太場" },
+  { reading: "ようふく", correct: "洋服", wrong: "羊服" },
+  { reading: "だいじ", correct: "大事", wrong: "大寺" },
+  { reading: "しごと", correct: "仕事", wrong: "仕寺" },
+  { reading: "はんたい", correct: "反対", wrong: "坂対" },
+  { reading: "きょねん", correct: "去年", wrong: "去午" },
+  { reading: "とかい", correct: "都会", wrong: "郡会" },
+];
+
+// 「対になることば」用データ
+// a・b はそれぞれ { kanji, reading } の組。どちらの向きからも出題する。
+const PAIR_DATA = [
+  { a: { kanji: "夜", reading: "よる" }, b: { kanji: "朝", reading: "あさ" } },
+  { a: { kanji: "白", reading: "しろ" }, b: { kanji: "黒", reading: "くろ" } },
+  { a: { kanji: "月", reading: "つき" }, b: { kanji: "星", reading: "ほし" } },
+  { a: { kanji: "肉", reading: "にく" }, b: { kanji: "魚", reading: "さかな" } },
+  { a: { kanji: "雨", reading: "あめ" }, b: { kanji: "風", reading: "かぜ" } },
+  { a: { kanji: "遠い", reading: "とおい" }, b: { kanji: "近い", reading: "ちかい" } },
+  { a: { kanji: "広い", reading: "ひろい" }, b: { kanji: "せまい", reading: "せまい" } },
+  { a: { kanji: "動く", reading: "うごく" }, b: { kanji: "止まる", reading: "とまる" } },
+  { a: { kanji: "教える", reading: "おしえる" }, b: { kanji: "習う", reading: "ならう" } },
+  { a: { kanji: "大きい", reading: "おおきい" }, b: { kanji: "小さい", reading: "ちいさい" } },
+  { a: { kanji: "長い", reading: "ながい" }, b: { kanji: "短い", reading: "みじかい" } },
+  { a: { kanji: "重い", reading: "おもい" }, b: { kanji: "軽い", reading: "かるい" } },
+  { a: { kanji: "明るい", reading: "あかるい" }, b: { kanji: "暗い", reading: "くらい" } },
+  { a: { kanji: "強い", reading: "つよい" }, b: { kanji: "弱い", reading: "よわい" } },
+  { a: { kanji: "上", reading: "うえ" }, b: { kanji: "下", reading: "した" } },
+  { a: { kanji: "前", reading: "まえ" }, b: { kanji: "後ろ", reading: "うしろ" } },
+  { a: { kanji: "兄", reading: "あに" }, b: { kanji: "妹", reading: "いもうと" } },
+  { a: { kanji: "父", reading: "ちち" }, b: { kanji: "母", reading: "はは" } },
+  { a: { kanji: "買う", reading: "かう" }, b: { kanji: "売る", reading: "うる" } },
+  { a: { kanji: "始まる", reading: "はじまる" }, b: { kanji: "終わる", reading: "おわる" } },
+];
