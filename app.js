@@ -3,6 +3,8 @@
   "use strict";
 
   const STORAGE_KEY = "kanken89_stats_v1";
+  const INPUT_MODE_KEY = "kanken89_write_input_mode";
+  const HW_GUIDE_KEY = "kanken89_write_guide_on";
 
   const MODE_LABEL = {
     reading: "読み方",
@@ -453,6 +455,154 @@
   const progressFill = document.getElementById("progress-fill");
   const quizCounter = document.getElementById("quiz-counter");
 
+  const inputModeToggle = document.getElementById("input-mode-toggle");
+  const handwriteArea = document.getElementById("handwrite-area");
+  const hwCanvas = document.getElementById("handwrite-canvas");
+  const hwCtx = hwCanvas.getContext("2d");
+  const hwGuideToggle = document.getElementById("hw-guide-toggle");
+  const hwClearBtn = document.getElementById("hw-clear-btn");
+  const hwRevealBtn = document.getElementById("hw-reveal-btn");
+  const hwRevealArea = document.getElementById("hw-reveal-area");
+  const hwAnswerWord = document.getElementById("hw-answer-word");
+  const hwSelfcheck = document.getElementById("hw-selfcheck");
+  const hwCorrectBtn = document.getElementById("hw-correct-btn");
+  const hwWrongBtn = document.getElementById("hw-wrong-btn");
+
+  const HW_CANVAS_SIZE = 280; // 論理座標(CSS px)での一辺のサイズ
+  let writeInputMode = localStorage.getItem(INPUT_MODE_KEY) || "write";
+  let hwGuideOn = localStorage.getItem(HW_GUIDE_KEY) === "1";
+  let hwDrawing = false;
+
+  function setupHandwriteCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    hwCanvas.width = HW_CANVAS_SIZE * dpr;
+    hwCanvas.height = HW_CANVAS_SIZE * dpr;
+    hwCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  setupHandwriteCanvas();
+
+  function hwCanvasPos(e) {
+    const rect = hwCanvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * HW_CANVAS_SIZE,
+      y: ((e.clientY - rect.top) / rect.height) * HW_CANVAS_SIZE,
+    };
+  }
+
+  function drawHwGuide() {
+    if (!hwGuideOn || !session) return;
+    const q = session.queue[session.index];
+    if (!q || q.type !== "writing") return;
+    const paths = STROKE_ORDER_DATA[q._meta.entry.kanji];
+    if (!paths) return;
+    const scale = HW_CANVAS_SIZE / 109;
+    hwCtx.save();
+    hwCtx.globalAlpha = 0.16;
+    hwCtx.strokeStyle = "#4a5568";
+    hwCtx.lineWidth = 4 / scale;
+    hwCtx.lineCap = "round";
+    hwCtx.lineJoin = "round";
+    hwCtx.scale(scale, scale);
+    paths.forEach((d) => hwCtx.stroke(new Path2D(d)));
+    hwCtx.restore();
+  }
+
+  function hwClear() {
+    hwCtx.clearRect(0, 0, HW_CANVAS_SIZE, HW_CANVAS_SIZE);
+    drawHwGuide();
+  }
+
+  function hwStrokeStart(e) {
+    hwDrawing = true;
+    hwCanvas.setPointerCapture(e.pointerId);
+    const p = hwCanvasPos(e);
+    hwCtx.beginPath();
+    hwCtx.moveTo(p.x, p.y);
+    e.preventDefault();
+  }
+  function hwStrokeMove(e) {
+    if (!hwDrawing) return;
+    const p = hwCanvasPos(e);
+    hwCtx.globalAlpha = 1;
+    hwCtx.strokeStyle = "#26313d";
+    hwCtx.lineWidth = 9;
+    hwCtx.lineCap = "round";
+    hwCtx.lineJoin = "round";
+    hwCtx.lineTo(p.x, p.y);
+    hwCtx.stroke();
+    e.preventDefault();
+  }
+  function hwStrokeEnd() {
+    hwDrawing = false;
+  }
+  hwCanvas.addEventListener("pointerdown", hwStrokeStart);
+  hwCanvas.addEventListener("pointermove", hwStrokeMove);
+  hwCanvas.addEventListener("pointerup", hwStrokeEnd);
+  hwCanvas.addEventListener("pointercancel", hwStrokeEnd);
+  hwCanvas.addEventListener("pointerleave", hwStrokeEnd);
+
+  function updateHwGuideBtn() {
+    hwGuideToggle.classList.toggle("active", hwGuideOn);
+  }
+  updateHwGuideBtn();
+
+  hwGuideToggle.addEventListener("click", () => {
+    hwGuideOn = !hwGuideOn;
+    localStorage.setItem(HW_GUIDE_KEY, hwGuideOn ? "1" : "0");
+    updateHwGuideBtn();
+    hwClear();
+  });
+
+  hwClearBtn.addEventListener("click", () => hwClear());
+
+  hwRevealBtn.addEventListener("click", () => {
+    const q = session.queue[session.index];
+    hwAnswerWord.textContent = q.answer;
+    hwRevealArea.hidden = false;
+    hwRevealBtn.hidden = true;
+  });
+
+  hwCorrectBtn.addEventListener("click", () => {
+    const q = session.queue[session.index];
+    submitAnswer(q, "（手書き）できた", true);
+  });
+  hwWrongBtn.addEventListener("click", () => {
+    const q = session.queue[session.index];
+    submitAnswer(q, "（手書き）まちがえた", false);
+  });
+
+  function updateInputModeBtns() {
+    [...inputModeToggle.children].forEach((b) => {
+      b.classList.toggle("selected", b.dataset.inputMode === writeInputMode);
+    });
+  }
+
+  inputModeToggle.addEventListener("click", (e) => {
+    const btn = e.target.closest(".input-mode-btn");
+    if (!btn || !session) return;
+    writeInputMode = btn.dataset.inputMode;
+    localStorage.setItem(INPUT_MODE_KEY, writeInputMode);
+    updateInputModeBtns();
+    showWritingInput(session.queue[session.index]);
+  });
+
+  function showWritingInput(q) {
+    hwRevealArea.hidden = true;
+    hwRevealBtn.hidden = false;
+    if (writeInputMode === "write") {
+      answerForm.hidden = true;
+      handwriteArea.hidden = false;
+      hwClear();
+    } else {
+      answerForm.hidden = false;
+      handwriteArea.hidden = true;
+      answerInput.hidden = false;
+      choiceGrid.hidden = true;
+      choiceGrid.innerHTML = "";
+      setTimeout(() => answerInput.focus(), 50);
+    }
+  }
+
   let chosenChoice = null;
 
   function startSession(mode, count, level) {
@@ -491,6 +641,8 @@
     feedback.hidden = true;
     answerForm.hidden = false;
     answerInput.value = "";
+    inputModeToggle.hidden = true;
+    handwriteArea.hidden = true;
 
     if (isChoiceLike(q.type)) {
       answerInput.hidden = true;
@@ -498,6 +650,10 @@
       choiceGrid.innerHTML = q.choices
         .map((c) => `<button type="button" class="choice-btn" data-value="${c}">${formatAnswerValue(q.type, c)}</button>`)
         .join("");
+    } else if (q.type === "writing") {
+      inputModeToggle.hidden = false;
+      updateInputModeBtns();
+      showWritingInput(q);
     } else {
       answerInput.hidden = false;
       choiceGrid.hidden = true;
@@ -516,6 +672,32 @@
     chosenChoice = btn.dataset.value;
     [...choiceGrid.children].forEach((b) => b.classList.toggle("chosen", b === btn));
   });
+
+  function submitAnswer(q, userAnswer, isCorrect) {
+    recordAnswer(q._meta, isCorrect);
+
+    if (isCorrect) {
+      session.correct++;
+    } else {
+      session.wrong.push({ q, userAnswer });
+    }
+
+    inputModeToggle.hidden = true;
+    handwriteArea.hidden = true;
+    feedback.hidden = false;
+    submitBtn.disabled = true;
+
+    if (isCorrect) {
+      feedbackMark.textContent = "○ せいかい！";
+      feedbackMark.className = "feedback-mark correct";
+      feedbackText.innerHTML = "";
+    } else {
+      feedbackMark.textContent = "✕ ざんねん";
+      feedbackMark.className = "feedback-mark wrong";
+      const ansText = formatAnswerValue(q.type, q.answer);
+      feedbackText.innerHTML = `正しいこたえ: <b>${ansText}</b>`;
+    }
+  }
 
   answerForm.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -537,27 +719,7 @@
       isCorrect = normalize(userAnswer) === normalize(q.answer);
     }
 
-    recordAnswer(q._meta, isCorrect);
-
-    if (isCorrect) {
-      session.correct++;
-    } else {
-      session.wrong.push({ q, userAnswer });
-    }
-
-    feedback.hidden = false;
-    submitBtn.disabled = true;
-
-    if (isCorrect) {
-      feedbackMark.textContent = "○ せいかい！";
-      feedbackMark.className = "feedback-mark correct";
-      feedbackText.innerHTML = "";
-    } else {
-      feedbackMark.textContent = "✕ ざんねん";
-      feedbackMark.className = "feedback-mark wrong";
-      const ansText = formatAnswerValue(q.type, q.answer);
-      feedbackText.innerHTML = `正しいこたえ: <b>${ansText}</b>`;
-    }
+    submitAnswer(q, userAnswer, isCorrect);
   });
 
   nextBtn.addEventListener("click", () => {

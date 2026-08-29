@@ -118,6 +118,30 @@
       <div id="question-prompt" class="question-prompt"></div>
       <div id="question-display" class="question-display"></div>
 
+      <div id="input-mode-toggle" class="input-mode-toggle" hidden>
+        <button type="button" class="input-mode-btn" data-input-mode="write">✏️ 手書き</button>
+        <button type="button" class="input-mode-btn" data-input-mode="type">⌨️ 入力</button>
+      </div>
+
+      <div id="handwrite-area" class="handwrite-area" hidden>
+        <div class="handwrite-toolbar">
+          <button type="button" id="hw-guide-toggle" class="hw-tool-btn">お手本をうすく表示</button>
+          <button type="button" id="hw-clear-btn" class="hw-tool-btn">消す</button>
+        </div>
+        <div class="handwrite-canvas-wrap">
+          <canvas id="handwrite-canvas"></canvas>
+        </div>
+        <button type="button" id="hw-reveal-btn" class="primary-btn">こたえを見る</button>
+        <div id="hw-reveal-area" class="hw-reveal-area" hidden>
+          <div class="hw-reveal-label">正しいこたえ</div>
+          <div id="hw-answer-word" class="hw-answer-word"></div>
+          <div id="hw-selfcheck" class="hw-selfcheck">
+            <button type="button" id="hw-correct-btn" class="hw-check-btn hw-check-correct">○ できた</button>
+            <button type="button" id="hw-wrong-btn" class="hw-check-btn hw-check-wrong">✕ まちがえた</button>
+          </div>
+        </div>
+      </div>
+
       <form id="answer-form">
         <input id="answer-input" class="answer-input" type="text" autocomplete="off" autocapitalize="off" placeholder="ここに こたえを書く">
         <div id="choice-grid" class="choice-grid" hidden></div>

@@ -298,6 +298,105 @@ html, body {
 }
 .choice-btn.chosen { border-color: var(--accent); background: #e6f7f5; }
 
+/* 手書き入力 */
+.input-mode-toggle {
+  display: inline-flex;
+  gap: 6px;
+  background: #f0f2f6;
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+.input-mode-btn {
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-sub);
+  cursor: pointer;
+}
+.input-mode-btn.selected {
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(30, 41, 59, 0.12);
+}
+
+.handwrite-area { margin-bottom: 14px; }
+.handwrite-toolbar {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.hw-tool-btn {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  background: #fff;
+  color: var(--text-sub);
+  cursor: pointer;
+}
+.hw-tool-btn.active {
+  border-color: var(--accent);
+  color: #1c7a73;
+  background: #e6f7f5;
+}
+.handwrite-canvas-wrap {
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto 14px;
+  background: #fff;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+#handwrite-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+  background:
+    linear-gradient(#eef1f5 1px, transparent 1px) 0 50% / 100% 1px no-repeat,
+    linear-gradient(90deg, #eef1f5 1px, transparent 1px) 50% 0 / 1px 100% no-repeat;
+}
+.hw-reveal-area {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+.hw-reveal-label {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  margin-bottom: 4px;
+}
+.hw-answer-word {
+  font-size: 2.4rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+.hw-selfcheck {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.hw-check-btn {
+  padding: 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+}
+.hw-check-correct { border-color: var(--correct); color: var(--correct); }
+.hw-check-wrong { border-color: var(--wrong); color: var(--wrong); }
+
 .feedback {
   margin-top: 6px;
   padding-top: 10px;
