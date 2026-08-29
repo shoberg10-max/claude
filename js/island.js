@@ -4,8 +4,8 @@ const Island = (() => {
   const screenEl = UI.screenEl;
 
   const LEVELS = {
-    k9: { key: 'k9', label: '9級', grade: '1年生の漢字', total: 80 },
-    k8: { key: 'k8', label: '8級', grade: '2年生の漢字', total: 160 }
+    k9: { key: 'k9', label: '9級', grade: '2年生の漢字', total: KANJI_K9.length },
+    k8: { key: 'k8', label: '8級', grade: '3年生の漢字', total: KANJI_K8.length }
   };
   const TERRAIN = ['tree', 'blossom', 'palm', 'mountain', 'wave', 'house',
                    'sunflower', 'castle', 'cactus', 'shell', 'bluebell', 'star'];
@@ -333,7 +333,7 @@ const Island = (() => {
 
     if (idx >= list.length) { onDone(); return; }
     const entry = list[idx];
-    const readingHint = [...entry.kun, ...entry.on][0] || '';
+    const readingHint = `${entry.word}（${entry.reading}）`;
 
     const card = el('div', { className: 'quizCard' });
     card.appendChild(el('div', { className: 'quizInstruction', text: '書いてみよう！　なぞって れんしゅうしよう' }));
@@ -636,13 +636,12 @@ const Island = (() => {
     const grid = el('div', { className: 'kanjiListGrid' });
     dataset(level).forEach(entry => {
       const lv = Storage.getIslandKanjiLevel(level, entry.k);
-      const readings = [...entry.on.map(r => 'オ' + r), ...entry.kun.map(r => 'ク' + r)].join('　');
       grid.appendChild(el('div', { className: 'kanjiListItem' }, [
         el('div', { className: 'kanjiListChar' + (lv >= 3 ? ' mastered' : ''), text: entry.k }),
-        el('div', { className: 'kanjiListReading', text: readings })
+        el('div', { className: 'kanjiListReading', text: `${entry.word}（${entry.reading}）` })
       ]));
     });
-    screenEl.appendChild(el('div', { className: 'kanjiListLegend', text: 'オ＝音読み　ク＝訓読み　金色＝おぼえたかんじ' }));
+    screenEl.appendChild(el('div', { className: 'kanjiListLegend', text: '金色＝おぼえたかんじ' }));
     screenEl.appendChild(grid);
     screenEl.appendChild(el('button', { className: 'backBtn', text: '← しまマップへ', onClick: renderHome }));
     screenEl.appendChild(bottomNav('home'));

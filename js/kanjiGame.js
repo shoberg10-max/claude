@@ -1,4 +1,7 @@
-// ゆるもじ島のクイズ生成（KANJI1 / KANJI2 を使う）
+// ゆるもじ島のクイズ生成（KANJI_K9 / KANJI_K8 を使う）
+// 出題データは claude/kanji-kentei-8-app-d3s15h の data.js（GRADE2_DATA / KANJI_DATA）と
+// 同じ内容。1字ずつの音訓読みではなく、その字を使った熟語・ことば（word）と
+// その読み方（reading）の組で出題する。
 const KanjiGame = (() => {
 
   function randInt(min, max) {
@@ -15,7 +18,7 @@ const KanjiGame = (() => {
   }
 
   function datasetFor(level) {
-    return level === 'k8' ? KANJI2 : KANJI1;
+    return level === 'k8' ? KANJI_K8 : KANJI_K9;
   }
 
   // まだ覚えていない漢字を優先しつつランダムに選ぶ
@@ -43,23 +46,12 @@ const KanjiGame = (() => {
     return chosen;
   }
 
-  function allReadingsOf(entry) {
-    return [...entry.on, ...entry.kun];
-  }
-
-  function randomReadingFor(entry) {
-    const readings = entry.kun.length && Math.random() < 0.6 ? entry.kun : (entry.on.length ? entry.on : entry.kun);
-    return readings[randInt(0, readings.length - 1)];
-  }
-
+  // 読み方クイズ：ことば（熟語など）を見て、正しい読みを選ぶ
   function makeReadingQuestion(level, entry) {
     const dataset = datasetFor(level);
-    const correct = randomReadingFor(entry);
-    const ownReadings = new Set(allReadingsOf(entry));
     const distractorPool = dataset
-      .filter(e => e.k !== entry.k)
-      .flatMap(allReadingsOf)
-      .filter(r => r && !ownReadings.has(r));
+      .filter(e => e.k !== entry.k && e.reading !== entry.reading)
+      .map(e => e.reading);
     const distractors = new Set();
     let guard = 0;
     while (distractors.size < 3 && guard < 500) {
@@ -69,18 +61,17 @@ const KanjiGame = (() => {
     return {
       kanji: entry.k,
       mode: 'reading',
-      instruction: 'この かんじの よみかたは？',
-      prompt: entry.k,
-      choices: shuffle([correct, ...distractors]),
-      answer: correct
+      instruction: 'つぎの ことばの よみかたは？',
+      prompt: entry.word,
+      choices: shuffle([entry.reading, ...distractors]),
+      answer: entry.reading
     };
   }
 
+  // かんじさがしクイズ：読みを見て、正しいことば（漢字）を選ぶ
   function makeFindQuestion(level, entry) {
     const dataset = datasetFor(level);
-    const correct = entry.k;
-    const reading = randomReadingFor(entry);
-    const distractorPool = dataset.filter(e => e.k !== entry.k).map(e => e.k);
+    const distractorPool = dataset.filter(e => e.k !== entry.k).map(e => e.word);
     const distractors = new Set();
     let guard = 0;
     while (distractors.size < 3 && guard < 500) {
@@ -90,10 +81,10 @@ const KanjiGame = (() => {
     return {
       kanji: entry.k,
       mode: 'find',
-      instruction: 'この よみかたの かんじは？',
-      prompt: reading,
-      choices: shuffle([correct, ...distractors]),
-      answer: correct
+      instruction: 'つぎの よみかたの ことばは？',
+      prompt: entry.reading,
+      choices: shuffle([entry.word, ...distractors]),
+      answer: entry.word
     };
   }
 
