@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<title>漢字検定8級 練習アプリ</title>
+<title>漢字検定8級・9級 練習アプリ</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,9 +12,24 @@
   <!-- ホーム画面 -->
   <section id="screen-home" class="screen">
     <header class="app-header">
-      <h1>漢字検定8級<br>もんだいれんしゅう</h1>
-      <p class="sub">小学3年生修了程度の漢字で練習しよう</p>
+      <h1>漢字検定8級・9級<br>もんだいれんしゅう</h1>
+      <p class="sub">小学2・3年生修了程度の漢字で練習しよう</p>
     </header>
+
+    <div class="card">
+      <h2>きゅう(れべる)をえらぶ</h2>
+      <div class="level-grid" id="level-grid">
+        <button class="level-btn" data-level="9">
+          <span class="level-name">9級</span>
+          <span class="level-sub">小学2年生修了程度</span>
+        </button>
+        <button class="level-btn" data-level="8">
+          <span class="level-name">8級</span>
+          <span class="level-sub">小学3年生修了程度</span>
+        </button>
+      </div>
+      <p class="sub small">「部首なかま」は学年をまたいだ共通問題です。</p>
+    </div>
 
     <div class="card">
       <h2>もんだいの しゅるい</h2>
@@ -44,10 +59,15 @@
           <span class="mode-label">ことばのペア</span>
           <span class="mode-desc">対になることばを書く</span>
         </button>
+        <button class="mode-btn" data-mode="radical">
+          <span class="mode-icon">部</span>
+          <span class="mode-label">部首なかま</span>
+          <span class="mode-desc">同じ部首の漢字を選ぶ</span>
+        </button>
         <button class="mode-btn" data-mode="mix">
           <span class="mode-icon">総</span>
           <span class="mode-label">まとめて</span>
-          <span class="mode-desc">5しゅるいをランダムに</span>
+          <span class="mode-desc">6しゅるいをランダムに</span>
         </button>
       </div>
     </div>

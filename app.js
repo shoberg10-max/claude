@@ -1,8 +1,8 @@
-// 漢字検定8級 練習アプリ ロジック
+// 漢字検定 8級・9級 練習アプリ ロジック
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "kanken8_stats_v1";
+  const STORAGE_KEY = "kanken89_stats_v1";
 
   const MODE_LABEL = {
     reading: "読み方",
@@ -10,12 +10,20 @@
     strokes: "画数",
     choice: "漢字えらび",
     pair: "ことばのペア",
+    radical: "部首なかま",
+  };
+
+  // レベルごとのデータセット。「radical」は学年をまたぐ共通データなのでここには含めない。
+  const LEVELS = {
+    9: { label: "9級", sub: "小学2年生修了程度", kanjiData: GRADE2_DATA, choiceData: GRADE2_CHOICE_DATA, pairData: GRADE2_PAIR_DATA },
+    8: { label: "8級", sub: "小学3年生修了程度", kanjiData: KANJI_DATA, choiceData: CHOICE_DATA, pairData: PAIR_DATA },
   };
 
   /* ---------- 状態 ---------- */
-  let session = null; // { queue, index, correct, wrong: [], mode, count, isReview, metas? }
+  let session = null; // { queue, index, correct, wrong: [], mode, count, level, isReview, metas? }
   let selectedMode = "reading";
   let selectedCount = 20;
+  let selectedLevel = "8";
 
   /* ---------- ユーティリティ ---------- */
   function shuffle(arr) {
@@ -32,6 +40,24 @@
       .trim()
       .replace(/[\s　]+/g, "")
       .replace(/[。.！!？?]+$/g, "");
+  }
+
+  // 画数クイズの4択(正解1つ+誤り3つ、すべて1以上の重複なし整数)を作る。
+  function generateStrokeChoices(correct) {
+    const pool = [];
+    for (let off = -4; off <= 4; off++) {
+      if (off === 0) continue;
+      const v = correct + off;
+      if (v >= 1 && v !== correct) pool.push(v);
+    }
+    const wrong = shuffle(pool).slice(0, 3);
+    let extra = 1;
+    while (wrong.length < 3) {
+      const v = correct + extra;
+      if (v !== correct && !wrong.includes(v)) wrong.push(v);
+      extra++;
+    }
+    return [correct, ...wrong];
   }
 
   function loadStats() {
@@ -55,32 +81,54 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
   }
 
-  // KANJI_DATA由来(読み方/書き取り/画数)は漢字1字をキーにしてまとめる。
-  // 漢字えらび/ことばのペアは種類ごとに別キーにする。
+  // KANJI_DATA/GRADE2_DATA由来(読み方/書き取り/画数)は漢字1字をキーにしてまとめる。
+  // 学年で漢字がかぶることはないため、9級・8級を分けなくても衝突しない。
   function weakKeyFor(meta) {
     if (meta.qtype === "choice") return `choice:${meta.entry.correct}`;
     if (meta.qtype === "pair") return `pair:${meta.entry.a.kanji}|${meta.entry.b.kanji}`;
+    if (meta.qtype === "radical") return `radical:${meta.shown}`;
     return meta.entry.kanji;
   }
 
   function weakLabel(key) {
     if (key.startsWith("choice:")) return key.slice(7);
     if (key.startsWith("pair:")) return key.slice(5).replace("|", "⇔");
+    if (key.startsWith("radical:")) return key.slice(8);
     return key;
+  }
+
+  function findKanjiEntry(kanji) {
+    return GRADE2_DATA.find((e) => e.kanji === kanji) || KANJI_DATA.find((e) => e.kanji === kanji);
+  }
+  function findChoiceEntry(correctWord) {
+    return CHOICE_DATA.find((e) => e.correct === correctWord) || GRADE2_CHOICE_DATA.find((e) => e.correct === correctWord);
+  }
+  function findPairEntry(ak, bk) {
+    return (
+      PAIR_DATA.find((e) => e.a.kanji === ak && e.b.kanji === bk) ||
+      GRADE2_PAIR_DATA.find((e) => e.a.kanji === ak && e.b.kanji === bk)
+    );
+  }
+  function findRadicalGroup(kanji) {
+    return RADICAL_GROUPS.find((g) => g.kanji.includes(kanji));
   }
 
   function metaFromWeakKey(key) {
     if (key.startsWith("choice:")) {
-      const word = key.slice(7);
-      const entry = CHOICE_DATA.find((e) => e.correct === word);
+      const entry = findChoiceEntry(key.slice(7));
       return entry ? { qtype: "choice", entry } : null;
     }
     if (key.startsWith("pair:")) {
       const [ak, bk] = key.slice(5).split("|");
-      const entry = PAIR_DATA.find((e) => e.a.kanji === ak && e.b.kanji === bk);
+      const entry = findPairEntry(ak, bk);
       return entry ? { qtype: "pair", entry, direction: Math.random() < 0.5 ? "a2b" : "b2a" } : null;
     }
-    const entry = KANJI_DATA.find((e) => e.kanji === key);
+    if (key.startsWith("radical:")) {
+      const shown = key.slice(8);
+      const group = findRadicalGroup(shown);
+      return group ? { qtype: "radical", group, shown } : null;
+    }
+    const entry = findKanjiEntry(key);
     if (!entry) return null;
     const types = ["reading", "writing", "strokes"];
     return { qtype: types[Math.floor(Math.random() * types.length)], entry };
@@ -130,16 +178,7 @@
     }
     // strokes
     const correct = entry.strokes;
-    const offsets = shuffle([-3, -2, -1, 1, 2, 3, 4]).slice(0, 3);
-    const choiceSet = new Set([correct]);
-    for (const off of offsets) {
-      let v = correct + off;
-      if (v < 1) v = correct + Math.abs(off) + 1;
-      choiceSet.add(v);
-      if (choiceSet.size >= 4) break;
-    }
-    while (choiceSet.size < 4) choiceSet.add(correct + choiceSet.size + 1);
-    const choices = shuffle(Array.from(choiceSet)).slice(0, 4);
+    const choices = shuffle(generateStrokeChoices(correct));
     return {
       type,
       kanji: entry.kanji,
@@ -179,33 +218,69 @@
     };
   }
 
+  function buildRadicalQuestion(group, shownKanji) {
+    const shown = shownKanji || group.kanji[Math.floor(Math.random() * group.kanji.length)];
+    const sameGroupOthers = group.kanji.filter((k) => k !== shown);
+    const correct = sameGroupOthers[Math.floor(Math.random() * sameGroupOthers.length)];
+    const otherGroups = RADICAL_GROUPS.filter((g) => g !== group);
+    const wrongPool = shuffle(otherGroups.flatMap((g) => g.kanji));
+    const wrongChoices = [];
+    for (const k of wrongPool) {
+      if (wrongChoices.length >= 3) break;
+      if (!wrongChoices.includes(k)) wrongChoices.push(k);
+    }
+    const choices = shuffle([correct, ...wrongChoices]);
+    return {
+      type: "radical",
+      kanji: correct,
+      prompt: `次の「${shown}」と同じ部首（${group.radical}）のなかまの漢字はどれでしょう。`,
+      display: shown,
+      answer: correct,
+      choices,
+      _meta: { qtype: "radical", group, shown },
+    };
+  }
+
   function rebuildQuestion(meta) {
     if (!meta) return null;
     if (meta.qtype === "choice") return buildChoiceQuestion(meta.entry);
     if (meta.qtype === "pair") return buildPairQuestion(meta.entry, meta.direction);
+    if (meta.qtype === "radical") return buildRadicalQuestion(meta.group, meta.shown);
     return buildQuestion(meta.entry, meta.qtype);
   }
 
-  function buildQueue(mode, count) {
+  function allRadicalCandidates() {
+    const list = [];
+    RADICAL_GROUPS.forEach((group) => {
+      group.kanji.forEach((shown) => list.push(buildRadicalQuestion(group, shown)));
+    });
+    return list;
+  }
+
+  function buildQueue(mode, count, level) {
+    const L = LEVELS[level];
     let candidates;
     if (mode === "mix") {
       candidates = [];
-      KANJI_DATA.forEach((entry) => {
+      L.kanjiData.forEach((entry) => {
         candidates.push(buildQuestion(entry, "reading"));
         candidates.push(buildQuestion(entry, "writing"));
         candidates.push(buildQuestion(entry, "strokes"));
       });
-      CHOICE_DATA.forEach((entry) => candidates.push(buildChoiceQuestion(entry)));
-      PAIR_DATA.forEach((entry) => {
+      L.choiceData.forEach((entry) => candidates.push(buildChoiceQuestion(entry)));
+      L.pairData.forEach((entry) => {
         candidates.push(buildPairQuestion(entry, "a2b"));
         candidates.push(buildPairQuestion(entry, "b2a"));
       });
+      candidates.push(...allRadicalCandidates());
     } else if (mode === "choice") {
-      candidates = CHOICE_DATA.map((e) => buildChoiceQuestion(e));
+      candidates = L.choiceData.map((e) => buildChoiceQuestion(e));
     } else if (mode === "pair") {
-      candidates = PAIR_DATA.flatMap((e) => [buildPairQuestion(e, "a2b"), buildPairQuestion(e, "b2a")]);
+      candidates = L.pairData.flatMap((e) => [buildPairQuestion(e, "a2b"), buildPairQuestion(e, "b2a")]);
+    } else if (mode === "radical") {
+      candidates = allRadicalCandidates();
     } else {
-      candidates = KANJI_DATA.map((e) => buildQuestion(e, mode));
+      candidates = L.kanjiData.map((e) => buildQuestion(e, mode));
     }
     candidates = shuffle(candidates);
     const n = count === "all" ? candidates.length : Math.min(count, candidates.length);
@@ -227,8 +302,16 @@
   }
 
   /* ---------- ホーム画面 ---------- */
+  const levelGrid = document.getElementById("level-grid");
   const modeGrid = document.getElementById("mode-grid");
   const countGrid = document.getElementById("count-grid");
+
+  levelGrid.addEventListener("click", (e) => {
+    const btn = e.target.closest(".level-btn");
+    if (!btn) return;
+    selectedLevel = btn.dataset.level;
+    [...levelGrid.children].forEach((b) => b.classList.toggle("selected", b === btn));
+  });
 
   modeGrid.addEventListener("click", (e) => {
     const btn = e.target.closest(".mode-btn");
@@ -244,9 +327,10 @@
     [...countGrid.children].forEach((b) => b.classList.toggle("selected", b === btn));
   });
   modeGrid.querySelector('[data-mode="reading"]').classList.add("selected");
+  levelGrid.querySelector('[data-level="8"]').classList.add("selected");
 
   document.getElementById("start-btn").addEventListener("click", () => {
-    startSession(selectedMode, selectedCount);
+    startSession(selectedMode, selectedCount, selectedLevel);
   });
 
   document.getElementById("weak-review-btn").addEventListener("click", () => {
@@ -314,10 +398,10 @@
 
   let chosenChoice = null;
 
-  function startSession(mode, count) {
-    const queue = buildQueue(mode, count);
+  function startSession(mode, count, level) {
+    const queue = buildQueue(mode, count, level);
     if (queue.length === 0) return;
-    session = { queue, index: 0, correct: 0, wrong: [], mode, count, isReview: false };
+    session = { queue, index: 0, correct: 0, wrong: [], mode, count, level, isReview: false };
     showScreen("quiz");
     renderQuestion();
   }
@@ -325,13 +409,13 @@
   function startReviewFromMetas(metas) {
     const queue = shuffle(metas.map(rebuildQuestion).filter(Boolean));
     if (queue.length === 0) return;
-    session = { queue, index: 0, correct: 0, wrong: [], mode: "review", count: "all", isReview: true, metas };
+    session = { queue, index: 0, correct: 0, wrong: [], mode: "review", count: "all", level: null, isReview: true, metas };
     showScreen("quiz");
     renderQuestion();
   }
 
   function isChoiceLike(type) {
-    return type === "strokes" || type === "choice";
+    return type === "strokes" || type === "choice" || type === "radical";
   }
 
   function renderQuestion() {
@@ -492,7 +576,7 @@
     if (session.isReview) {
       startReviewFromMetas(session.metas);
     } else {
-      startSession(session.mode, session.count);
+      startSession(session.mode, session.count, session.level);
     }
   });
 

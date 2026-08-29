@@ -96,6 +96,30 @@ html, body {
 .mode-label { font-weight: 700; font-size: 0.95rem; }
 .mode-desc { font-size: 0.72rem; color: var(--text-sub); text-align: center; }
 
+.level-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.level-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  background: #fbfcfe;
+  cursor: pointer;
+}
+.level-btn.selected {
+  border-color: var(--accent);
+  background: #e6f7f5;
+}
+.level-name { font-weight: 700; font-size: 1.1rem; }
+.level-sub { font-size: 0.72rem; color: var(--text-sub); }
+
 .count-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
