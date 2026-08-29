@@ -452,8 +452,24 @@ main#screen {
 
 /* 待機モーション：静止画の描き込みより、この動きのほうが体感の差が大きい */
 .charSpriteInner {
-  transform-origin: 50px 84px;
+  transform-origin: 50% 90%;
   animation: charIdle 2.4s ease-in-out infinite;
+}
+
+/* ドット絵は座標系が16ドットなので移動量が別。
+   さらに補間を切って、昔のLCDのような2コマのパタパタ動作にする。 */
+.charSpritePixel .charSpriteInner { animation: charIdlePixel 1s steps(1, end) infinite; }
+@keyframes charIdlePixel {
+  0%, 50% { transform: translateY(0); }
+  50.01%, 100% { transform: translateY(-1px); }
+}
+.charSpritePixel.charSpritePop .charSpriteInner { animation: charPopPixel 0.6s steps(1, end); }
+@keyframes charPopPixel {
+  0%   { transform: translateY(0); }
+  25%  { transform: translateY(-2px); }
+  50%  { transform: translateY(-3px); }
+  75%  { transform: translateY(-1px); }
+  100% { transform: translateY(0); }
 }
 @keyframes charIdle {
   0%, 100% { transform: translateY(0) scale(1, 1); }

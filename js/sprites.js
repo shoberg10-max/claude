@@ -79,8 +79,6 @@ const Sprites = (() => {
     }
   };
 
-  function has(id) { return Object.prototype.hasOwnProperty.call(CHARS, id); }
-
   // かぶりものは今のところ絵文字を装着位置に載せる（アイテム絵の実装までのつなぎ）
   function hatLayer(char, hatEmoji) {
     if (!hatEmoji) return '';
@@ -104,5 +102,130 @@ const Sprites = (() => {
     </svg>`;
   }
 
-  return { render, has };
+  // =========================================================
+  // ドット絵スタイル（昔のたまごっち風）
+  // =========================================================
+  // 1マス＝1ドットのグリッドを文字で持ち、同じデータをパレット違いで描く。
+  //   K=輪郭  B=体の塗り  E=目  M=口  W=ハイライト  G=葉  P=ほっぺ  .=透明
+  // カラー版と1bit LCD版の違いはパレットだけで、グリッドは共通。
+  // 口はカラーでは濃い線、1bitでは「穴」にしたいので B/K とは別の記号にしている。
+  const PALETTES = {
+    color: { K: OUTLINE, B: CREAM, E: EYE, M: OUTLINE, W: '#FFFFFF', G: '#7CC15C', P: BLUSH },
+    // 1bit：体を1色で塗りつぶし、目と口はパネルを透かす穴にする
+    lcd: { K: '#2E3A22', B: '#2E3A22', E: null, M: null, W: null, G: '#2E3A22', P: '#2E3A22' }
+  };
+  const LCD_BG = '#A8BC84';
+
+  const PIXEL_CHARS = {
+    mojimaru: {
+      grid: [
+        '......GG....GG......',
+        '.....GGG.GG.GGG.....',
+        '.........GG.........',
+        '.......KKKKKK.......',
+        '.....KKBBBBBBKK.....',
+        '....KBBBBBBBBBBK....',
+        '...KBBBBBBBBBBBBK...',
+        '..KBBBBBBBBBBBBBBK..',
+        '..KBBBWEEBBWEEBBBK..',
+        '..KBBBEEEBBEEEBBBK..',
+        '..KBBBEEEBBEEEBBBK..',
+        '..KBPPBBBBBBBBPPBK..',
+        '...KBBBBBMMBBBBBK...',
+        '..KKKBBBBBBBBBBKKK..',
+        '.....KKBBBBBBKK.....',
+        '.......KKKKKK.......',
+        '.....KKK....KKK.....',
+        '.....KKK....KKK.....'
+      ],
+      // 表情は目（行8-10）と口（行12）の差し替えだけ
+      faces: {
+        normal: {},
+        // 閉じた目は横一直線だと寝顔に見えるので ^ ^ の形にする
+        happy: {
+          8: '..KBBBBEBBBBEBBBBK..',
+          9: '..KBBBEBEBBEBEBBBK..',
+          10: '..KBBBBBBBBBBBBBBK..',
+          12: '...KBBBBMMMMBBBBK...'
+        },
+        surprised: {
+          8: '..KBBEEEEBBEEEEBBK..',
+          9: '..KBBEEEEBBEEEEBBK..',
+          10: '..KBBEEEEBBEEEEBBK..'
+        },
+        sad: {
+          10: '..KBBBBBBBBBBBBBBK..',
+          12: '...KBBBBMBBMBBBBK...'
+        },
+        wink: {
+          8: '..KBBBBEBBBWEEBBBK..',
+          9: '..KBBBEBEBBEEEBBBK..',
+          10: '..KBBBBBBBBEEEBBBK..',
+          12: '...KBBBBMMMMBBBBK...'
+        }
+      },
+      hatAnchor: { x: 9.5, y: 3 }
+    }
+  };
+
+  function pixelGrid(char, faceName) {
+    const override = char.faces[faceName] || char.faces.normal;
+    return char.grid.map((row, y) => (override[y] !== undefined ? override[y] : row));
+  }
+
+  function renderPixel(id, opts = {}) {
+    const char = PIXEL_CHARS[id];
+    if (!char) return '';
+    const grid = pixelGrid(char, opts.face);
+    const pal = PALETTES[opts.palette] || PALETTES.color;
+    const w = grid[0].length;
+    const h = grid.length;
+    const pad = opts.lcd ? 2 : 0;
+    const size = opts.size || 96;
+
+    let out = '';
+    if (opts.lcd) {
+      out += `<rect x="${-pad}" y="${-pad}" width="${w + pad * 2}" height="${h + pad * 2}" rx="1.5" fill="${LCD_BG}"/>`;
+    }
+    // 横に連続する同色ドットは1つの rect にまとめる
+    for (let y = 0; y < h; y++) {
+      const row = grid[y];
+      let x = 0;
+      while (x < w) {
+        const ch = row[x];
+        let run = 1;
+        while (x + run < w && row[x + run] === ch) run++;
+        const color = pal[ch];
+        if (color) out += `<rect x="${x}" y="${y}" width="${run}" height="1" fill="${color}"/>`;
+        x += run;
+      }
+    }
+    if (opts.hat) {
+      const a = char.hatAnchor;
+      out += `<text x="${a.x}" y="${a.y}" font-size="7" text-anchor="middle" dominant-baseline="central">${opts.hat}</text>`;
+    }
+
+    const cls = 'charSprite charSpritePixel' + (opts.className ? ' ' + opts.className : '');
+    return `<svg class="${cls}" width="${size}" height="${size}"
+      viewBox="${-pad} ${-pad} ${w + pad * 2} ${h + pad * 2}"
+      shape-rendering="crispEdges" role="img" aria-label="${opts.label || ''}">
+      <g class="charSpriteInner">${out}</g>
+    </svg>`;
+  }
+
+  // 'vector' か 'pixel' を切りかえる。既存の呼び出し側は render() のまま。
+  let style = 'pixel';
+  function setStyle(s) { style = s; }
+
+  function renderAuto(id, opts = {}) {
+    return style === 'pixel' ? renderPixel(id, opts) : render(id, opts);
+  }
+
+  function has(id) {
+    return style === 'pixel'
+      ? Object.prototype.hasOwnProperty.call(PIXEL_CHARS, id)
+      : Object.prototype.hasOwnProperty.call(CHARS, id);
+  }
+
+  return { render: renderAuto, renderVector: render, renderPixel, setStyle, has };
 })();
