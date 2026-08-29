@@ -18,7 +18,9 @@ const KanjiGame = (() => {
   }
 
   function datasetFor(level) {
-    return level === 'k8' ? KANJI_K8 : KANJI_K9;
+    if (level === 'k8') return KANJI_K8;
+    if (level === 'k9') return KANJI_K9;
+    return KANJI_K10;
   }
 
   // まだ覚えていない漢字を優先しつつランダムに選ぶ

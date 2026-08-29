@@ -24,14 +24,14 @@ const Storage = (() => {
 
   function defaultIsland() {
     return {
-      level: 'k9',            // 'k9'=9級(1年) / 'k8'=8級(2年)
+      level: 'k10',            // 'k10'=10級(1年) / 'k9'=9級(2年) / 'k8'=8級(3年)
       coins: 0,
       tickets: 0,
       charXp: 0,
       streak: 0,
       restTickets: 1,
       lastPlayDate: null,
-      missionCount: { k9: 0, k8: 0 },
+      missionCount: { k10: 0, k9: 0, k8: 0 },
       kanjiState: {},          // `${level}:${kanji}` -> 0..3
       kanjiSeen: {},           // `${level}:${kanji}` -> 'YYYY-MM-DD'（最後に出題した日）
       companions: ['mojimaru'],

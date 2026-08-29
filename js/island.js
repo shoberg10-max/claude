@@ -4,6 +4,7 @@ const Island = (() => {
   const screenEl = UI.screenEl;
 
   const LEVELS = {
+    k10: { key: 'k10', label: '10級', grade: '1年生の漢字', total: KANJI_K10.length },
     k9: { key: 'k9', label: '9級', grade: '2年生の漢字', total: KANJI_K9.length },
     k8: { key: 'k8', label: '8級', grade: '3年生の漢字', total: KANJI_K8.length }
   };
@@ -13,7 +14,7 @@ const Island = (() => {
   function currentLevel() { return Storage.getIsland().level; }
   function dataset(level) { return KanjiGame.datasetFor(level); }
   function masteredCount(level) { return Storage.getIslandMasteredCount(level, dataset(level)); }
-  function totalMastered() { return masteredCount('k9') + masteredCount('k8'); }
+  function totalMastered() { return Object.keys(LEVELS).reduce((sum, lv) => sum + masteredCount(lv), 0); }
 
   function shuffle(arr) {
     const a = arr.slice();
