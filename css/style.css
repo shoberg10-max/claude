@@ -446,6 +446,36 @@ main#screen {
 .itemCell.itemOwned { opacity: 1; cursor: pointer; border-color: #dbeeff; }
 .itemCell.itemEquipped { border-color: var(--green-dark); background: #d3f9d8; }
 
+/* キャラクタースプライト */
+.charStage { display: flex; justify-content: center; }
+.charSprite { display: block; overflow: visible; }
+
+/* 待機モーション：静止画の描き込みより、この動きのほうが体感の差が大きい */
+.charSpriteInner {
+  transform-origin: 50px 84px;
+  animation: charIdle 2.4s ease-in-out infinite;
+}
+@keyframes charIdle {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50%      { transform: translateY(-4px) scale(0.985, 1.015); }
+}
+
+/* 正解・レベルアップ時のスカッシュ＆ストレッチ */
+.charSpritePop .charSpriteInner { animation: charPop 0.55s ease-out; }
+@keyframes charPop {
+  0%   { transform: translateY(0) scale(1, 1); }
+  25%  { transform: translateY(2px) scale(1.14, 0.86); }
+  55%  { transform: translateY(-10px) scale(0.92, 1.1); }
+  80%  { transform: translateY(0) scale(1.05, 0.95); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .charSpriteInner, .charSpritePop .charSpriteInner { animation: none; }
+}
+
+.feedbackRow { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+
 .charScreenTop { padding: 30px 20px; }
 .xpBar { background: #eee; border-radius: 999px; height: 14px; margin: 14px 0 6px; overflow: hidden; }
 .xpBarFill { background: linear-gradient(90deg, var(--green), var(--green-dark)); height: 100%; }

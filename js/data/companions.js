@@ -3,6 +3,7 @@ const COMPANIONS = [
   {
     id: 'mojimaru',
     emoji: '🌱',
+    sprite: 'mojimaru',
     name: 'もじまる',
     desc: '主人公。好奇心いっぱいのたんけん隊長。漢字が大好き！',
     always: true

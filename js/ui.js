@@ -18,7 +18,12 @@ const UI = (() => {
   }
 
   function setTitle(t) { titleEl.textContent = t; }
-  function clearScreen() { screenEl.innerHTML = ''; }
+  // 画面を切りかえたら先頭までスクロールを戻す
+  // （下部ナビから移動すると、前の画面のスクロール位置が残ってしまうため）
+  function clearScreen() {
+    screenEl.innerHTML = '';
+    window.scrollTo(0, 0);
+  }
   function append(node) { screenEl.appendChild(node); }
 
   function setStatBar(node) {

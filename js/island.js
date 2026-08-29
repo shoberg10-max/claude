@@ -23,6 +23,19 @@ const Island = (() => {
     return a;
   }
 
+  // SVGスプライトがあるキャラはそれを、なければ絵文字を表示する
+  function charFigure(companionId, opts = {}) {
+    if (Sprites.has(companionId)) {
+      return el('div', { className: 'charStage', html: Sprites.render(companionId, opts) });
+    }
+    return el('div', { className: 'bigCardEmoji', text: opts.fallback || '' });
+  }
+
+  function equippedHatEmoji() {
+    const item = TREASURE_ITEMS.find(i => i.id === Storage.getEquippedItem());
+    return item ? item.emoji : null;
+  }
+
   // ---------- 共通：ステータスバー ----------
   function renderStatBar() {
     const info = Storage.getCharLevelInfo();
@@ -138,7 +151,7 @@ const Island = (() => {
     const missionNo = Storage.getMissionCount(level) + 1;
 
     const card = el('div', { className: 'quizCard missionIntroCard' }, [
-      el('div', { className: 'bigCardEmoji', text: '🌱' }),
+      charFigure('mojimaru', { size: 120, face: 'happy', hat: equippedHatEmoji(), label: 'もじまる', fallback: '🌱' }),
       el('div', { className: 'questionText', text: `ミッション ${missionNo}` }),
       el('div', { className: 'heartsRow', text: '❤️❤️❤️' }),
       el('div', { className: 'quizInstruction', text: 'かんじを 8もん とこう！さいごに 書く れんしゅうもあるよ。' }),
@@ -181,10 +194,19 @@ const Island = (() => {
 
     function showFeedback(isCorrect, correctText) {
       feedback.innerHTML = '';
-      feedback.appendChild(el('div', {
-        className: isCorrect ? 'feedbackOk' : 'feedbackNg',
-        text: isCorrect ? '⭕ せいかい！ もじまる「やったね！」' : `✕ ざんねん… こたえは ${correctText}`
-      }));
+      feedback.appendChild(el('div', { className: 'feedbackRow' }, [
+        charFigure('mojimaru', {
+          size: 72,
+          face: isCorrect ? 'happy' : 'sad',
+          hat: equippedHatEmoji(),
+          className: isCorrect ? 'charSpritePop' : '',
+          label: 'もじまる'
+        }),
+        el('div', {
+          className: isCorrect ? 'feedbackOk' : 'feedbackNg',
+          text: isCorrect ? '⭕ せいかい！ もじまる「やったね！」' : `✕ ざんねん… こたえは ${correctText}`
+        })
+      ]));
       const nextBtn = el('button', { className: 'nextBtn', text: index + 1 >= questions.length ? 'つぎへ →' : 'つぎへ →' });
       nextBtn.addEventListener('click', () => goNext(isCorrect));
       feedback.appendChild(nextBtn);
@@ -365,7 +387,7 @@ const Island = (() => {
     renderStatBar();
     UI.clearScreen();
     screenEl.appendChild(el('div', { className: 'resultCard' }, [
-      el('div', { className: 'bigCardEmoji', text: stage.emoji }),
+      charFigure('mojimaru', { size: 140, face: 'surprised', hat: equippedHatEmoji(), className: 'charSpritePop', label: 'もじまる', fallback: stage.emoji }),
       el('div', { className: 'resultScore', text: `もじまるが Lv.${level} に なった！` }),
       el('div', { className: 'resultScore', text: stage.title }),
       el('button', { className: 'primaryBtn', text: 'つぎへ →', onClick: next })
@@ -460,7 +482,7 @@ const Island = (() => {
     const xpPct = Math.round((info.xpIntoLevel / info.xpForNext) * 100);
 
     screenEl.appendChild(el('div', { className: 'quizCard charScreenTop' }, [
-      el('div', { className: 'bigCardEmoji', text: (equippedItem ? equippedItem.emoji + ' ' : '') + stage.emoji }),
+      charFigure('mojimaru', { size: 160, face: 'happy', hat: equippedItem ? equippedItem.emoji : null, label: 'もじまる', fallback: (equippedItem ? equippedItem.emoji + ' ' : '') + stage.emoji }),
       el('div', { className: 'questionText', text: `もじまる Lv.${info.level}` }),
       el('div', { className: 'quizInstruction', text: stage.title }),
       el('div', { className: 'xpBar' }, [el('div', { className: 'xpBarFill', attrs: { style: `width:${xpPct}%` } })]),
@@ -473,7 +495,9 @@ const Island = (() => {
     COMPANIONS.forEach(c => {
       const unlocked = c.always || unlockedIds.includes(c.id);
       companionGrid.appendChild(el('div', { className: 'companionCard' + (unlocked ? '' : ' companionLocked') }, [
-        el('div', { className: 'bigCardEmoji', text: unlocked ? c.emoji : '🔒' }),
+        unlocked && c.sprite
+          ? charFigure(c.sprite, { size: 84, face: 'normal', label: c.name })
+          : el('div', { className: 'bigCardEmoji', text: unlocked ? c.emoji : '🔒' }),
         el('div', { className: 'menuCardTitle', text: unlocked ? c.name : '？？？' }),
         el('div', { className: 'menuCardScore', text: unlocked ? c.desc : c.hint })
       ]));
